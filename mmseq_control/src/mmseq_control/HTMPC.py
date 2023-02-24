@@ -115,8 +115,8 @@ class HTMPC(MPC):
         self.x_bar = xbar_opt.copy()
         self.u_bar = ubar_opt.copy()
         acc_cmd = self.u_bar[0]
-        self.v_cmd = self.v_cmd + acc_cmd * self.sim_dt
-        return self.v_cmd, acc_cmd
+        self.v_cmd = self.v_cmd + acc_cmd * self.dt
+        return v + acc_cmd * self.dt, acc_cmd
 
     def solveHTMPC(self, xo, xbar, ubar, cost_fcns, hier_csts, r_bars):
         """ HTMPC solver
@@ -158,7 +158,7 @@ class HTMPC(MPC):
                         csts_params["ineq"].append([r_bars[prev_task_id][0].T, e_bars[prev_task_id]])
 
                 t0 = time.perf_counter()
-                xbar_lopt, ubar_lopt, status = self.solveSTMPC(xo, xbar_l.copy(), ubar_l.copy(), cost_fcn, r_bars[task_id], csts, csts_params, i, task_id)
+                xbar_lopt, ubar_lopt, status = self.solveSTMPCCasadi(xo, xbar_l.copy(), ubar_l.copy(), cost_fcn, r_bars[task_id], csts, csts_params, i, task_id)
                 t1 = time.perf_counter()
                 # print("STMPC Time: {}".format(t1 - t0))
                 self.stmpc_run_time[i, task_id] = t1 - t0
@@ -258,6 +258,109 @@ class HTMPC(MPC):
             else:
                 results['status_val'] = -10
                 results['x'] = np.zeros(g.size)
+
+            dzopt = np.array(results['x']).squeeze()
+            dubar = dzopt[self.nx * (self.N + 1):]
+            linesearch_step_opt = 1.
+            # t0 = time.perf_counter()
+            if results['status'] == 'optimal':
+                linesearch_step_opt, J_opt = self.lineSearch(xo, ubar_i, dubar, cost_fcn, cost_fcn_params, csts, csts_params)
+            else:
+                linesearch_step_opt = 0
+
+            ubar_opt_i = ubar_i + linesearch_step_opt*dubar.reshape((self.N, self.nu))
+            xbar_opt_i = self._predictTrajectories(xo, ubar_opt_i)
+            xbar_i, ubar_i = xbar_opt_i.copy(), ubar_opt_i.copy()
+
+
+            self.cost_iter[ht_iter, task_id, i+1] = self._eval_cost_functions(cost_fcn, xbar_i, ubar_i, cost_fcn_params)
+            self.step_size[ht_iter, task_id, i] = linesearch_step_opt
+            self.solver_status[ht_iter, task_id, i] = results['status_val']
+            # t1 = time.perf_counter()
+            # print("Line Search time:{}".format(t1 - t0))
+
+        return xbar_i, ubar_i, results['status']
+
+    def solveSTMPCCasadi(self, xo, xbar, ubar, cost_fcn, cost_fcn_params, csts, csts_params, ht_iter=0, task_id=0):
+        """
+
+        :param xo:
+        :param xbar:
+        :param ubar:
+        :param cost_fcn: a list of cost functions to be added together
+        :param cost_fcn_params: a list of params to be passed to each cost function
+        :param csts: a dictionary, equality and inequality constraint list
+        :param csts_params: parameters for each constraint
+        :param ht_iter: current HT-MPC Solver iteration
+        :param task_id: current st task id
+        :return: xbar_opt, ubar_opt
+        """
+        xbar_i = xbar.copy()
+        ubar_i = ubar.copy()
+        self.cost_iter[ht_iter, task_id, 0] = self._eval_cost_functions(cost_fcn, xbar_i, ubar_i, cost_fcn_params)
+
+        for i in range(self.params["ST_MaxIntvl"]):
+            # tp0 = time.perf_counter()
+            # t0 = time.perf_counter()
+            # Cost Function
+            H = cs.DM.zeros((self.QPsize, self.QPsize))
+            H += cs.DM.eye(self.QPsize) * 1e-6
+            g = cs.DM.zeros(self.QPsize)
+            for id, f in enumerate(cost_fcn):
+                Hi, gi = f.quad(xbar_i, ubar_i, cost_fcn_params[id])
+                H += Hi
+                g += gi
+            # t1 = time.perf_counter()
+            # print("Cost Function Prep Time:{}".format(t1 - t0))
+
+            # Equality Constraints
+            # t0 = time.perf_counter()
+
+            A = cs.DM.zeros((0, self.QPsize))
+            b = cs.DM.zeros(0)
+
+            for id, cst in enumerate(csts["eq"]):
+                Ai, bi = cst.linearize(xbar_i, ubar_i, *csts_params["eq"][id])
+                A = cs.vertcat(A, Ai)
+                b = cs.vertcat(b, bi)
+            # t1 = time.perf_counter()
+            # print("Eq Constraint Prep Time:{}".format(t1 - t0))
+
+            # Inequality Constraints (without state bound)
+            # t0 = time.perf_counter()
+            C = cs.DM.zeros((0, self.QPsize))
+            d = cs.DM.zeros(0)
+            for id, cst in enumerate(csts["ineq"][1:]):
+                Ci, di = cst.linearize(xbar_i, ubar_i, *csts_params["ineq"][id+1])
+                C = cs.vertcat(C, Ci)
+                d = cs.vertcat(d, di)
+
+            # C_scaled, d_scaled = self.scaleConstraints(C.toarray(), d.toarray().flatten())
+
+            # State Bound
+            _, bx = self.xuCst.linearize(xbar_i, ubar_i)
+
+            Ac = cs.vertcat(A, C)
+            uba = cs.vertcat(-b, -d)
+            lba = cs.vertcat(-b, -cs.DM.inf(d.shape[0]))
+
+            qp = {}
+            qp['h'] = H.sparsity()
+            qp['a'] = Ac.sparsity()
+            opts= {"error_on_fail": False}
+            S = cs.conic('S', 'gurobi', qp, opts)
+
+            # H = H.toarray()
+            # H = np.where(H < 1e-8, 0, H)
+
+            t0 = time.perf_counter()
+            results = S(h=H, g=g, a=Ac, uba=uba, lba=lba, lbx=bx[self.QPsize:], ubx=-bx[:self.QPsize], x0=cs.DM.zeros(self.QPsize))
+
+            t1 = time.perf_counter()
+            print("QP time:{}".format(t1 - t0))
+
+            results['status_val'] = 1
+            results['status'] = 'optimal'
 
             dzopt = np.array(results['x']).squeeze()
             dubar = dzopt[self.nx * (self.N + 1):]
