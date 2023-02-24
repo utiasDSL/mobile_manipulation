@@ -22,6 +22,7 @@ catkin_install_python(PROGRAMS
    scripts/experiments_simple_demo.py
    scripts/simple_sim.py
    nodes/sim_ros.py
+   nodes/controller_ros.py
    DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
  )
 
