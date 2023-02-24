@@ -195,9 +195,9 @@ class HTMPC(MPC):
             # tp0 = time.perf_counter()
             # t0 = time.perf_counter()
             # Cost Function
-            H = np.zeros((self.QPsize, self.QPsize))
-            H += np.eye(self.QPsize) * 1e-6
-            g = np.zeros(self.QPsize)
+            H = cs.DM.zeros((self.QPsize, self.QPsize))
+            H += cs.DM.eye(self.QPsize) * 1e-6
+            g = cs.DM.zeros(self.QPsize)
             for id, f in enumerate(cost_fcn):
                 Hi, gi = f.quad(xbar_i, ubar_i, cost_fcn_params[id])
                 H += Hi
@@ -208,44 +208,44 @@ class HTMPC(MPC):
             # Equality Constraints
             # t0 = time.perf_counter()
 
-            A = np.zeros((0, self.QPsize))
-            b = np.zeros(0)
+            A = cs.DM.zeros((0, self.QPsize))
+            b = cs.DM.zeros(0)
 
             for id, cst in enumerate(csts["eq"]):
                 Ai, bi = cst.linearize(xbar_i, ubar_i, *csts_params["eq"][id])
-                A = np.vstack((A, Ai))
-                b = np.hstack((b, bi))
+                A = cs.vertcat(A, Ai)
+                b = cs.vertcat(b, bi)
             # t1 = time.perf_counter()
             # print("Eq Constraint Prep Time:{}".format(t1 - t0))
 
             # Inequality Constraints
             # t0 = time.perf_counter()
-            C = np.zeros((0, self.QPsize))
-            d = np.zeros(0)
+            C = cs.DM.zeros((0, self.QPsize))
+            d = cs.DM.zeros(0)
             for id, cst in enumerate(csts["ineq"]):
                 Ci, di = cst.linearize(xbar_i, ubar_i, *csts_params["ineq"][id])
-                C = np.vstack((C, Ci))
-                d = np.hstack((d, di))
+                C = cs.vertcat(C, Ci)
+                d = cs.vertcat(d, di)
 
-            C_scaled, d_scaled = self.scaleConstraints(C, d)
+            C_scaled, d_scaled = self.scaleConstraints(C.toarray(), d.toarray().flatten())
             # t1 = time.perf_counter()
             # print("InEq Constraint Prep Time:{}".format(t1 - t0))
 
             # tp1 = time.perf_counter()
             # print("QP Prep Time:{}".format(tp1 - tp0))
             # Solve QP
-            P = matrix(H)
-            q = matrix(g)
+            P = matrix(H.toarray())
+            q = matrix(g.toarray())
             G = matrix(C_scaled)
             h = matrix(-d_scaled)
-            A = matrix(A)
-            b = matrix(-b)
+            A = matrix(A.toarray())
+            b = matrix(-b.toarray())
             solvers.options['mosek'] = {iparam.log: 0, iparam.max_num_warnings: 0}
                                         # dparam.intpnt_qo_tol_pfeas: 1e-5,
                                         # dparam.intpnt_qo_tol_dfeas: 1e-5,
                                         # dparam.intpnt_qo_tol_rel_gap: 1e-5,
                                         # dparam.intpnt_qo_tol_infeas: 1e-5}
-            initval = {'x': matrix(np.zeros(g.size))}
+            initval = {'x': matrix(np.zeros(self.QPsize))}
             # t0 = time.perf_counter()
             results = solvers.qp(P, q, G, h, A, b, initvals=initval, solver='mosek')
             # t1 = time.perf_counter()

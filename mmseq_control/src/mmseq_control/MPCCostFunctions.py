@@ -89,7 +89,7 @@ class LinearLeastSquare(CostFunctions):
         H = self.hess_fcn(z_bar, r_bar)
         g = self.grad_fcn(z_bar, r_bar)
 
-        return H.toarray(), g.toarray().flatten()
+        return H, g
 
 
 class TrackingCostFunction(CostFunctions):
@@ -153,7 +153,7 @@ class TrackingCostFunction(CostFunctions):
         z_bar = np.hstack((x_bar.flatten(), u_bar.flatten()))
         H = self.hess_approx_fcn(z_bar, r_bar.T)
         g = self.grad_fcn(z_bar, r_bar.T)
-        return H.toarray(), g.toarray().flatten()
+        return H, g
 
 
 class EEPos3CostFunction(TrackingCostFunction):

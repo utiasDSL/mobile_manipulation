@@ -82,7 +82,7 @@ class MotionConstraint(Constraint):
         A = self.grad_fcn(z_bar, *params)
         b = self.h_fcn(x_bar.T, u_bar.T, *params)
 
-        return A.toarray(), b.toarray().flatten()
+        return A, b
 
     def check(self, x_bar, u_bar, *params):
         h = self.h_fcn(x_bar.T, u_bar.T, *params)
@@ -124,7 +124,7 @@ class NonlinearConstraint(Constraint):
         C = self.grad_fcn(z_bar, *params)
         d = self.g_fcn(x_bar.T, u_bar.T, *params)
 
-        return C.toarray(), d.toarray().flatten()
+        return C, d
 
     def check(self, x_bar, u_bar, *params):
         g = self.g_fcn(x_bar.T, u_bar.T, *params)
