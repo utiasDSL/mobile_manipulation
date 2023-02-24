@@ -21,7 +21,7 @@ catkin_install_python(PROGRAMS
    scripts/experiments.py
    scripts/experiments_simple_demo.py
    scripts/simple_sim.py
-   scripts/sim_ros.py
+   nodes/sim_ros.py
    DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
  )
 
