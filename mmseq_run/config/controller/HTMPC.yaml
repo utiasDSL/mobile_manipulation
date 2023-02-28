@@ -19,10 +19,10 @@ controller:
     Effort:
       Qqa: 0.
       Qqb: 0.
-      Qva: 1.e-4
-      Qvb: 2.e-4
-      Qua: 1.e-3
-      Qub: 1.e-3
+      Qva: 0.01
+      Qvb: 0.1
+      Qua: 0.1
+      Qub: 1.
 
   # robot parameters
   robot:

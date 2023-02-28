@@ -96,19 +96,16 @@ class HTMPC(MPC):
 
         for id, planner in enumerate(planners):
             r_bar = [planner.getTrackingPoint(t+k*self.dt, (self.x_bar[k, :self.DoF], self.x_bar[k, self.DoF:]))[0] for k in range(self.N+1)]
-            r_bars.append([np.array(r_bar)])
+            r_bars.append([np.array(r_bar), np.zeros(self.CtrlEffCost.nr)])
             if planner.cost_type == "EEPos3":
-                cost_fcns.append([self.EEPos3Cost])
+                cost_fcns.append([self.EEPos3Cost, self.CtrlEffCost])
             elif planner.cost_type == "BasePos2":
-                cost_fcns.append([self.BasePos2Cost])
+                cost_fcns.append([self.BasePos2Cost, self.CtrlEffCost])
             else:
                 self.py_logger.warning("unknown cost type, planner # %d", id)
 
             if id < num_plans - 1:
                 hier_csts.append(HierarchicalTrackingConstraint(cost_fcns[-1][0], planner.type))
-            else:
-                r_bars[-1].append(np.zeros(self.CtrlEffCost.nr))
-                cost_fcns[-1].append(self.CtrlEffCost)
 
 
         xbar_opt, ubar_opt = self.solveHTMPC(xo, self.x_bar.copy(), self.u_bar.copy(), cost_fcns, hier_csts, r_bars)
@@ -141,7 +138,7 @@ class HTMPC(MPC):
         self.step_size = np.zeros((self.params["HT_MaxIntvl"], task_num, self.params["ST_MaxIntvl"]))
         self.solver_status = np.zeros_like(self.step_size)
 
-        self.tol_schedule = np.linspace(0.1, 0.01, self.params["HT_MaxIntvl"])
+        self.tol_schedule = np.linspace(0.01, 0.01, self.params["HT_MaxIntvl"])
 
         for i in range(self.params["HT_MaxIntvl"]):
             e_bars = []
@@ -336,7 +333,7 @@ class HTMPC(MPC):
                 C = cs.vertcat(C, Ci)
                 d = cs.vertcat(d, di)
 
-            C_scaled, d_scaled = self.scaleConstraints(C.toarray(), d.toarray().flatten())
+            C_scaled, d_scaled = self.scaleConstraintsNew(C.toarray(), d.toarray().flatten())
 
             # State Bound
             _, bx = self.xuCst.linearize(xbar_i, ubar_i)
@@ -358,7 +355,7 @@ class HTMPC(MPC):
 
             t0 = time.perf_counter()
             try:
-                results = S(h=H, g=g, a=Ac, uba=uba, lba=lba, lbx=bx[self.QPsize:], ubx=-bx[:self.QPsize], x0=cs.DM.zeros(self.QPsize))
+                results = S(h=H, g=g, a=Ac, uba=uba, lba=lba, lbx=bx[self.QPsize:], ubx=-bx[:self.QPsize])
                 results['status_val'] = 1
                 results['status'] = 'optimal'
             except RuntimeError:
@@ -406,7 +403,17 @@ class HTMPC(MPC):
         smallval_idx = np.where(np.logical_and(h < 1e-2, h > -1e-2))
         h[smallval_idx] = 0.
 
-        smallval_G_idx = np.where(G<1e-10)
+        # smallval_G_idx = np.where(np.abs(G) < 1e-10)
+        # G[smallval_G_idx] = 0.
+
+        return G.copy(), h.copy()
+
+    def scaleConstraintsNew(self, G, h):
+        smallval_idx = np.where(np.abs(h) < 1e-6)
+        h[smallval_idx] = 0.
+
+
+        smallval_G_idx = np.where(np.abs(G) < 1e-10)
         G[smallval_G_idx] = 0.
 
         return G.copy(), h.copy()
@@ -438,7 +445,7 @@ class HTMPC(MPC):
             xbar_new = self._predictTrajectories(xo, ubar_new)
 
             J_new = 0
-            for fid, f in enumerate(cost_fcn):
+            for fid, f in enumerate(cost_fcn[:-1]):
                 J_new += f.evaluate(xbar_new, ubar_new, cost_fcn_params[fid])
 
             if a == 0:
