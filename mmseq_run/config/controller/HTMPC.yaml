@@ -8,6 +8,9 @@ controller:
   HT_MaxIntvl: 3
   ST_MaxIntvl: 3
 
+  beta: 0.5
+  alpha: 0.05
+
   # weights for each cost function
   cost_params:
     EEPos3:

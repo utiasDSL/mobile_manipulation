@@ -263,6 +263,8 @@ class HTMPC(MPC):
             # t0 = time.perf_counter()
             if results['status'] == 'optimal':
                 linesearch_step_opt, J_opt = self.lineSearch(xo, ubar_i, dubar, cost_fcn, cost_fcn_params, csts, csts_params)
+                # linesearch_step_opt, J_opt = self.lineSearchNew(xo, ubar_i, dubar, cost_fcn, cost_fcn_params, csts, csts_params, dzopt)
+
             else:
                 linesearch_step_opt = 0
 
@@ -375,7 +377,8 @@ class HTMPC(MPC):
             linesearch_step_opt = 1.
             t0 = time.perf_counter()
             if results['status'] == 'optimal':
-                linesearch_step_opt, J_opt = self.lineSearch(xo, ubar_i, dubar, cost_fcn, cost_fcn_params, csts, csts_params)
+                # linesearch_step_opt, J_opt = self.lineSearch(xo, ubar_i, dubar, cost_fcn, cost_fcn_params, csts, csts_params)
+                linesearch_step_opt, _ = self.lineSearchNew(xo, ubar_i, dubar, cost_fcn, cost_fcn_params, csts, csts_params, dzopt)
 
                 ubar_opt_i = ubar_i + linesearch_step_opt*dubar.reshape((self.N, self.nu))
                 xbar_opt_i = self._predictTrajectories(xo, ubar_opt_i)
@@ -434,6 +437,52 @@ class HTMPC(MPC):
             feas = False
 
         return feas
+
+    def lineSearchNew(self, xo, ubar, dubar, cost_fcn, cost_fcn_params, csts, csts_params, dzopt):
+        # scale factor starts at 1
+        t = 1
+
+        beta = self.params["beta"]      # backtracking coefficient
+        alpha = self.params["alpha"]    # discount in decrement
+        MAX_ITER = 10
+
+        dubar_rp = dubar.reshape((self.N, self.nu))
+        xbar = self._predictTrajectories(xo, ubar)
+        for k in range(MAX_ITER):
+            ubar_new = ubar + t * dubar_rp
+            xbar_new = self._predictTrajectories(xo, ubar_new)
+
+            feas = True
+            for cst_id, cst in enumerate(csts["ineq"]):
+                feas_i = cst.check(xbar_new, ubar_new, *csts_params["ineq"][cst_id])
+                if not feas_i:
+                    feas = False
+                    self.py_logger.debug("Controller: line search step not feasible.")
+                    break
+
+            if feas:
+                J_xp = 0
+                J_xp_lin = 0
+                for fid, f in enumerate(cost_fcn[:-1]):
+                    J_xp += f.evaluate(xbar_new, ubar_new, cost_fcn_params[fid])
+                    _, g = f.quad(xbar, ubar, cost_fcn_params[fid])
+                    J_xp_lin += f.evaluate(xbar, ubar, cost_fcn_params[fid]) + alpha * g.T @ dzopt
+                if J_xp < J_xp_lin:
+                    return t, J_xp
+                else:
+                    self.py_logger.debug("Controller: line search step acceptance condition not met.")
+
+            t = t * beta
+
+        J = 0
+        for fid, f in enumerate(cost_fcn):
+            J += f.evaluate(xbar, ubar, cost_fcn_params[fid])
+        return 0, J
+
+
+
+
+
 
     def lineSearch(self, xo, ubar, dubar, cost_fcn, cost_fcn_params, csts, csts_params):
         alphas = np.linspace(0, 1, 10)
