@@ -30,7 +30,7 @@ class MPC():
         self.BasePos2Cost = BasePos2CostFunction(self.dt, self.N, self.robot, config["cost_params"]["BasePos2"])
         self.CtrlEffCost = ControlEffortCostFunciton(self.dt, self.N, self.robot, config["cost_params"]["Effort"])
 
-        self.sim_dt = self.params["sim_dt"]
+        self.rate = self.params["rate"]
 
         self.x_bar = np.zeros((self.N + 1, self.nx))  # current best guess x0,...,xN
         self.u_bar = np.zeros((self.N, self.nu))  # current best guess u0,...,uN-1
@@ -114,7 +114,7 @@ class HTMPC(MPC):
         self.u_bar = ubar_opt.copy()
         acc_cmd = self.u_bar[0]
         self.v_cmd = self.v_cmd + acc_cmd * self.dt
-        return v + acc_cmd * self.dt, acc_cmd
+        return self.v_cmd, acc_cmd
 
     def solveHTMPC(self, xo, xbar, ubar, cost_fcns, hier_csts, r_bars):
         """ HTMPC solver
