@@ -103,7 +103,7 @@ def main():
         time.sleep(sim.timestep)
 
     timestamp = datetime.datetime.now()
-    logger.save(timestamp, "data")
+    logger.save(timestamp, "sim")
     # plotter = DataPlotter.from_logger(logger)
     # plotter.plot_cmd_vs_real_vel()
     # plotter.plot_ee_position()
