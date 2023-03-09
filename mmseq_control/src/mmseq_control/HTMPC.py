@@ -96,13 +96,22 @@ class HTMPC(MPC):
 
         for id, planner in enumerate(planners):
             r_bar = [planner.getTrackingPoint(t+k*self.dt, (self.x_bar[k, :self.DoF], self.x_bar[k, self.DoF:]))[0] for k in range(self.N+1)]
-            r_bars.append([np.array(r_bar), np.zeros(self.CtrlEffCost.nr)])
+            # r_bars.append([np.array(r_bar), np.zeros(self.CtrlEffCost.nr)])
+            r_bars.append([np.array(r_bar)])
             if planner.cost_type == "EEPos3":
-                cost_fcns.append([self.EEPos3Cost, self.CtrlEffCost])
+                # cost_fcns.append([self.EEPos3Cost, self.CtrlEffCost])
+                cost_fcns.append([self.EEPos3Cost])
+
             elif planner.cost_type == "BasePos2":
-                cost_fcns.append([self.BasePos2Cost, self.CtrlEffCost])
+                # cost_fcns.append([self.BasePos2Cost, self.CtrlEffCost])
+                cost_fcns.append([self.BasePos2Cost])
+
             else:
                 self.py_logger.warning("unknown cost type, planner # %d", id)
+
+            if id == num_plans - 1:
+                cost_fcns[-1].append(self.CtrlEffCost)
+                r_bars[-1].append(np.zeros(self.CtrlEffCost.nr))
 
             if id < num_plans - 1:
                 hier_csts.append(HierarchicalTrackingConstraint(cost_fcns[-1][0], planner.type))
@@ -349,7 +358,7 @@ class HTMPC(MPC):
             qp = {}
             qp['h'] = H.sparsity()
             qp['a'] = Ac.sparsity()
-            opts= {"error_on_fail": True, "gurobi": {"OutputFlag": 1, "Presolve": 1, "BarConvTol": 1e-8, "OptimalityTol": 1e-6}}
+            opts= {"error_on_fail": True, "gurobi": {"OutputFlag": 0, "LogToConsole": 0, "Presolve": 1, "BarConvTol": 1e-8, "OptimalityTol": 1e-6}}
             S = cs.conic('S', 'gurobi', qp, opts)
 
             # H = H.toarray()
