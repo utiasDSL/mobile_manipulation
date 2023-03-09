@@ -31,7 +31,7 @@ class SoTBase(ABC):
         pass
 
     @abstractmethod
-    def update(self, t, robot):
+    def update(self, t, states):
         pass
 
 class SoTStatic(SoTBase):
@@ -44,10 +44,9 @@ class SoTStatic(SoTBase):
         end_id = min(self.curr_task_id + num_planners, self.planner_num)
         return self.planners[self.curr_task_id:end_id]
 
-    def update(self, t, robot):
-        Pee, _ = robot.link_pose()
-        Pb, _ = robot.link_pose(-1)
-        Pb = Pb[:2]
+    def update(self, t, states):
+        Pee = states["EE"][0]
+        Pb = states["base"][:2]
         # check if current task is finished
         planner = self.planners[self.curr_task_id]
         finished = False
@@ -58,7 +57,7 @@ class SoTStatic(SoTBase):
 
         # current task is finished move on to next task, unless it's the last task in the stack
         if finished:
-            if self.curr_task_id != self.planner_num - 1:
+            if self.curr_task_id != self.planner_num - 2:
                 self.curr_task_id = min(self.planner_num-1, self.curr_task_id + 1)
                 self.logger.info("SoT finished %d/%d tasks.", self.curr_task_id, self.planner_num)
             else:
@@ -79,10 +78,9 @@ class SoTCycle(SoTBase):
 
         return [self.planners[i] for i in indices]
 
-    def update(self, t, robot):
-        Pee, _ = robot.link_pose()
-        Pb, _ = robot.link_pose(-1)
-        Pb = Pb[:2]
+    def update(self, t, states):
+        Pee = states["EE"][0]
+        Pb = states["base"][:2]
         # check if current task is finished
         planner = self.planners[self.curr_task_id]
         finished = False

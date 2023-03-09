@@ -12,7 +12,7 @@ import rospy
 from mmseq_simulator import simulation
 from mmseq_utils import parsing
 from mmseq_utils.logging import DataLogger, DataPlotter
-from mobile_manipulation_central.simulation_ros_interface import SimulatedMobileManipulatorROSInterface
+from mobile_manipulation_central.simulation_ros_interface import SimulatedMobileManipulatorROSInterface, SimulatedViconObjectInterface
 
 def main():
     np.set_printoptions(precision=3, suppress=True)
@@ -63,6 +63,8 @@ def main():
     rospy.init_node("sim_ros")
     ros_interface = SimulatedMobileManipulatorROSInterface()
     ros_interface.publish_time(t)
+
+    vicon_tool_interface = SimulatedViconObjectInterface("tool")
     while not ros_interface.ready():
         q, v = robot.joint_states()
         ros_interface.publish_feedback(t, q, v)
@@ -82,8 +84,10 @@ def main():
 
         cmd_vel_world = robot.command_velocity(ros_interface.cmd_vel, bodyframe=True)
         t, _ = sim.step(t, step_robot=False)
-        ee_curr_pos, _ = robot.link_pose()
+        ee_curr_pos, ee_curr_orn = robot.link_pose()
         base_curr_pos, _ = robot.link_pose(-1)
+        vicon_tool_interface.publish_pose(t, ee_curr_pos, ee_curr_orn)
+
 
         # log
         r_ew_w, Q_we = robot.link_pose()

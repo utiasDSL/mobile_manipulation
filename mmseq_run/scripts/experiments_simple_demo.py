@@ -143,7 +143,8 @@ def main():
         plt.show(block=False)
         plt.pause(0.01)
 
-        sot.update(t, robot)
+        states = {"EE": robot.link_pose(), "base": robot_states[0][:3]}
+        sot.update(t, states)
 
         # update ghost object in sim
         for pid in range(sot.planner_num):

@@ -14,7 +14,7 @@ from mmseq_simulator import simulation
 from mmseq_plan.TaskManager import SoTStatic
 from mmseq_utils import parsing
 from mmseq_utils.logging import DataLogger, DataPlotter
-from mobile_manipulation_central.ros_interface import MobileManipulatorROSInterface
+from mobile_manipulation_central.ros_interface import MobileManipulatorROSInterface, ViconObjectInterface
 
 class ControllerROSNode:
 
@@ -50,7 +50,6 @@ class ControllerROSNode:
             self.controller = HTMPCLex(ctrl_config)
 
         self.sot = SoTStatic(planner_config)
-        self.planners = self.sot.getPlanners(num_planners=2)
         self.ctrl_rate = ctrl_config["rate"]
 
         # set py logger level
@@ -78,6 +77,7 @@ class ControllerROSNode:
 
         # ROS Related
         self.robot_interface = MobileManipulatorROSInterface()
+        self.vicon_tool_interface = ViconObjectInterface("tool")
         rospy.on_shutdown(self.shutdownhook)
         self.ctrl_c = False
         self.run()
@@ -91,7 +91,7 @@ class ControllerROSNode:
         rate = rospy.Rate(self.ctrl_rate)
 
 
-        while not self.robot_interface.ready():
+        while not self.robot_interface.ready() or not self.vicon_tool_interface.ready():
             self.robot_interface.brake()
             rate.sleep()
 
@@ -114,8 +114,9 @@ class ControllerROSNode:
             # print("Msg Oldness Base: {}s, Arm: {}s".format(t - robot_interface.base.last_msg_time, t - robot_interface.arm.last_msg_time))
             # print("q: {}, v:{}, u: {}, acc:{}".format(robot_states[0][0], robot_states[1][0], u[0], acc))
             # tc1 = time.perf_counter()
+            planners = self.sot.getPlanners(num_planners=2)
             tc1_ros = rospy.Time.now().to_sec()
-            u, acc = self.controller.control(t-t0, robot_states, self.planners)
+            u, acc = self.controller.control(t-t0, robot_states, planners)
             tc2_ros = rospy.Time.now().to_sec()
             # print("Controller Time (ROS): {}s ".format(tc2_ros - tc1_ros))
             # tc2 = time.perf_counter()
@@ -123,13 +124,16 @@ class ControllerROSNode:
 
             self.robot_interface.publish_cmd_vel(u)
 
+            # Update Task Manager
+            states = {"base": robot_states[0][:3], "EE": (self.vicon_tool_interface.position, self.vicon_tool_interface.orientation)}
+            self.sot.update(t, states)
             # log
             self.logger.append("ts", t)
             self.log_mpc_info(self.logger, self.controller)
             self.logger.append("controller_run_time", tc2_ros - tc1_ros)
             r_ew_wd = []
             r_bw_wd = []
-            for planner in self.planners:
+            for planner in planners:
                 if planner.type == "EE":
                     r_ew_wd, _ = planner.getTrackingPoint(t, robot_states)
                 elif planner.type == "base":
