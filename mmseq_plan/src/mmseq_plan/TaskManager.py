@@ -12,6 +12,8 @@ from mmseq_utils import parsing
 
 class SoTBase(ABC):
     def __init__(self, config):
+        self.config = config
+
         self.planners = []
         for task_entry in config["tasks"]:
             if task_entry["name"][:2] == "EE":
@@ -128,7 +130,23 @@ class SoTCycle(SoTBase):
         planner_name_new = [self.planners[2*i + 1].name for i in range(self.planner_num//2)]
         self.logger.info("Curr Task: {} New Task Seq: {}".format(self.curr_task_id, planner_name_new))
 
+class SoTTimed(SoTBase):
+    def __init__(self, config):
+        self.curr_base_task_id = 1
+        super().__init__(config)
 
+        self.task_switching_time = self.config["task_switching_time"]
+        assert(len(self.task_switching_time)+2 == len(self.planners))
+
+    def getPlanners(self, num_planners=2):
+        return [self.planners[0], self.planners[self.curr_base_task_id]]
+
+    def update(self, t, states):
+        if self.curr_base_task_id < self.planner_num - 1 and t > self.task_switching_time[self.curr_base_task_id-1]:
+            self.curr_base_task_id += 1
+            self.curr_base_task_id = min(self.curr_base_task_id, self.planner_num - 1)
+
+            self.logger.info("SoT on base task %d.", self.curr_base_task_id)
 
 if __name__ == "__main__":
     config_path = "$PROJECTMM3D_HOME/experiments/config/sim/simulation.yaml"
