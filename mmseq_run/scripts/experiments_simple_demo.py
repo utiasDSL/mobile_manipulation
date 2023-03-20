@@ -11,6 +11,7 @@ import matplotlib.pyplot as plt
 from pyb_utils.ghost import GhostSphere, GhostCylinder
 
 from mmseq_control.HTMPC import HTMPC, HTMPCLex
+from mmseq_control.IDKC import IKCPrioritized
 from mmseq_simulator import simulation
 from mmseq_plan.TaskManager import SoTCycle
 from mmseq_utils import parsing
@@ -75,7 +76,8 @@ def main():
         controller = HTMPC(ctrl_config)
     elif ctrl_config["type"] == "lex":
         controller = HTMPCLex(ctrl_config)
-
+    elif ctrl_config["type"] == "TP-IDKC":
+        controller = IKCPrioritized(ctrl_config)
     sot = SoTCycle(planner_config)
 
     # set py logger level
@@ -178,6 +180,12 @@ def main():
 
         logger.append("r_bw_w_ds", r_bw_wd)
         logger.append("r_bw_ws", robot_states[0][:2])
+
+        if ctrl_config["type"] == "SQP" or ctrl_config["type"] == "SQP_TOL_SCHEDULE":
+            logger.append("mpc_solver_statuss", controller.solver_status)
+            logger.append("mpc_cost_iters", controller.cost_iter)
+            logger.append("mpc_cost_finals", controller.cost_final)
+            logger.append("mpc_step_sizes", controller.step_size)
 
         time.sleep(sim.timestep)
 
