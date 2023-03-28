@@ -177,7 +177,7 @@ class EEPos3CostFunction(TrackingCostFunction):
         nx = ss_mdl["nx"]
         nu = ss_mdl["nu"]
         nr = 3
-        fk_ee = robot_mdl.kinSymMdls["thing_tool"]
+        fk_ee = robot_mdl.kinSymMdls[robot_mdl.tool_link_name]
         f_fcn = cs.Function("fee", [robot_mdl.x_sym], [fk_ee(robot_mdl.q_sym)[0]])
         cost_params = {}
         cost_params["Qk"] = np.eye(nr) * params["Qk"]

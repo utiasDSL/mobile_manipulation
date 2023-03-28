@@ -3,6 +3,10 @@ simulation:
   duration: 25.
   gravity: [0, 0, -9.81]
 
+  robot:
+    # home: [0, 0, 0, 0.5pi, -0.75pi, -0.5pi, -0.25pi, -0.5pi, 0.5pi]  # upright
+    home: [ 0., -0, 0., 0.5pi, -0.25pi, 0.5pi, -0.25pi, 0.5pi, 0.417pi ]  # standard
+
   pybullet_connection: "DIRECT"  # "Direct" or "GUI"
 
   static_obstacles:
@@ -48,19 +52,19 @@ simulation:
 planner:
   sot_type: "SoTStatic"
   tasks:
-#    - name: "Base Pos 1"
-#      planner_type: "BaseSingleWaypoint"
-#      target_pos: [2.0, 0.]
-#      tracking_err_tol: 0.25
+    - name: "Base Pos 1"
+      planner_type: "BaseSingleWaypoint"
+      target_pos: [2.0, 0.]
+      tracking_err_tol: 0.25
 #    - name: "EE Pos 1"
 #      planner_type: "EESimplePlanner"
 #      target_pos: [2.0, 1., 1.]
 #      hold_period: 3.
 #      tracking_err_tol: 0.02
-    - name: "Base Pos 2"
-      planner_type: "BaseSingleWaypoint"
-      target_pos: [4., 0.]
-      tracking_err_tol: 0.3
+#    - name: "Base Pos 2"
+#      planner_type: "BaseSingleWaypoint"
+#      target_pos: [4., 0.]
+#      tracking_err_tol: 0.3
 #    - name: "EE Pos 2"
 #      planner_type: "EESimplePlanner"
 #      target_pos: [4., 1., 1.]
@@ -80,7 +84,7 @@ controller:
   type: "SQP_TOL_SCHEDULE"
   HT_MaxIntvl: 1
   ST_MaxIntvl: 1
-  rate: 30 #hz
+  rate: 50 #hz
   slack: False
   soft_cst: True
   xu_soft:

@@ -18,7 +18,8 @@ class MobileManipulator3D:
         """ Casadi simbolic model of Mobile Manipulator
 
         """
-        urdf_path = parsing.parse_ros_path(config["robot"]["urdf"])
+        urdf_path = parsing.parse_and_compile_urdf(config["robot"]["urdf"])
+        # urdf_path = parsing.parse_ros_path(config["robot"]["urdf"])
         urdf = open(urdf_path, 'r').read()
         self.kindyn = cas_kin_dyn.CasadiKinDyn(urdf)  # construct main class
 
@@ -176,7 +177,6 @@ def main():
     config = parsing.load_config(args.config)
     sim_config = config["simulation"]
     ctrl_config = config["controller"]
-
     # Create Sym Mdl
     robot = MobileManipulator3D(ctrl_config)
 
