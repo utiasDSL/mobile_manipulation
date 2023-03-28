@@ -83,7 +83,6 @@ def main():
         ros_interface.publish_time(t)
 
         cmd_vel_world = robot.command_velocity(ros_interface.cmd_vel, bodyframe=True)
-        t, _ = sim.step(t, step_robot=False)
         ee_curr_pos, ee_curr_orn = robot.link_pose()
         base_curr_pos, _ = robot.link_pose(-1)
         vicon_tool_interface.publish_pose(t, ee_curr_pos, ee_curr_orn)
@@ -102,7 +101,7 @@ def main():
 
         logger.append("r_bw_ws", q[:2])
 
-
+        t, _ = sim.step(t, step_robot=False)
         time.sleep(sim.timestep)
 
     timestamp = datetime.datetime.now()
