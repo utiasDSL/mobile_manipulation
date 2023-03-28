@@ -11,7 +11,8 @@
   <node pkg="mmseq_run" type="sim_ros.py" name="sim_ros" output="screen" required="true" args="--config $(arg config) --GUI" />
 
   <!-- Controller -->
-  <node pkg="mmseq_run" type="controller_ros_simple_demo.py" name="controller" output="screen" required="true" args="--config $(arg config)" />
+<!--  <node pkg="mmseq_run" type="controller_ros_simple_demo.py" name="controller" output="screen" required="true" args="&#45;&#45;config $(arg config)" />-->
+  <node pkg="mmseq_run" type="controller_ros.py" name="controller" output="screen" required="true" args="--config $(arg config)" />
 
 
 </launch>

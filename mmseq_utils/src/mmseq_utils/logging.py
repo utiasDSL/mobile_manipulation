@@ -65,6 +65,8 @@ class DataLogger:
         data_path = dir_path / "data.npz"
         config_path = dir_path / "config.yaml"
 
+        self.data["dir_path"] = str(dir_path)
+
         # save the recorded data
         np.savez_compressed(data_path, **self.data)
 
@@ -234,7 +236,36 @@ class DataPlotter:
 
         return axes
 
+    def plot_cmds(self, axes=None, legend=None):
+        ts = self.data["ts"]
+        cmd_vels = self.data["cmd_vels"]
+        nq = int(self.data["nq"])
+        nv = int(self.data["nv"])
 
+        if axes is None:
+            axes = []
+            f, axes = plt.subplots(nv, 1, sharex=True)
+        if legend is None:
+            legend = self.data["name"]
+
+        prop_cycle = plt.rcParams["axes.prop_cycle"]
+        colors = prop_cycle.by_key()["color"]
+
+        for i in range(nv):
+            axes[i].plot(
+                ts,
+                cmd_vels[:, i],
+                label=legend + f"$v_{{cmd_{i + 1}}}$",
+                linestyle="--",
+                color=colors[i],
+            )
+
+            axes[i].grid()
+            axes[i].legend()
+        axes[-1].set_xlabel("Time (s)")
+        axes[0].set_title("Commanded joint velocity (rad/s)")
+
+        return axes
 
     def plot_cmd_vs_real_vel(self, axes=None):
         ts = self.data["ts"]
@@ -305,7 +336,7 @@ class DataPlotter:
         plt.grid()
         plt.xlabel("Time (s)")
         plt.ylabel(ylabel)
-        plt.legend()
+        plt.legend(loc="upper right")
         plt.title(title)
 
         ax = plt.gca()
@@ -456,7 +487,7 @@ class DataPlotter:
         xlables = [str(t) for t in t_sim]
         for l in range(task_num):
             axes[l].plot(status[:, :, l, :].flatten(), "x-", label=legend + " solver status", linewidth=2, markersize=8)
-            # axes[l].plot(step_size[:, :, l, :].flatten(), "x-", label=legend + " step size", linewidth=2, markersize=8)
+            axes[l].plot(step_size[:, :, l, :].flatten(), "x-", label=legend + " step size", linewidth=2, markersize=8)
             axes[l].set_title("Task" + str(l))
             axes[l].set_xticks(xticks)
             axes[l].set_xticklabels(xlables)
@@ -469,6 +500,7 @@ class DataPlotter:
         plt.show()
 
     def plot_all(self):
+        self.data["name"] = ""
         self.plot_ee_position()
         self.plot_base_position()
         self.plot_tracking_err()
@@ -480,7 +512,8 @@ class DataPlotter:
         # self.plot_run_time()
 
         figs = [plt.figure(n) for n in plt.get_fignums()]
-        multipage("data.pdf", figs)
+        print(self.data["dir_path"])
+        multipage(Path(str(self.data["dir_path"])) / "data.pdf", figs)
 
     def plot_mpc(self):
         self.plot_cost_htmpc()
@@ -490,5 +523,11 @@ class DataPlotter:
     def plot_robot(self):
         self.plot_cmd_vs_real_vel()
         self.plot_state()
+
+    def plot_tracking(self):
+        self.plot_ee_position()
+        self.plot_base_position()
+        self.plot_tracking_err()
+        self.plot_cmd_vs_real_vel()
 
 

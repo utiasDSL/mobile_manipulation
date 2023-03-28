@@ -11,6 +11,10 @@ def plot_tracking(plotters):
     plotters["sim"].plot_ee_position(ee_axes)
     plotters["sim"].plot_base_position(base_axes)
 
+def plot_cmd_vel(plotters):
+    axes = plotters["control"].plot_cmds(legend="controller_")
+    plotters["sim"].plot_cmds(axes=axes, legend="sim_")
+
 def construct_logger(path_to_folder):
     data = {}
     for filename in os.listdir(path_to_folder):
@@ -39,5 +43,6 @@ if __name__ == "__main__":
         plot_tracking(data_plotter_dict)
     if args.robot:
         data_plotter_dict["sim"].plot_robot()
+        # plot_cmd_vel(data_plotter_dict)
 
     plt.show()
