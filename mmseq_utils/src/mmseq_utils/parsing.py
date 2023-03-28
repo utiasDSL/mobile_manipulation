@@ -1,13 +1,12 @@
 """Utilities for parsing general configuration dictionaries."""
-from collections import deque
 from pathlib import Path
-import tempfile
 
 import rospkg
 import numpy
 import numpy as np
 import yaml
 import os
+import xacro
 import IPython
 
 
@@ -130,6 +129,62 @@ def xacro_include(path):
     <xacro:include filename="{path}" />
     """
 
+def parse_and_compile_urdf(d, max_runs=10, compare_existing=True):
+    """Parse and compile a URDF from a xacro'd URDF file."""
+
+    s = """
+    <?xml version="1.0" ?>
+    <robot name="robot" xmlns:xacro="http://www.ros.org/wiki/xacro">
+    """.strip()
+    for incl in d["includes"]:
+        s += xacro_include(incl)
+    s += "</robot>"
+
+    doc = xacro.parse(s)
+    s1 = doc.toxml()
+
+    # xacro args
+    mappings = d["args"] if "args" in d else {}
+
+    # keep processing until a fixed point is reached
+    run = 1
+    while run < max_runs:
+        xacro.process_doc(doc, mappings=mappings)
+        s2 = doc.toxml()
+        if s1 == s2:
+            break
+        s1 = s2
+        run += 1
+
+    if run == max_runs:
+        raise ValueError("URDF file did not converge.")
+
+    # write the final document to a file for later consumption
+    output_path = parse_ros_path(d, as_string=False)
+
+    # make sure path exists
+    if not output_path.parent.exists():
+        output_path.parent.mkdir()
+
+    text = doc.toprettyxml(indent="  ")
+
+    # if the full path already exists, we can check if the contents are the
+    # same to avoid writing it if it hasn't changed. This avoids some race
+    # conditions if the file is being compiled by multiple processes
+    # concurrently.
+    if output_path.exists() and compare_existing:
+        with open(output_path) as f:
+            text_current = f.read()
+        if text_current == text:
+            print("URDF files are the same - not writing.")
+            return output_path.as_posix()
+        else:
+            print("URDF files are not the same - writing.")
+
+    with open(output_path, "w") as f:
+        f.write(text)
+
+    return output_path.as_posix()
 
 def parse_support_offset(d):
     """Parse the x-y offset of an object relative to its support plane.
