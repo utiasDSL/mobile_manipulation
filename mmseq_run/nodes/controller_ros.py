@@ -77,7 +77,9 @@ class ControllerROSNode:
 
         # ROS Related
         self.robot_interface = MobileManipulatorROSInterface()
-        self.vicon_tool_interface = ViconObjectInterface("tool")
+        self.vicon_tool_interface = ViconObjectInterface("ThingWoodTray")
+        # self.vicon_tool_interface = ViconObjectInterface("tool")
+
         rospy.on_shutdown(self.shutdownhook)
         self.ctrl_c = False
         self.run()
@@ -103,7 +105,11 @@ class ControllerROSNode:
         self.planner_coord_transform(self.robot_interface.q, self.planner_config)
         self.sot = SoTStatic(self.planner_config)
 
+        print("robot coord: {}".format(self.robot_interface.q))
+        for planner in self.sot.planners:
+            print("planner target:{}".format(planner.getTrackingPoint(0)))
 
+        input("Press Enter to continue...")
         t = rospy.Time.now().to_sec()
         t0 = t
 
