@@ -1,40 +1,20 @@
 planner:
   sot_type: "SoTStatic"
   tasks:
-#    - name: "Base Pos 1"
-#      planner_type: "BaseSingleWaypoint"
-#      target_pos: [2.0, 0.]
-#      tracking_err_tol: 0.25
-    - name: "EE Pos 1"
-      planner_type: "EESimplePlanner"
-      target_pos: [1.5, -0.5, 1.]
-      hold_period: 3.
-      tracking_err_tol: 0.02
+    - name: "Base Pos 1"
+      planner_type: "BaseSingleWaypoint"
+      target_pos: [2.0, 0.]
+      tracking_err_tol: 0.25
+#    - name: "EE Pos 1"
+#      planner_type: "EESimplePlanner"
+#      target_pos: [1.5, -0.5, 1.]
+#      hold_period: 3.
+#      tracking_err_tol: 0.02
 
 controller:
-  type: "SQP_TOL_SCHEDULE"
-  HT_MaxIntvl: 1
-  ST_MaxIntvl: 1
-  rate: 50 #hz
-  slack: False
-  soft_cst: True
-  xu_soft:
-    mu: 0.00001
-    zeta: 0.00008
-  cost_params:
-    EEPos3:
-      Qk: 2.
-      P: 10.
-    BasePos2:
-      Qk: 2.
-      P: 10.
-    Effort:
-      Qqa: 0.
-      Qqb: 0.
-      Qva: 0.005
-      Qvb: 0.005
-      Qua: 0.003
-      Qub: 0.05
+  mpc_rate: 10 #hz
+
+
 
 include:
   - package: "mmseq_run"

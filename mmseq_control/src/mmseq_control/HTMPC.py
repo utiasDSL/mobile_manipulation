@@ -30,7 +30,7 @@ class MPC():
         self.BasePos2Cost = BasePos2CostFunction(self.dt, self.N, self.robot, config["cost_params"]["BasePos2"])
         self.CtrlEffCost = ControlEffortCostFunciton(self.dt, self.N, self.robot, config["cost_params"]["Effort"])
 
-        self.rate = self.params["rate"]
+        self.rate = self.params["mpc_rate"]
 
         self.x_bar = np.zeros((self.N + 1, self.nx))  # current best guess x0,...,xN
         self.u_bar = np.zeros((self.N, self.nu))  # current best guess u0,...,uN-1
@@ -129,14 +129,15 @@ class HTMPC(MPC):
         self.x_bar = xbar_opt.copy()
         self.u_bar = ubar_opt.copy()
         acc_cmd = self.u_bar[0]
-        self.v_cmd = self.v_cmd + acc_cmd / self.rate
-        if not self.params["soft_cst"]:
-            clamp_rate = 0.99
-            self.v_cmd = np.where(self.v_cmd < self.robot.ub_x[self.robot.DoF:] * clamp_rate, self.v_cmd,
-                                  self.robot.ub_x[self.robot.DoF:] * clamp_rate)
-            self.v_cmd = np.where(self.v_cmd > self.robot.lb_x[self.robot.DoF:] * clamp_rate, self.v_cmd,
-                                  self.robot.lb_x[self.robot.DoF:] * clamp_rate)
-        return self.v_cmd, acc_cmd
+        self.v_cmd = self.x_bar[0][self.robot.DoF:]
+        # self.v_cmd = self.v_cmd + acc_cmd / self.rate
+        # if not self.params["soft_cst"]:
+        #     clamp_rate = 0.99
+        #     self.v_cmd = np.where(self.v_cmd < self.robot.ub_x[self.robot.DoF:] * clamp_rate, self.v_cmd,
+        #                           self.robot.ub_x[self.robot.DoF:] * clamp_rate)
+        #     self.v_cmd = np.where(self.v_cmd > self.robot.lb_x[self.robot.DoF:] * clamp_rate, self.v_cmd,
+        #                           self.robot.lb_x[self.robot.DoF:] * clamp_rate)
+        return self.v_cmd, acc_cmd, self.u_bar.copy()
 
     def solveHTMPC(self, xo, xbar, ubar, cost_fcns, hier_csts, r_bars):
         """ HTMPC solver

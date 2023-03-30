@@ -1,6 +1,6 @@
 controller:
   # HT-MPC Solver Type, lex vs SQP
-  type: "SQP"
+  type: "SQP_TOL_SCHEDULE"
 
   # MPC params
   dt: 0.1
@@ -8,23 +8,32 @@ controller:
   HT_MaxIntvl: 1
   ST_MaxIntvl: 1
 
-  beta: 0.5
-  alpha: 0.05
+  mpc_rate: 10 #hz
+  cmd_vel_pub_rate: 100 # hz
+  slack: False
+  soft_cst: True
+
+  # soft constraints parameters
+  xu_soft:
+      mu: 0.00001
+      zeta: 0.00008
 
   # weights for each cost function
   cost_params:
     EEPos3:
-      Qk: 5.
-      P: 100.
+      Qk: 2.
+      P: 10.
     BasePos2:
-      Qk: 5.
-      P: 100.
+      Qk: 2.
+      P: 10.
     Effort:
       Qqa: 0.
       Qqb: 0.
-      Qva: 0.01
-      Qvb: 0.01
-      Qua: 0.01
-      Qub: 0.2
+      Qva: 0.005
+      Qvb: 0.005
+      Qua: 0.003
+      Qub: 0.05
 
-
+  # line search parameters
+  beta: 0.5
+  alpha: 0.05
