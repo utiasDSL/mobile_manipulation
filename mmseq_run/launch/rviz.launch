@@ -1,0 +1,9 @@
+<?xml version="1.0"?>
+<!-- Launches the Rviz to visualize. -->
+
+<launch>
+
+  <!-- Rviz -->
+  <node name="rviz" pkg="rviz" type="rviz" args="-d $(find mmseq_run)/rviz/mm_basic.rviz" required="true"/>
+
+</launch>

@@ -5,14 +5,16 @@
   <arg name="config"/>
 
   <!-- use simulation time -->
-  <param name="/use_sim_time" value="true" type="bool"/>
-
-  <!-- Simulation -->
-  <node pkg="mmseq_run" type="sim_ros.py" name="sim_ros" output="screen" required="true" args="--config $(arg config) --GUI" />
+  <param name="/use_sim_time" value="False" type="bool"/>
 
   <!-- Controller -->
-<!--  <node pkg="mmseq_run" type="controller_ros_simple_demo.py" name="controller" output="screen" required="true" args="&#45;&#45;config $(arg config)" />-->
-  <node pkg="mmseq_run" type="mpc_ros.py" name="controller" output="screen" required="true" args="--config $(arg config)" />
+  <node pkg="mmseq_run" type="mpc_ros.py" name="controller" output="screen" required="true" args="--config $(arg config)"/>
 
+  <!-- TF -->
+  <include file="$(find mobile_manipulation_central)/launch/thing_description.launch">
+    <arg name="visual_params" value="$(find ur_description)/config/ur10/visual_parameters.yaml" />
+  </include>
+<!--  <node pkg="robot_state_publisher" type="robot_state_publisher" name="ur10_state_publisher" ns="ur10"/>-->
+  <node name="ridgeback_state_publisher" pkg="mobile_manipulation_central" type="ridgeback_state_publisher_node.py"/>
 
 </launch>

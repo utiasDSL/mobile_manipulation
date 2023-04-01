@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<robot name="end_effector_fingers">
+<robot name="end_effector_fingers" xmlns:xacro="http://wiki.ros.org/xacro">
 <!--  <joint name="tool0_tcp_fixed_joint" type="fixed">-->
 <!--    <origin rpy="0.0 0.0 3.14159" xyz="0.0 0.0 0.290"/>-->
 <!--    <parent link="ur10_arm_tool0"/>-->
@@ -13,7 +13,11 @@
   <!-- s = 0.2 -->
   <!-- h = 0.0577 -->
   <!-- r = 0.1155 -->
-
+   <joint name="gripped_object_joint" type="fixed">
+     <xacro:transformed_origin name="gripped_object_transform" />
+     <parent link="gripper"/>
+     <child link="gripped_object"/>
+   </joint>
   <!-- Custom tool for tray balancing -->
   <!-- When oriented forward, the frame has: z forward, x down, y left -->
   <!-- When oriented up (i.e. for balancing): z up, x forward, y left -->

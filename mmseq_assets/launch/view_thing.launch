@@ -1,0 +1,11 @@
+<?xml version="1.0"?>
+<launch>
+
+  <include file="$(find mobile_manipulation_central)/launch/thing_description.launch"/>
+
+  <node name="joint_state_publisher_gui" pkg="joint_state_publisher_gui" type="joint_state_publisher_gui" />
+  <node pkg="robot_state_publisher" type="robot_state_publisher" name="rob_st_pub_arm">
+  </node>
+
+  <node name="rviz" pkg="rviz" type="rviz" args="-d $(find mmseq_run)/rviz/mm_basic.rviz" required="true"/>
+</launch>
