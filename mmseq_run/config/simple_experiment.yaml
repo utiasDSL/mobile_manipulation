@@ -1,15 +1,37 @@
 planner:
   sot_type: "SoTStatic"
   tasks:
-    - name: "Base Pos 1"
-      planner_type: "BaseSingleWaypoint"
-      target_pos: [2.0, 0.]
-      tracking_err_tol: 0.25
-#    - name: "EE Pos 1"
-#      planner_type: "EESimplePlanner"
-#      target_pos: [1.5, -0.5, 1.]
-#      hold_period: 3.
+#    - name: "Base Pos 1"
+#      planner_type: "BaseSingleWaypoint"
+#      frame_id: "base"
+#      target_pos: [0.0, 0.]
+#      tracking_err_tol: 0.25
+    - name: "EE Pos 1"
+      planner_type: "EESimplePlanner"
+      frame_id: "EE"
+      target_pos: [0., 0.0, 0.]
+      hold_period: 3.
+      tracking_err_tol: 0.02
+#    - name: "EE Circle 1 "
+#      planner_type: "EEPosTrajectoryCircle"
+#      frame_id: "EE"
+#      period: 5
+#      round: 2
+#      plane_id: [1, 2]
+#      center: [0., 0.5, 0.0]
+#      radius: 0.5
+#      angular_offset: 1.0pi
 #      tracking_err_tol: 0.02
+    - name: "Base Circle 1 "
+      planner_type: "BasePosTrajectoryCircle"
+      frame_id: "base"
+      period: 10
+      round: 2
+      plane_id: [1, 2 ]
+      center: [ -0.5, 0.]
+      radius: 0.5
+      angular_offset: 0.0pi
+      tracking_err_tol: 0.02
 
 controller:
   mpc_rate: 10 #hz
