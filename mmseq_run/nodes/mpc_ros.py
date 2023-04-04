@@ -189,17 +189,24 @@ class ControllerROSNode:
 
         self.sot_lock.acquire()
         for pid, planner in enumerate(self.sot.planners):
+            color = [0] * 3
+            color[pid % 3] = 1
             if planner.ref_type == "waypoint":
-                color = [0] * 3
-                color[pid % 3] = 1
                 if planner.ref_data_type == "Vec3":
                     marker_plan = self._make_marker(Marker.SPHERE, pid, rgba=color + [1], scale=[0.1, 0.1, 0.1])
                     marker_plan.pose.position = Point(*planner.target_pos)
                 elif planner.ref_data_type == "Vec2":
                     marker_plan = self._make_marker(Marker.CYLINDER, pid, rgba=color + [1], scale=[0.1, 0.1, 0.5])
-                    marker_plan.pose.position = Point(*planner.target_pos, 0)
-                marker_plan.lifetime = rospy.Duration.from_sec(0.1)
+                    marker_plan.pose.position = Point(*planner.target_pos, 0.25)
+            elif planner.ref_type == "trajectory":
+                marker_plan = self._make_marker(Marker.LINE_STRIP, pid, rgba=color + [1], scale=[0.1, 0.1, 0.1])
 
+                if planner.ref_data_type == "Vec3":
+                    marker_plan.points = [Point(*pt) for pt in planner.plan]
+                elif planner.ref_data_type == "Vec2":
+                    marker_plan.points = [Point(*pt, 0) for pt in planner.plan]
+
+            marker_plan.lifetime = rospy.Duration.from_sec(0.1)
             self.plan_visualization_pub.publish(marker_plan)
 
         self.sot_lock.release()
@@ -237,8 +244,9 @@ class ControllerROSNode:
                 return
 
         print("Controller received joint states. Proceed ... ")
-        self.planner_coord_transform(self.robot_interface.q, self.planner_config)
         self.sot = SoTStatic(self.planner_config)
+        self.planner_coord_transform(self.robot_interface.q, self.vicon_tool_interface.position, self.sot.planners)
+
         rospy.Timer(rospy.Duration(0, int(1e8)), self._publish_planner_data)
 
         print("robot coord: {}".format(self.robot_interface.q))
@@ -246,6 +254,7 @@ class ControllerROSNode:
             print("planner target:{}".format(planner.getTrackingPoint(0)))
 
         input("Press Enter to continue...")
+        self.sot.activatePlanners(num_planners=2)
         t = rospy.Time.now().to_sec()
         t0 = t
 
@@ -289,9 +298,9 @@ class ControllerROSNode:
             r_bw_wd = []
             for planner in planners:
                 if planner.type == "EE":
-                    r_ew_wd, _ = planner.getTrackingPoint(t, robot_states)
+                    r_ew_wd, _ = planner.getTrackingPoint(t-t0, robot_states)
                 elif planner.type == "base":
-                    r_bw_wd, _ = planner.getTrackingPoint(t, robot_states)
+                    r_bw_wd, _ = planner.getTrackingPoint(t-t0, robot_states)
             if len(r_ew_wd) > 0:
                 self.logger.append("r_ew_w_ds", r_ew_wd)
             if len(r_bw_wd) > 0:
@@ -310,13 +319,26 @@ class ControllerROSNode:
         logger.append("mpc_cost_finals", controller.cost_final)
         logger.append("mpc_step_sizes", controller.step_size)
 
-    def planner_coord_transform(self, q, planner_config):
+    def planner_coord_transform(self, q, ree, planners):
         R_wb = rotz(q[2])
-        for task in planner_config["tasks"]:
-            if task["planner_type"] == "EESimplePlanner":
-                task["target_pos"] = R_wb @ task["target_pos"] + np.hstack((q[:2],0))
-            elif task["planner_type"] == "BaseSingleWaypoint":
-                task["target_pos"] = (R_wb @ np.hstack((task["target_pos"], 1)))[:2] + q[:2]
+        for planner in planners:
+            P = np.zeros(3)
+            if planner.frame_id == "base":
+                P = np.hstack((q[:2],0))
+            elif planner.frame_id == "EE":
+                P = ree
+
+            if planner.__class__.__name__ == "EESimplePlanner":
+                planner.target_pos = R_wb @ planner.target_pos + P
+            elif planner.__class__.__name__ == "EEPosTrajectoryCircle":
+                planner.c = R_wb @ planner.c + P
+                planner.plan = planner.plan @ R_wb.T + P
+
+            elif planner.__class__.__name__ == "BaseSingleWaypoint":
+                planner.target_pos = (R_wb @ np.hstack((planner.target_pos, 0)))[:2] + P[:2]
+            elif planner.__class__.__name__ == "BasePosTrajectoryCircle":
+                planner.c = R_wb[:2,:2] @ planner.c + P[:2]
+                planner.plan = planner.plan @ R_wb[:2, :2].T + P[:2]
 
 if __name__ == "__main__":
     rospy.init_node("controller_ros")
