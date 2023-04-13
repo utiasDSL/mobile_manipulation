@@ -17,7 +17,7 @@ from trajectory_msgs.msg import MultiDOFJointTrajectory, MultiDOFJointTrajectory
 
 from mmseq_control.HTMPC import HTMPC, HTMPCLex
 from mmseq_simulator import simulation
-from mmseq_plan.TaskManager import SoTStatic
+import mmseq_plan.TaskManager as TaskManager
 from mmseq_utils import parsing
 from mmseq_utils.logging import DataLogger, DataPlotter
 from mobile_manipulation_central.ros_interface import MobileManipulatorROSInterface, ViconObjectInterface
@@ -244,7 +244,9 @@ class ControllerROSNode:
                 return
 
         print("Controller received joint states. Proceed ... ")
-        self.sot = SoTStatic(self.planner_config)
+        # self.sot = SoTStatic(self.planner_config)
+        planner_class = getattr(TaskManager, self.planner_config["sot_type"])
+        self.sot = planner_class(self.planner_config)
         self.planner_coord_transform(self.robot_interface.q, self.vicon_tool_interface.position, self.sot.planners)
 
         rospy.Timer(rospy.Duration(0, int(1e8)), self._publish_planner_data)

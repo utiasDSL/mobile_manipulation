@@ -1,0 +1,46 @@
+planner:
+  sot_type: "SoTTimed"
+  tasks:
+    - name: "EE Pos 1"
+      planner_type: "EESimplePlanner"
+      frame_id: "EE"
+      target_pos: [0.0, 0.0, 0.0]
+      hold_period: 3.
+      tracking_err_tol: 0.02
+#    - name: "Base Pos 1"
+#      planner_type: "BaseSingleWaypoint"
+#      frame_id: "base"
+#      target_pos: [0.0, 0.]
+#      tracking_err_tol: 0.02
+    - name: "Base Pos 1"
+      planner_type: "BaseSingleWaypoint"
+      frame_id: "base"
+      target_pos: [-1.0, 0.]
+      tracking_err_tol: 0.02
+    - name: "Base Pos 2"
+      planner_type: "BaseSingleWaypoint"
+      frame_id: "base"
+      target_pos: [ -1.0, -0.5 ]
+      tracking_err_tol: 0.02
+    - name: "Base Pos 3"
+      planner_type: "BaseSingleWaypoint"
+      frame_id: "base"
+      target_pos: [ 0.5, 0.5]
+      tracking_err_tol: 0.02
+  task_switching_time: [10., 20.]
+controller:
+  mpc_rate: 10 #hz
+
+
+
+include:
+  - package: "mmseq_run"
+    path: "config/robot/thing.yaml"
+  - package: "mmseq_run"
+    path: "config/controller/HTMPC.yaml"
+  - package: "mmseq_run"
+    path: "config/sim/simulation.yaml"
+
+logging:
+  log_dir: "/home/tracy/Documents/PhD/data/debug"
+  log_level: 20 # 0 - not set, 10 - debug, 20 - info
