@@ -31,7 +31,7 @@ planner:
 
 controller:
   mpc_rate: 10 #hz
-  penalize_du: True
+  penalize_du: False
   ST_MaxIntvl: 1
 
   cost_params:
@@ -48,6 +48,8 @@ controller:
         Qvb: 0.01
         Qua: 0.01
         Qub: 0.05
+        Qdua: 0.
+        Qdub: 0.
 
 include:
   - package: "mmseq_run"
