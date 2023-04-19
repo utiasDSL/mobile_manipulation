@@ -239,6 +239,60 @@ class DataPlotter:
     def plot_cmds(self, axes=None, legend=None):
         ts = self.data["ts"]
         cmd_vels = self.data["cmd_vels"]
+        cmd_accs = self.data.get("cmd_accs")
+        nq = int(self.data["nq"])
+        nv = int(self.data["nv"])
+
+        if axes is None:
+            axes = []
+            for i in range(2):
+                f, ax = plt.subplots(nv, 1, sharex=True)
+                axes.append(ax)
+        if legend is None:
+            legend = self.data["name"]
+
+        prop_cycle = plt.rcParams["axes.prop_cycle"]
+        colors = prop_cycle.by_key()["color"]
+
+        ax = axes[0]
+        for i in range(nv):
+            ax[i].plot(
+                ts,
+                cmd_vels[:, i],
+                '-x',
+                label=legend + f"$v_{{cmd_{i + 1}}}$",
+                linestyle="--",
+                color=colors[i],
+            )
+
+            ax[i].grid()
+            ax[i].legend()
+        ax[-1].set_xlabel("Time (s)")
+        ax[0].set_title("Commanded joint velocity (rad/s)")
+
+        if cmd_accs is not None:
+            ax = axes[1]
+            for i in range(nv):
+                ax[i].plot(
+                    ts,
+                    cmd_accs[:, i],
+                    '-x',
+                    label=legend + f"$a_{{cmd_{i + 1}}}$",
+                    linestyle="--",
+                    color=colors[i],
+                )
+
+                ax[i].grid()
+                ax[i].legend()
+            ax[-1].set_xlabel("Time (s)")
+            ax[0].set_title("Commanded joint acceleration (rad/s^2)")
+
+        return axes
+
+    def plot_du(self, axes=None, legend=None):
+        ts = self.data["ts"]
+        cmd_accs = self.data["cmd_accs"]
+        cmd_dacc = cmd_accs[1:, :] - cmd_accs[:-1, :]
         nq = int(self.data["nq"])
         nv = int(self.data["nv"])
 
@@ -253,17 +307,18 @@ class DataPlotter:
 
         for i in range(nv):
             axes[i].plot(
-                ts,
-                cmd_vels[:, i],
+                ts[:-1],
+                cmd_dacc[:, i],
+                '-x',
                 label=legend + f"$v_{{cmd_{i + 1}}}$",
-                linestyle="--",
                 color=colors[i],
             )
 
             axes[i].grid()
             axes[i].legend()
         axes[-1].set_xlabel("Time (s)")
-        axes[0].set_title("Commanded joint velocity (rad/s)")
+        axes[0].set_title("Commanded joint acceleration time difference (rad/s^3)")
+
 
         return axes
 

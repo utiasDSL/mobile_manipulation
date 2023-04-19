@@ -199,7 +199,7 @@ class BasePos2CostFunction(TrackingCostFunction):
 
         super().__init__(dt, nx, nu, N, nr, f_fcn, cost_params)
 
-class ControlEffortCostFunciton(LinearLeastSquare):
+class ControlEffortCostFunciton(CostFunctions):
     def __init__(self, dt, N, robot_mdl, params):
 
         ss_mdl = robot_mdl.ssSymMdl
@@ -208,7 +208,7 @@ class ControlEffortCostFunciton(LinearLeastSquare):
         nr = nx * (N+1) + nu * N
 
 
-
+        # x u penalizaiton
         Qq = [params["Qqb"]] * (robot_mdl.DoF - robot_mdl.numjoint) + [params["Qqa"]] * robot_mdl.numjoint
         Qv = [params["Qvb"]] * (nu - robot_mdl.numjoint) + [params["Qva"]] * robot_mdl.numjoint
         Qx = np.diag((Qq + Qv) * N + [0] * nx)
@@ -218,14 +218,29 @@ class ControlEffortCostFunciton(LinearLeastSquare):
         ll_params = {}
         ll_params["W"] = block_diag(Qx, Qu)
         ll_params["A"] = np.eye(nr)
-        super().__init__(dt, nx, nu, N, nr, ll_params)
+        self.xu_cost = LinearLeastSquare(dt, nx, nu, N, nr, ll_params)
 
+        # du penalization
+        Qdu = [params["Qdub"]] * (nu - robot_mdl.numjoint) + [params["Qdua"]] * robot_mdl.numjoint
+        Qdu = np.diag(Qdu * N)
+        Lambda = np.eye(N*nu)
+        Lambda[nu:, :-nu] = -np.eye((N-1)*nu)
+        ll_params_du = {}
+        ll_params_du["W"] = Qdu
+        ll_params_du["A"] = np.hstack((np.zeros((N*nu, (N+1)*nx)), Lambda))
+        self.du_cost = LinearLeastSquare(dt, nx, nu, N, nu*N, ll_params_du)
+
+        super().__init__(dt, nx, nu, N)
 
     def evaluate(self, x_bar, u_bar, *params):
-        return super().evaluate(x_bar, u_bar, np.zeros(self.nr))
+        Jxu = self.xu_cost.evaluate(x_bar, u_bar, np.zeros(self.QPsize))
+        Jdu = self.du_cost.evaluate(x_bar, u_bar, np.hstack((*params, np.zeros((self.N-1)*self.nu))))
+        return Jxu + Jdu
 
     def quad(self, x_bar, u_bar, *params):
-        return super().quad(x_bar, u_bar, np.zeros(self.nr))
+        Hxu, gxu = self.xu_cost.quad(x_bar, u_bar, np.zeros(self.QPsize))
+        Hdu, gdu = self.du_cost.quad(x_bar, u_bar, np.hstack((*params, np.zeros((self.N-1)*self.nu))))
+        return Hxu + Hdu, gxu + gdu
 
 class SoftConstraintsRBFCostFunction(CostFunctions):
     def __init__(self, mu, zeta, cst_obj, name="SoftConstraint"):
@@ -315,19 +330,15 @@ if __name__ == "__main__":
     dt = 0.1
     N = 10
     # robot mdl
-    robot = MobileManipulator3D()
+    from mmseq_utils import parsing
 
-    # cost function params
-    cost_params = {}
-    cost_params["EE"] = {"Qk": 1., "P": 1.}
-    cost_params["base"] = {"Qk": 1., "P": 1.}
-    cost_params["effort"] = {"Qqa": 0., "Qqb": 0.,
-                             "Qva": 1e-2, "Qvb": 2e-2,
-                             "Qua": 1e-1, "Qub": 1e-1}
+    config = parsing.load_config(
+        "/home/tracy/Projects/mm_catkin_ws/src/mm_sequential_tasks/mmseq_run/config/simple_experiment.yaml")
+    robot = MobileManipulator3D(config["controller"])
 
-    cost_base = BasePos2CostFunction(dt, N, robot, cost_params["base"])
-    cost_ee = EEPos3CostFunction(dt, N, robot, cost_params["EE"])
-    cost_eff = ControlEffortCostFunciton(dt, N, robot, cost_params["effort"])
+    cost_base = BasePos2CostFunction(dt, N, robot, config["controller"]["cost_params"]["BasePos2"])
+    cost_ee = EEPos3CostFunction(dt, N, robot, config["controller"]["cost_params"]["EEPos3"])
+    cost_eff = ControlEffortCostFunciton(dt, N, robot, config["controller"]["cost_params"]["Effort"])
     cost_fcn = cost_eff
 
     q = [0.0, 0.0, 0.0] + [0.0, -2.3562, -1.5708, -2.3562, -1.5708, 1.5708]
@@ -335,11 +346,11 @@ if __name__ == "__main__":
     x = np.hstack((np.array(q), v))
     x_bar = np.tile(x, (N+1, 1))
     u_bar = np.zeros((N, 9))
-    r_bar = np.array([1] * cost_fcn.nr)
-    r_bar = np.tile(r_bar, (N+1, 1))
+    # r_bar = np.array([1] * cost_fcn.nr)
+    # r_bar = np.tile(r_bar, (N+1, 1))
+    r_bar = np.ones(9)
 
     J_sym = cost_fcn.evaluate(x_bar, u_bar, r_bar)
-    print(J_sym)
     H_sym, g_sym = cost_fcn.quad(x_bar, u_bar, r_bar)
     g_num = np.zeros(cost_fcn.QPsize)
 
@@ -359,7 +370,7 @@ if __name__ == "__main__":
             indx = (N+1) * 18 + i*u_bar.shape[1] + j
             g_num[indx] = (J_p - J_sym) / eps
 
-    print(np.linalg.norm(g_num - g_sym))
+    print("Difference in gradient:{}".format(np.linalg.norm(g_num - g_sym)))
     print(H_sym)
-    time_quad()
+    # time_quad()
 

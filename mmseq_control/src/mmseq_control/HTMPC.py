@@ -8,7 +8,7 @@ from cvxopt import solvers, matrix
 from mosek import iparam, dparam
 
 from mmseq_control.MPCCostFunctions import EEPos3CostFunction, BasePos2CostFunction, ControlEffortCostFunciton, SoftConstraintsRBFCostFunction
-from mmseq_control.MPCConstraints import HierarchicalTrackingConstraint, MotionConstraint, StateControlBoxConstraint
+from mmseq_control.MPCConstraints import HierarchicalTrackingConstraint, MotionConstraint, StateControlBoxConstraint, StateControlBoxConstraintNew
 from mmseq_control.robot import MobileManipulator3D as MM
 from mmseq_utils.math import wrap_pi_array
 
@@ -36,11 +36,14 @@ class MPC():
         self.x_bar = np.zeros((self.N + 1, self.nx))  # current best guess x0,...,xN
         self.u_bar = np.zeros((self.N, self.nu))  # current best guess u0,...,uN-1
         self.zopt = np.zeros(self.QPsize)  # current lineaization point
+        self.u_prev = np.zeros(self.nu)
         self.xu_bar_init = False
 
         self.v_cmd = np.zeros(self.nx - self.DoF)
-
-        self.xuCst = StateControlBoxConstraint(self.dt, self.robot, self.N, tol=1e-5)
+        if self.params["penalize_du"]:
+            self.xuCst = StateControlBoxConstraintNew(self.dt, self.robot, self.N, tol=1e-5)
+        else:
+            self.xuCst = StateControlBoxConstraint(self.dt, self.robot, self.N, tol=1e-5)
         self.MotionCst = MotionConstraint(self.dt, self.N, self.robot)
         self.xuSoftCst = SoftConstraintsRBFCostFunction(self.params["xu_soft"]["mu"], self.params["xu_soft"]["zeta"], self.xuCst, "xuSoftCst")
 
@@ -122,7 +125,7 @@ class HTMPC(MPC):
         for id, planner in enumerate(planners):
             r_bar = [planner.getTrackingPoint(t + k * self.dt, (self.x_bar[k, :self.DoF], self.x_bar[k, self.DoF:]))[0]
                      for k in range(self.N + 1)]
-            r_bars.append([[np.array(r_bar)], [np.zeros(self.CtrlEffCost.nr)]])
+            r_bars.append([[np.array(r_bar)], [self.u_prev]])
 
             if planner.type == "EE" and planner.ref_data_type == "Vec3":
                 cost_fcns.append([self.EEPos3Cost, self.CtrlEffCost])
@@ -146,8 +149,8 @@ class HTMPC(MPC):
 
         self.x_bar = xbar_opt.copy()
         self.u_bar = ubar_opt.copy()
-        acc_cmd = self.u_bar[0]
-        self.v_cmd = self.x_bar[0][self.robot.DoF:]
+        self.u_prev = self.u_bar[0].copy()
+        self.v_cmd = self.x_bar[0][self.robot.DoF:].copy()
         # self.v_cmd = self.v_cmd + acc_cmd / self.rate
         # if not self.params["soft_cst"]:
         #     clamp_rate = 0.99
@@ -157,7 +160,7 @@ class HTMPC(MPC):
         #                           self.robot.lb_x[self.robot.DoF:] * clamp_rate)
         self.ee_bar, self.base_bar = self._getEEBaseTrajectories(self.x_bar)
 
-        return self.v_cmd, acc_cmd, self.u_bar.copy()
+        return self.v_cmd, self.u_prev, self.u_bar.copy()
 
     def solveHTMPC(self, xo, xbar, ubar, cost_fcns, hier_csts, r_bars):
         """ HTMPC solver
@@ -193,22 +196,31 @@ class HTMPC(MPC):
                     csts = {"eq": [self.MotionCst], "ineq": []}
                     csts_params = {"eq": [[xo]], "ineq": []}
 
+                    if self.params["penalize_du"]:
+                        xuSoft_param = [[self.u_prev]]
+                    else:
+                        xuSoft_param = [[]]
+
+                    st_cost_fcn = cost_fcn + [self.xuSoftCst]
+                    st_cost_fcn_params = r_bars[task_id] + xuSoft_param
+
                 else:
                     csts = {"eq": [self.MotionCst], "ineq": [self.xuCst]}
                     csts_params = {"eq": [[xo]], "ineq": [[]]}
+
+                    st_cost_fcn = cost_fcn
+                    st_cost_fcn_params = r_bars[task_id]
 
                 if task_id > 0:
                     csts["ineq"] += hier_csts[:task_id]
                     for prev_task_id in range(task_id):
                         csts_params["ineq"].append([r_bars[prev_task_id][0][0].T, e_bars[prev_task_id]])
 
+
+
                 # t0 = time.perf_counter()
-                if self.params["soft_cst"]:
-                    xbar_lopt, ubar_lopt, status = self.solveSTMPCCasadi(xo, xbar_l.copy(), ubar_l.copy(), cost_fcn+[self.xuSoftCst],
-                                                                         r_bars[task_id]+[[]], csts, csts_params, i, task_id)
-                else:
-                    xbar_lopt, ubar_lopt, status = self.solveSTMPCCasadi(xo, xbar_l.copy(), ubar_l.copy(), cost_fcn,
-                                                                     r_bars[task_id], csts, csts_params, i, task_id)
+                xbar_lopt, ubar_lopt, status = self.solveSTMPCCasadi(xo, xbar_l.copy(), ubar_l.copy(), st_cost_fcn,
+                                                                     st_cost_fcn_params, csts, csts_params, i, task_id)
 
                 # t1 = time.perf_counter()
                 # print("STMPC Time: {}".format(t1 - t0))
@@ -219,9 +231,9 @@ class HTMPC(MPC):
                 ubar_l = ubar_lopt.copy()
 
         for task_id, cost_fcn in enumerate(cost_fcns):
-            self.cost_final[task_id] = self._eval_cost_functions(cost_fcn, xbar_l, ubar_l, r_bars[task_id])
-            if self.params["soft_cst"]:
-                self.cost_final[task_id] += self.xuSoftCst.evaluate(xbar_l, ubar_l)
+            self.cost_final[task_id] = self._eval_cost_functions(st_cost_fcn, xbar_l, ubar_l, st_cost_fcn_params)
+            # if self.params["soft_cst"]:
+            #     self.cost_final[task_id] += self.xuSoftCst.evaluate(xbar_l, ubar_l, *xuSoft_param[0])
         return xbar_l, ubar_l
 
 
@@ -288,7 +300,8 @@ class HTMPC(MPC):
             # C_scaled, d_scaled = self.scaleConstraints(C.toarray(), d.toarray().flatten())
 
             # State Bound
-            _, bx = self.xuCst.linearize(xbar_i, ubar_i)
+            if not self.params["soft_cst"]:
+                _, bx = self.xuCst.linearize(xbar_i, ubar_i)
 
             Ac = cs.vertcat(A, C)
             uba = cs.vertcat(-b, -d)
