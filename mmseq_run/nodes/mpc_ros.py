@@ -308,6 +308,7 @@ class ControllerROSNode:
             if len(r_bw_wd) > 0:
                 self.logger.append("r_bw_w_ds", r_bw_wd)
             self.logger.append("cmd_vels", u)
+            self.logger.append("cmd_accs", acc)
 
             rate.sleep()
 

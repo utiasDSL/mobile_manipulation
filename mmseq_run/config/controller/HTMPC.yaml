@@ -12,6 +12,7 @@ controller:
   cmd_vel_pub_rate: 100 # hz
   slack: False
   soft_cst: True
+  penalize_du: True
 
   # soft constraints parameters
   xu_soft:
@@ -32,7 +33,9 @@ controller:
       Qva: 0.01
       Qvb: 0.01
       Qua: 0.01
-      Qub: 0.05
+      Qub: 0.01
+      Qdua: 0.
+      Qdub: 0.1
 
   # line search parameters
   beta: 0.5

@@ -172,8 +172,34 @@ class StateControlBoxConstraint(NonlinearConstraint):
         self.lb = np.array(ss_mdl["lb_x"] * (N+1) + ss_mdl["lb_u"] * N)
         g_eqn = cs.vertcat(self.z_bar_sym, -self.z_bar_sym) - np.expand_dims(np.hstack((self.ub, -self.lb)),-1)
         g_fcn = cs.Function('g_'+name, [self.x_bar_sym, self.u_bar_sym], [g_eqn], ["x_bar", "u_bar"], ['g_'+name])
-
         super().__init__(dt, nx, nu, ng, N, g_fcn, [], name, tol=tol)
+
+class StateControlBoxConstraintNew(NonlinearConstraint):
+    def __init__(self, dt, robot_mdl, N, tol=1e-2):
+        ss_mdl = robot_mdl.ssSymMdl
+        nx = ss_mdl["nx"]
+        nu = ss_mdl["nu"]
+        name = "xuboxnew"
+        Constraint.__init__(self, dt, nx, nu, N, name)
+
+        # state and input bounds
+        ng = self.z_bar_sym.size(1)
+        self.ub = np.array(ss_mdl["ub_x"] * (N+1) + ss_mdl["ub_u"] * N)
+        self.lb = np.array(ss_mdl["lb_x"] * (N+1) + ss_mdl["lb_u"] * N)
+        g_eqn = cs.vertcat(self.z_bar_sym, -self.z_bar_sym) - np.expand_dims(np.hstack((self.ub, -self.lb)),-1)
+        # g_fcn = cs.Function('g_'+name, [self.x_bar_sym, self.u_bar_sym], [g_eqn], ["x_bar", "u_bar"], ['g_'+name])
+
+        # input rate bounds
+        # convert to delt u (i.e. time difference value)
+        self.ub_du = np.array(ss_mdl["ub_udot"] * N) * dt
+        self.lb_du = np.array(ss_mdl["lb_udot"] * N) * dt
+        self.u_prev = cs.MX.sym("u_prev", nu)
+        du_eqn = cs.vec(self.u_bar_sym) - cs.vertcat(self.u_prev, cs.vec(self.u_bar_sym[:, :-1]))
+        g_eqn_du = cs.vertcat(du_eqn, -du_eqn) - np.expand_dims(np.hstack((self.ub_du, -self.lb_du)), -1)
+
+        g_fcn = cs.Function('g_' + name, [self.x_bar_sym, self.u_bar_sym, self.u_prev], [cs.vertcat(g_eqn, g_eqn_du)], ["x_bar", "u_bar", "u_prev"], ['g_' + name])
+
+        super().__init__(dt, nx, nu, ng, N, g_fcn, [self.u_prev], name, tol=tol)
 
 def testSoftConstraint(config):
     from mmseq_control.MPCCostFunctions import SoftConstraintsRBFCostFunction
@@ -184,8 +210,8 @@ def testSoftConstraint(config):
     nx = robot.ssSymMdl["nx"]
     nu = robot.ssSymMdl["nu"]
     Qpsize = (N + 1) * nx + N * nu
-    x_bar = np.ones((N + 1, nx))*1.15
-    u_bar = np.ones((N, nu)) * 1
+    x_bar = np.ones((N + 1, nx))*0.1
+    u_bar = np.ones((N, nu)) * 0
     z_bar = np.hstack((x_bar.flatten(), u_bar.flatten()))
     e_bar = np.ones((N+1) * 2) * 2
     r_bar = np.ones((N+1, 2))
@@ -215,7 +241,15 @@ def testSoftConstraint(config):
     print(xu_cst_soft.h_fcn(x_bar.T, u_bar.T))
     print(J_soft)
 
-def testBoxConstraint():
+    xu_cst_new = StateControlBoxConstraintNew(dt, robot, N)
+    xu_cst_soft = SoftConstraintsRBFCostFunction(mu, zeta, xu_cst_new, "xu")
+
+    u_prev = np.hstack((np.ones(2)*0., np.zeros(7)))
+    J_soft = xu_cst_soft.evaluate(x_bar, u_bar, u_prev)
+    print(xu_cst_soft.h_fcn(x_bar.T, u_bar.T, u_prev))
+    print(J_soft)
+
+def testBoxConstraint(config):
     print("Testing Box Constraint")
     dt = 0.1
     N = 1
@@ -235,6 +269,40 @@ def testBoxConstraint():
 
     Cnum = np.vstack((np.eye(Qpsize), -np.eye(Qpsize)))
     dnum = np.hstack((-ub, lb)) + Cnum @ z_bar
+
+    Cdiff = np.linalg.norm(Cnum - Csym)
+    ddiff = np.linalg.norm(dnum - dsym)
+    print("C diff:{}".format(Cdiff))
+    print("d diff:{}".format(ddiff))
+
+def testBoxConstraintNew(config):
+    print("Testing Box Constraint")
+    dt = 0.1
+    N = 2
+    # robot mdl
+    robot = MobileManipulator3D(config["controller"])
+    nx = robot.ssSymMdl["nx"]
+    nu = robot.ssSymMdl["nu"]
+    Qpsize = (N+1)*nx + N * nu
+    cst = StateControlBoxConstraintNew(dt, robot, N)
+    x_bar = np.ones((N + 1, nx))
+    u_bar = np.ones((N, nu))
+    z_bar = np.hstack((x_bar.flatten(), u_bar.flatten()))
+    u_prev = -1 * np.ones(nu)
+
+    lb = np.array(robot.ssSymMdl["lb_x"] * (N+1) + robot.ssSymMdl["lb_u"] * N)
+    ub = np.array(robot.ssSymMdl["ub_x"] * (N+1) + robot.ssSymMdl["ub_u"] * N)
+    Csym, dsym = cst.linearize(x_bar, u_bar, u_prev)
+
+    Cdu = np.zeros((N*nu, Qpsize))
+    Cdu[:, (N+1)*nx:] = np.eye(N * nu)
+    Cdu[nu:, (N+1)*nx:-nu] = -np.eye((N-1)*nu)
+    lb_du = np.array(robot.ssSymMdl["lb_udot"] * N) * dt
+    ub_du = np.array(robot.ssSymMdl["ub_udot"] * N) * dt
+    ub_du[:nu] += u_prev
+    lb_du[:nu] += u_prev
+    Cnum = np.vstack((np.eye(Qpsize), -np.eye(Qpsize), Cdu, -Cdu))
+    dnum = np.hstack((-ub, lb, -ub_du, lb_du)) + Cnum @ z_bar
 
     Cdiff = np.linalg.norm(Cnum - Csym)
     ddiff = np.linalg.norm(dnum - dsym)
@@ -306,7 +374,7 @@ if __name__ == "__main__":
     N = 10
     # robot mdl
     from mmseq_utils import parsing
-    config = parsing.load_config("/home/tracy/Projects/mm_catkin_ws/src/mm_sequential_tasks/mmseq_run/config/sim/simulation.yaml")
+    config = parsing.load_config("/home/tracy/Projects/mm_catkin_ws/src/mm_sequential_tasks/mmseq_run/config/simple_experiment.yaml")
     robot = MobileManipulator3D(config["controller"])
     motion_cst = MotionConstraint(dt, N, robot)
 
@@ -344,7 +412,7 @@ if __name__ == "__main__":
     print("Diff b: {}".format(b_diff))
     print(motion_cst.check(x_bar, u_bar, *params))
 
-    testNonlinearConstraint()
-    testHiearchicalConstraint()
-    testBoxConstraint()
+    # testNonlinearConstraint()
+    # testHiearchicalConstraint()
+    # testBoxConstraintNew(config)
     testSoftConstraint(config)

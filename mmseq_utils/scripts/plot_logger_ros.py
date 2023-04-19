@@ -14,6 +14,7 @@ def plot_tracking(plotters):
 def plot_cmd_vel(plotters):
     axes = plotters["control"].plot_cmds(legend="controller_")
     plotters["sim"].plot_cmds(axes=axes, legend="sim_")
+    plotters["control"].plot_du()
 
 def construct_logger(path_to_folder):
     data = {}
@@ -43,6 +44,6 @@ if __name__ == "__main__":
         plot_tracking(data_plotter_dict)
     if args.robot:
         data_plotter_dict["sim"].plot_robot()
-        # plot_cmd_vel(data_plotter_dict)
+        plot_cmd_vel(data_plotter_dict)
 
     plt.show()
