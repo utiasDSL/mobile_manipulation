@@ -20,18 +20,32 @@ planner:
     - name: "Base Pos 2"
       planner_type: "BaseSingleWaypoint"
       frame_id: "base"
-      target_pos: [ -1.0, -0.5 ]
+      target_pos: [ -1.0, -1.0 ]
       tracking_err_tol: 0.02
     - name: "Base Pos 3"
       planner_type: "BaseSingleWaypoint"
       frame_id: "base"
-      target_pos: [ 0.5, 0.5]
+      target_pos: [ 0.25, 0.25]
       tracking_err_tol: 0.02
   task_switching_time: [10., 20.]
 controller:
   mpc_rate: 10 #hz
+  ST_MaxIntvl: 1
 
-
+  cost_params:
+    EEPos3:
+      Qk: 1.
+      P: 10.
+    BasePos2:
+      Qk: 1.
+      P: 10.
+    Effort:
+      Qqa: 0.
+      Qqb: 0.
+      Qva: 0.01
+      Qvb: 0.01
+      Qua: 0.01
+      Qub: 0.05
 
 include:
   - package: "mmseq_run"

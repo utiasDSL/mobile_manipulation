@@ -289,7 +289,7 @@ class ControllerROSNode:
             states = {"base": robot_states[0][:3], "EE": (self.vicon_tool_interface.position, self.vicon_tool_interface.orientation)}
 
             self.sot_lock.acquire()
-            self.sot.update(t, states)
+            self.sot.update(t-t0, states)
             self.sot_lock.release()
 
             # log
