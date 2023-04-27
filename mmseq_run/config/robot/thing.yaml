@@ -36,6 +36,7 @@ simulation:
         - "$(find mobile_manipulation_central)/urdf/xacro/cartesian_base_joints.urdf.xacro"
         - "$(find mobile_manipulation_central)/urdf/xacro/thing_no_wheels.urdf.xacro"
         - "$(find mmseq_assets)/thing/xacro/end_effector_fingers.urdf.xacro"
+        - "$(find mmseq_assets)/thing/xacro/collision.urdf.xacro"
       args:
         use_collision: "false"
         transform_params: "$(find mobile_manipulation_central)/config/null_transforms.yaml"
@@ -76,14 +77,34 @@ controller:
     tool_link_name: "gripped_object"
     base_type: omnidirectional
 
+    collision_link_names:
+      base:
+        - "base_collision_link"
+      upper_arm:
+        - "ur10_arm_upper_arm_collision_link"
+        - "ur10_arm_upper_arm_collision_sphere_link1"
+        - "ur10_arm_upper_arm_collision_sphere_link2"
+        - "ur10_arm_upper_arm_collision_sphere_link3"
+      forearm:
+        - "ur10_arm_forearm_collision_link"
+        - "ur10_arm_forearm_collision_sphere_link1"
+        - "ur10_arm_forearm_collision_sphere_link2"
+      wrist:
+        - "ur10_arm_wrist1_collision_link"
+        - "ur10_arm_wrist3_collision_link"
+      tool:
+        - "gripped_object_collision_link"
+
+      static_obstacles:
+        - "ground"
+
     urdf:
-      #      package: "mmseq_assets"
-      #      path: "thing/urdf/mm_ocs2_fingers.urdf"
       package: "mmseq_assets"
       path: "thing/urdf/thing_ocs2.urdf"
       includes:
         - "$(find mobile_manipulation_central)/urdf/xacro/thing_no_wheels.urdf.xacro"
         - "$(find mmseq_assets)/thing/xacro/end_effector_fingers.urdf.xacro"
+        - "$(find mmseq_assets)/thing/xacro/collision.urdf.xacro"
       args:
-        use_collision: "false"
+        use_collision: "True"
         transform_params: "$(find mmseq_run)/config/robot/robot_transforms_real.yaml"

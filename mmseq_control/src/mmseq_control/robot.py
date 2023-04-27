@@ -1,17 +1,127 @@
 import argparse
 import datetime
 import matplotlib.pyplot as plt
+import pinocchio as pin
 
 import numpy as np
 import casadi as cs
 import casadi_kin_dyn.py3casadi_kin_dyn as cas_kin_dyn
+import rospkg
 from scipy.linalg import expm
+import hppfcl as fcl
 
 from liegroups import SO3
 from mmseq_utils import parsing
 from mmseq_simulator import simulation
+from mobile_manipulation_central.kinematics import RobotKinematics
 
 import yappi
+
+def signed_distance_sphere_sphere(c1, c2, r1, r2):
+    """ signed distance between two spheres
+
+    :param c1: numpy array or casadi sym of size 3, center of sphere 1
+    :param c2: numpy array or casadi sym of size 3, center of sphere 2
+    :param r1: scalar, radius of sphere 1
+    :param r2: scalar, radius of sphere 2
+    :return:
+    """
+    return cs.norm_2(c1 - c2) - r1 -r2
+
+def signed_distance_half_space_sphere(d, p, n, c, r):
+    """ signed distance of a sphere to half space
+
+    :param d: scalar, offset from p along n
+    :param p: vector, offset of the normal vector
+    :param n: numpy array, normal vector of the plane
+    :param c: numpy array or casadi sym of size 3, center of the sphere
+    :param r: scalar, radius of the sphere
+    :return:
+    """
+
+    return (c - p).T @ n - d - r
+
+
+class PinocchioInterface:
+
+    def __init__(self, config):
+        urdf_path = parsing.parse_and_compile_urdf(config["robot"]["urdf"])
+        self.model, self.collision_model, self.visual_model = pin.buildModelsFromUrdf(urdf_path)
+
+        self.collision_link_names = config["robot"]["collision_link_names"]
+
+    def getGeometryObject(self, link_names):
+        objs = []
+        for name in link_names:
+            o_id = self.collision_model.getGeometryId(name + "_0")
+            if o_id >= self.collision_model.ngeoms:
+                o = None
+            else:
+                o = self.collision_model.geometryObjects[o_id]
+            objs.append(o)
+
+        if len(objs) == 1:
+            return objs[0]
+        else:
+            return objs
+
+    def getSignedDistance(self, o1, tf1, o2, tf2):
+        o1_geo_type = o1.geometry.getNodeType()
+        o2_geo_type = o2.geometry.getNodeType()
+
+        if o1_geo_type == fcl.GEOM_SPHERE and o2_geo_type == fcl.GEOM_SPHERE:
+            signed_dist = signed_distance_sphere_sphere(tf1[0], tf2[0], o1.geometry.radius, o2.geometry.radius)
+        elif o1_geo_type == fcl.GEOM_HALFSPACE and o2_geo_type == fcl.GEOM_SPHERE:
+            # norm and displacement of the dividing plane
+            d = o1.geometry.d
+            nw = tf1[1] @ o1.geometry.n
+            signed_dist = signed_distance_half_space_sphere(d, tf1[0], nw, tf2[0], o2.geometry.radius)
+        elif o1_geo_type == fcl.GEOM_SPHERE and o2_geo_type == fcl.GEOM_HALFSPACE:
+            # norm and displacement of the dividing plane
+            d = o2.geometry.d
+            nw = tf2[1] @ o2.geometry.n
+            signed_dist = signed_distance_half_space_sphere(d, tf2[0], nw, tf1[0], o1.geometry.radius)
+
+        return signed_dist
+
+    def addCollisionObjects(self, geoms):
+        """ Add a list of geometry objects to the collision model
+
+        :param geoms: pinocchio GeometryObject
+        :return: None
+        """
+        for geom in geoms:
+            self.collision_model.addGeometryObject(geom)
+
+    def addCollisionPairs(self, pairs, expand_name=True):
+        """ add collision pairs to the model
+
+        :param pairs: list of tuples
+        :param expand_name: append _0 to link names if True
+        :return: None
+        """
+        for pair in pairs:
+            id1 = self.collision_model.getGeometryId(pair[0] + "_0" if expand_name else pair[0])
+            id2 = self.collision_model.getGeometryId(pair[1] + "_0" if expand_name else pair[1])
+            self.collision_model.addCollisionPair(pin.CollisionPair(id1, id2))
+
+    def addGroundCollisionObject(self):
+        # add a ground plane
+        ground_placement = pin.SE3.Identity()
+        ground_shape = fcl.Halfspace(np.array([0, 0, 1]), 0)
+        ground_geom_obj = pin.GeometryObject(
+            "ground_0", self.model.frames[0].parent, ground_shape, ground_placement
+        )
+        ground_geom_obj.meshColor = np.ones((4))
+
+        self.addCollisionObjects([ground_geom_obj])
+
+    def computeDistances(self, q):
+        data = self.model.createData()
+        geom_data = pin.GeometryData(self.collision_model)
+        pin.computeDistances(self.model, data, self.collision_model, geom_data, q)
+        return np.array([result.min_distance for result in geom_data.distanceResults])
+
 class MobileManipulator3D:
 
     def __init__(self, config):
@@ -19,16 +129,17 @@ class MobileManipulator3D:
 
         """
         urdf_path = parsing.parse_and_compile_urdf(config["robot"]["urdf"])
-        # urdf_path = parsing.parse_ros_path(config["robot"]["urdf"])
         urdf = open(urdf_path, 'r').read()
+        # we use cas_kin_dyn to build casadi forward kinematics functions
         self.kindyn = cas_kin_dyn.CasadiKinDyn(urdf)  # construct main class
+        # we use pinocchio models to access collision objects and build casadi signed distance functions
+        # Ideally, this should be done in cas_kin_dyn for consistency
+        self.pinocchio_interface = PinocchioInterface(config)
+        self.pinocchio_interface.addGroundCollisionObject()
+
 
         self.numjoint = self.kindyn.nq()
         self.DoF = self.numjoint + 3
-
-        self.qb_sym = cs.MX.sym('qb', 3)
-        self.qa_sym = cs.MX.sym('qa', self.numjoint)
-        self.q_sym = cs.vertcat(self.qb_sym, self.qa_sym)
 
         self.ub_x = parsing.parse_array(config["robot"]["limits"]["state"]["upper"])
         self.lb_x = parsing.parse_array(config["robot"]["limits"]["state"]["lower"])
@@ -39,10 +150,27 @@ class MobileManipulator3D:
 
         self.link_names = config["robot"]["link_names"]
         self.tool_link_name = config["robot"]["tool_link_name"]
-        self.base_type = config["robot"]["base_type"]
-        self._setupKinSymMdl()
+        self.collision_link_names = config["robot"]["collision_link_names"]
+
+        self.qb_sym = cs.MX.sym('qb', 3)
+        self.qa_sym = cs.MX.sym('qa', self.numjoint)
+        self.q_sym = cs.vertcat(self.qb_sym, self.qa_sym)
+
+        # create self.kinSymMdls dict:{robot links name: cs function of its forward kinematics function}
+        self._setupRobotKinSymMdl()
+        # create self.collisionLinkKinSymMdls dict:{collision links name: cs function of its forward kinematics function}
+        self._setupCollisionLinkKinSymMdl()
+        # create self.ssSymMdl robot's state space symbolic model
         self._setupSSSymMdlDI()
+        # create self.jacSymMdls dict:{robot links name: cs functions of its jacobian}
         self._setupJacobianSymMdl()
+        # create self.collision_pair pairs of collision links to perform collision avoidance
+        self._setupCollisionPair()
+        # create self.signedDistanceSymMdls dict:{collision pair tuple: cs function of their signed distance}
+        # also creates self.collisionSymMdl, a single cs function of all the singed distance function in self.signedDistanceSymMdls
+        self._setupCollisionSymMdl()
+
+        self.pinocchio_interface.addCollisionPairs(self.collision_pair)
 
     def _setupSSSymMdlDI(self):
         """ Create State-space symbolic model for MM
@@ -82,13 +210,89 @@ class MobileManipulator3D:
         self.ssSymMdl["B"] = B
         self.ssSymMdl["fmdlk"] = self._discretizefmdl(self.ssSymMdl)
 
-    def _setupKinSymMdl(self):
+    def _setupRobotKinSymMdl(self):
         """ Create kinematic symbolic model for MM links keyed by link name
 
         """
         self.kinSymMdls = {}
         for name in self.link_names:
             self.kinSymMdls[name] = self._getFk(name)
+
+    def _setupCollisionLinkKinSymMdl(self):
+        """ Create kinematic symbolic model for collision links
+
+        :return:
+        """
+        self.collisionLinkKinSymMdls = {}
+
+        for collision_group, link_list in self.collision_link_names.items():
+            if collision_group != "static_obstacles":
+                for name in link_list:
+                    self.collisionLinkKinSymMdls[name] = self._getFk(name)
+            else:
+                # we get obstacle transforms from pinocchio interface which is parsed from urdf
+                # we assume (for now) only static obstacles which have constant transforms
+                for name in link_list:
+                    obj = self.pinocchio_interface.getGeometryObject([name])
+                    self.collisionLinkKinSymMdls[name] = cs.Function("f_"+name, [self.q_sym], [obj.placement.translation,
+                                                                                               obj.placement.rotation])
+
+    def _addCollisionPairFromTwoGroups(self, group1, group2):
+        """ add all possible collision link pairs, one from each group
+
+        :param group1: a list of collision link
+        :param group2: another list of collision link
+        :return: nested list of possible pairs
+        """
+
+        pairs = []
+        for link_name1 in group1:
+            for link_name2 in group2:
+                pairs.append([link_name1, link_name2])
+
+        return pairs
+
+    def _setupCollisionPair(self):
+        self.collision_pair = [["ur10_arm_forearm_collision_link", "base_collision_link"],
+                               ["gripped_object_collision_link", "ground"]]
+
+        # self.collision_pair += self._addCollisionPairFromTwoGroups(self.collision_link_names["base"],
+        #                                                            [self.collision_link_names["forearm"][0]] +
+        #                                                            self.collision_link_names["wrist"] +
+        #                                                            self.collision_link_names["tool"])
+        #
+        # self.collision_pair += self._addCollisionPairFromTwoGroups(self.collision_link_names["upper_arm"][:2],
+        #                                                            self.collision_link_names["wrist"])
+        #
+        # self.collision_pair += self._addCollisionPairFromTwoGroups(self.collision_link_names["tool"],
+        #                                                            self.collision_link_names["upper_arm"] +
+        #                                                            self.collision_link_names["forearm"])
+        #
+        # self.collision_pair += self._addCollisionPairFromTwoGroups(["plane"],
+        #                                                            self.collision_link_names["tool"] +
+        #                                                            self.collision_link_names["wrist"])
+
+    def _setupCollisionSymMdl(self):
+        self.signedDistanceSymMdls = {}
+        sd_syms = []
+        for pair in self.collision_pair:
+            fk1 = self.collisionLinkKinSymMdls[pair[0]]
+            fk2 = self.collisionLinkKinSymMdls[pair[1]]
+            tf1_sym = fk1(self.q_sym)
+            tf2_sym = fk2(self.q_sym)
+
+            os = self.pinocchio_interface.getGeometryObject(pair)
+            if None in os:
+                print("either {} or {} isn't a collision geometry".format(*pair))
+                continue
+
+            sd_sym = self.pinocchio_interface.getSignedDistance(os[0], tf1_sym,
+                                                                os[1], tf2_sym)
+            sd_syms.append(sd_sym)
+            sd_fcn = cs.Function("sd_" + pair[0] + "_" + pair[1], [self.q_sym], [sd_sym])
+            self.signedDistanceSymMdls[tuple(pair)] = sd_fcn
+
+        self.collisionSymMdl = cs.Function("sd", [self.q_sym], [cs.vertcat(*sd_syms)])
 
     def _setupJacobianSymMdl(self):
         self.jacSymMdls = {}
@@ -98,7 +302,7 @@ class MobileManipulator3D:
             Jk_eqn = cs.jacobian(fk_pos_eqn, self.q_sym)
             self.jacSymMdls[name] = cs.Function(name + "_jac_fcn", [self.q_sym], [Jk_eqn], ["q"], ["J(q)"])
 
-    def _getFk(self, link_name):
+    def _getFk(self, link_name, base_frame=False):
         """ Create symbolic function for a link named link_name
             The symbolic function returns the position of its parent joint in and rotation w.r.t the world frame.
             Note this is different from link_state provided by Pybullet which provides CoM position.
@@ -108,7 +312,7 @@ class MobileManipulator3D:
             return cs.Function(link_name + "_fcn", [self.q_sym], [self.qb_sym[:2], self.qb_sym[2]], ["q"], ["pos2", "heading"])
 
         Hwb = cs.MX.eye(4)
-        if self.base_type != "fixed":
+        if not base_frame:
             Hwb[0, 0] = np.cos(self.qb_sym[2])
             Hwb[1, 0] = np.sin(self.qb_sym[2])
             Hwb[0, 1] = -np.sin(self.qb_sym[2])
@@ -166,6 +370,45 @@ class MobileManipulator3D:
 
         return x_bar
 
+def verify_link_transforms(robot_sim, sysMdls, link_names):
+    for name in link_names:
+        print(name)
+        q, v = robot_sim.joint_states()
+
+        if name in robot_sim.links:
+            link_idx = robot_sim.links[name][0]
+        else:
+            continue
+        pos_sim, orn_sim = robot_sim.link_pose(link_idx)
+        rot_sim = SO3.from_quaternion(orn_sim, 'xyzw').as_matrix()
+        J_sim = robot_sim.jacobian(q)
+
+        fk_fcn = sysMdls[name]
+        # yappi.set_clock_type("wall")
+        # yappi.start()
+        pos_mdl, rot_mdl = fk_fcn(q)
+        # J_fcn = robot.jacSymMdls[name]
+        # J_mdl = J_fcn(q)
+        # yappi.get_func_stats().print_all()
+
+        pos_mdl = pos_mdl.toarray().flatten()
+        # Note that position differences won't be zero because pybullet gives CoM position whereas casadi_kin_dyn gives joint position
+        # The differences should be exactly the CoM position in world frame
+        print("pos diff:{}, rot diff{}".format(np.linalg.norm(pos_sim - pos_mdl), np.linalg.norm(rot_mdl - rot_sim)))
+        # print("J diff{}".format(np.linalg.norm(J_mdl - J_sim[:3])))
+
+def verify_link_jacobian(robot_sim, sysMdls, link_names):
+    for name in link_names:
+        print(name)
+        q, v = robot_sim.joint_states()
+
+        J_sim = robot_sim.jacobian(q)
+
+        J_fcn = sysMdls[name]
+        J_mdl = J_fcn(q)
+
+        print("J diff{}".format(np.linalg.norm(J_mdl - J_sim[:3])))
+
 
 def main():
     parser = argparse.ArgumentParser()
@@ -195,31 +438,32 @@ def main():
     mm = sim.robot
     # mm.command_velocity(np.zeros(9))
     sim.settle(5.0)
+    link_names = robot.link_names[1:]
+    collision_link_names = []
+    for _, collision_link_name in robot.collision_link_names.items():
+        collision_link_names += collision_link_name
 
-    for name in robot.link_names[1:]:
-        print(name)
-        q, v = mm.joint_states()
+    # verify robot link transforms and jacobians
+    verify_link_transforms(mm, robot.kinSymMdls, link_names)
+    verify_link_jacobian(mm, robot.jacSymMdls, link_names)
 
-        link_idx = mm.links[name][0]
-        pos_sim, orn_sim = mm.link_pose(link_idx)
-        rot_sim = SO3.from_quaternion(orn_sim, 'xyzw').as_matrix()
-        J_sim = mm.jacobian(q)
+    # verify collision link transforms (world frame)
+    verify_link_transforms(mm, robot.collisionLinkKinSymMdls, collision_link_names)
 
-        fk_fcn = robot.kinSymMdls[name]
-        # yappi.set_clock_type("wall")
-        # yappi.start()
-        pos_mdl, rot_mdl = fk_fcn(q)
-        J_fcn = robot.jacSymMdls[name]
-        J_mdl = J_fcn(q)
-        # print(J_mdl)
-        # print(J_sim[:3])
-        # yappi.get_func_stats().print_all()
+    # verify collision link transforms (base frame)
+    # mm.reset_joint_configuration([0]*9)
+    # mm.command_velocity(np.zeros(9))
+    # sim.settle(1.0)
+    # verify_link_transforms(mm, robot.kinSymMdlsBaseFrame, collision_link_names)
 
-        pos_mdl = pos_mdl.toarray().flatten()
-        # Note that position differences won't be zero because pybullet gives CoM position whereas casadi_kin_dyn gives joint position
-        # The differences should be exactly the CoM position in world frame
-        print("pos diff:{}, rot diff{}".format(np.linalg.norm(pos_sim - pos_mdl), np.linalg.norm(rot_mdl - rot_sim)))
-        print("J diff{}".format(np.linalg.norm(J_mdl - J_sim[:3])))
+    print("Testing Signed Distance Model")
+    q = np.zeros(9)
+    q[2] = 1.5
+    sd_pin = robot.pinocchio_interface.computeDistances(q[3:])
+    sd_sym = robot.collisionSymMdl(q)
+    print("Signed Distance by pinocchio: {} by sym mdl: {}".format(sd_pin, sd_sym))
+    print("Singed Distance Diff: {}".format(np.linalg.norm(sd_pin - sd_sym)))
+
 
     print("Testing motion model integrator")
     dt = 0.1
