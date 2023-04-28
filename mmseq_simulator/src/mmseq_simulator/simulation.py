@@ -7,7 +7,7 @@ from pyb_utils.frame import debug_frame_world
 
 from mmseq_simulator.robot import SimulatedRobot
 from mmseq_simulator.camera import VideoManager
-from mmseq_utils import math, geometry
+from mmseq_utils import math, geometry, parsing
 import IPython
 
 
@@ -535,9 +535,8 @@ class BulletSimulation:
 
         # setup obstacles
         if config["static_obstacles"]["enabled"]:
-            obstacles_uid = pyb.loadURDF(
-                config["static_obstacles"]["urdf"]
-            )
+            urdf_path = parsing.parse_and_compile_urdf(config["static_obstacles"]["urdf"])
+            obstacles_uid = pyb.loadURDF(parsing.parse_path(urdf_path))
             pyb.changeDynamics(obstacles_uid, -1, mass=0)  # change to static object
 
         r_ew_w, Q_we = self.robot.link_pose()
