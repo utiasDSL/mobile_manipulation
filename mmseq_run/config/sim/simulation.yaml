@@ -12,6 +12,12 @@ simulation:
   static_obstacles:
     enabled: False
 
+    urdf:
+      package: "mmseq_assets"
+      path: "thing/urdf/scene.urdf"
+      includes:
+        - "$(find mmseq_assets)/thing/xacro/scenes/simple_obstacles.urdf.xacro"
+
   dynamic_obstacles:
     enabled: False
 

@@ -16,8 +16,11 @@ controller:
 
   # soft constraints parameters
   xu_soft:
-      mu: 0.00001
-      zeta: 0.00008
+    mu: 0.00001
+    zeta: 0.00008
+  collision_soft:
+    mu: 0.00001
+    zeta: 0.00008
 
   # weights for each cost function
   cost_params:

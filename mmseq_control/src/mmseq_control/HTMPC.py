@@ -10,12 +10,14 @@ from mosek import iparam, dparam
 from mmseq_control.MPCCostFunctions import EEPos3CostFunction, BasePos2CostFunction, ControlEffortCostFunciton, SoftConstraintsRBFCostFunction
 from mmseq_control.MPCConstraints import HierarchicalTrackingConstraint, MotionConstraint, StateControlBoxConstraint, StateControlBoxConstraintNew
 from mmseq_control.robot import MobileManipulator3D as MM
+from mmseq_control.robot import CasadiModelInterface as ModelInterface
 from mmseq_utils.math import wrap_pi_array
 
 
 class MPC():
     def __init__(self, config):
-        self.robot = MM(config)
+        self.model_interface = ModelInterface(config)
+        self.robot = self.model_interface.robot
         self.ssSymMdl = self.robot.ssSymMdl
         self.kinSymMdl = self.robot.kinSymMdls
         self.nx = self.ssSymMdl["nx"]

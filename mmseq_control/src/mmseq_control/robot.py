@@ -175,8 +175,10 @@ class CasadiModelInterface:
                                 "dynamic_obstacles": {}}
         self._setupCollisionPair()
 
-        self.signedDistanceSymMdls = {}
-        self.collisionSymMdls = {"static_obstacles": {}, "dynamic_obstacles": {}}
+        self.signedDistanceSymMdls = {}             # keyed by collision pair (tuple)
+        self.signedDistanceSymMdlsPerGroup = {"static_obstacles": {}, "dynamic_obstacles": {}}
+                                                    # nested dictionary, keyed by group name
+                                                    # obstacle groups are also a dictionary, keyed by obstacle name
         self._setupSelfCollisionSymMdl()
         self._setupStaticObstaclesCollisionSymMdl()
 
@@ -239,7 +241,7 @@ class CasadiModelInterface:
             sd_fcn = cs.Function("sd_" + pair[0] + "_" + pair[1], [self.robot.q_sym], [sd_sym])
             self.signedDistanceSymMdls[tuple(pair)] = sd_fcn
 
-        self.collisionSymMdls["self"] = cs.Function("sd", [self.robot.q_sym], [cs.vertcat(*sd_syms)])
+        self.signedDistanceSymMdlsPerGroup["self"] = cs.Function("sd", [self.robot.q_sym], [cs.vertcat(*sd_syms)])
 
     def _setupStaticObstaclesCollisionSymMdl(self):
         for obstacle, pairs in self.collision_pairs["static_obstacles"].items():
@@ -256,7 +258,23 @@ class CasadiModelInterface:
                 sd_fcn = cs.Function("sd_" + pair[0] + "_" + pair[1], [self.robot.q_sym], [sd_sym])
                 self.signedDistanceSymMdls[tuple(pair)] = sd_fcn
 
-            self.collisionSymMdls["static_obstacles"][obstacle] = cs.Function("sd", [self.robot.q_sym], [cs.vertcat(*sd_syms)])
+            self.signedDistanceSymMdlsPerGroup["static_obstacles"][obstacle] = cs.Function("sd", [self.robot.q_sym], [cs.vertcat(*sd_syms)])
+
+    def getSignedDistanceSymMdls(self, name):
+        """ get signed distance function by collision link name
+
+        :param name: collision link name
+        :return:
+        """
+        if name == "self":
+            return self.signedDistanceSymMdlsPerGroup["self"]
+        else:
+            for group, name_list in self.scene.collision_link_names.items():
+                if name in name_list:
+                    return self.signedDistanceSymMdlsPerGroup[group][name]
+
+        return None
+
 
 class Scene:
     def __init__(self, config):
@@ -393,6 +411,7 @@ class MobileManipulator3D:
             Note this is different from link_state provided by Pybullet which provides CoM position.
 
         """
+        # TODO: Should we handle base through pinocchio by adopting the cartesian base urdf file?
         if link_name == "base":
             return cs.Function(link_name + "_fcn", [self.q_sym], [self.qb_sym[:2], self.qb_sym[2]], ["q"], ["pos2", "heading"])
 
@@ -423,7 +442,7 @@ class MobileManipulator3D:
             B = ss_mdl["B"]
             nx = x_sym.size()[0]
             nu = u_sym.size()[0]
-
+            # TODO: discretization time is now hardcoded to 0.1 second. better if we could make dt symbolic too
             M = np.zeros((nx + nu, nx + nu))
             M[:nx, :nx] = A
             M[:nx, nx:] = B
@@ -447,6 +466,7 @@ class MobileManipulator3D:
         :return: x_bar
         """
         N = u_bar.shape[0]
+        # For linear system, discreet time model is exact
         if "linear" in ssSymMdl["mdl_type"]:
             fk = ssSymMdl["fmdlk"]
             f_pred = fk.mapaccum(N)
@@ -675,21 +695,24 @@ def test_casadi_interface(args):
     ctrl_config = config["controller"]
     sym_model = CasadiModelInterface(ctrl_config)
 
-    q = pin.randomConfiguration(sym_model.pinocchio_interface.model)
-
+    # q = pin.randomConfiguration(sym_model.pinocchio_interface.model)
+    q = np.zeros(6)
     print('----- Self Collision Check -----')
     sym_model.pinocchio_interface.addCollisionPairs(sym_model.collision_pairs["self"])
-    self_distance_mdl = sym_model.collisionSymMdls["self"](np.hstack((np.zeros(3), q)))
+    sd_fcn = sym_model.getSignedDistanceSymMdls("self")
+    self_distance_mdl = sd_fcn(np.hstack((np.zeros(3), q)))
     self_distance_pin = sym_model.pinocchio_interface.computeDistances(q)
+    print(self_distance_mdl)
     print(self_distance_mdl - self_distance_pin)
 
     print('----- Static Obstacle Collision Check -----')
     for obstacle, pairs in sym_model.collision_pairs["static_obstacles"].items():
         sym_model.pinocchio_interface.removeAllCollisionPairs()
         sym_model.pinocchio_interface.addCollisionPairs(pairs)
-        self_distance_mdl = sym_model.collisionSymMdls["static_obstacles"][obstacle](np.hstack((np.zeros(3), q)))
+        sd_fcn = sym_model.getSignedDistanceSymMdls(obstacle)
+        self_distance_mdl = sd_fcn(np.hstack((np.zeros(3), q)))
         self_distance_pin = sym_model.pinocchio_interface.computeDistances(q)
-        print("Diff: ", self_distance_mdl - self_distance_pin)
+        print("Obstacle {}, Distance Diff: ".format(obstacle, self_distance_mdl - self_distance_pin))
 
 
 if __name__ == "__main__":

@@ -201,6 +201,53 @@ class StateControlBoxConstraintNew(NonlinearConstraint):
 
         super().__init__(dt, nx, nu, ng, N, g_fcn, [self.u_prev], name, tol=tol)
 
+class SignedDistanceCollisionConstraint(NonlinearConstraint):
+    def __init__(self, robot_mdl, signed_distance_fcn, dt, N, d_safe, name="obstacle", tol=1e-2):
+        """ Signed Distance Collision Constraint
+                   - (sd(x_k) - d_safe) < 0
+
+        :param robot_mdl: class mmseq_control.robot.MobileManipulator3D
+        :param signed_distance_fcn: signed distance model between (multiple) body pair(s), casadi function
+        :param dt: discretization time step
+        :param N: prediction window size
+        :param d_safe: safe clearance, scalar, same for all body pairs
+        :param name: name of this set of collision pairs
+        :param tol: tolerence for this constraint
+        """
+        nx = robot_mdl.ssSymMdl["nx"]
+        nu = robot_mdl.ssSymMdl["nu"]
+        nq = robot_mdl.q_sym.size()[0]
+
+        Constraint.__init__(self, dt, nx, nu, N, name+"_collision")
+
+        g_sym_list = [- signed_distance_fcn(self.x_bar_sym[:nq][k]) + d_safe for k in range(N+1)]
+        g_sym = cs.vertcat(*g_sym_list)
+        ng = g_sym.size()[0]
+
+        g_fcn = cs.Function("f_"+self.name, [self.x_bar_sym, self.u_bar_sym], [g_sym], ["x_bar", "u_bar"], ["g_collision"])
+        super().__init__(dt, nx, nu, nq, N, g_fcn, [], self.name)
+
+def testCollisionConstraint(config):
+    from mmseq_control.robot import  CasadiModelInterface
+    from mmseq_control.MPCCostFunctions import SoftConstraintsRBFCostFunction
+    casadi_model_interface = CasadiModelInterface(config["controller"])
+    dt = 0.1
+    N = 2
+    robot_mdl = casadi_model_interface.robot
+    sd_fcn = casadi_model_interface.getSignedDistanceSymMdls("self")
+    const = SignedDistanceCollisionConstraint(robot_mdl, sd_fcn, dt, N, 0.1, "self")
+    nx = robot_mdl.ssSymMdl["nx"]
+    nu = robot_mdl.ssSymMdl["nu"]
+    x_bar = np.ones((N + 1, nx)) * 0.0
+    u_bar = np.ones((N, nu)) * 0
+
+    mu = config["controller"]["collision_soft"]["mu"]
+    zeta = config["controller"]["collision_soft"]["zeta"]
+    const_soft = SoftConstraintsRBFCostFunction(mu, zeta, const, "SelfCollisionSoftConstraint")
+    J_soft = const_soft.evaluate(x_bar, u_bar)
+    print(J_soft)
+
+
 def testSoftConstraint(config):
     from mmseq_control.MPCCostFunctions import SoftConstraintsRBFCostFunction
     dt = 0.1
@@ -415,4 +462,5 @@ if __name__ == "__main__":
     # testNonlinearConstraint()
     # testHiearchicalConstraint()
     # testBoxConstraintNew(config)
-    testSoftConstraint(config)
+    # testSoftConstraint(config)
+    testCollisionConstraint(config)
