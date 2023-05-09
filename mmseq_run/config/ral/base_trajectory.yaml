@@ -1,0 +1,51 @@
+planner:
+  sot_type: "SoTTimed"
+  tasks:
+    - name: "EE Pos 1"
+      planner_type: "EESimplePlanner"
+      frame_id: "EE"
+      target_pos: [0.0, 0.0, 0.0]
+      hold_period: 3.
+      tracking_err_tol: 0.02
+    - name: "Base Pos 1"
+      planner_type: "BasePosTrajectoryLine"
+      frame_id: "base"
+      initial_pos: [0.0, 0.]
+      target_pos: [-1.0, 0.]
+      cruise_speed: 1.
+      tracking_err_tol: 0.02
+    - name: "Base Pos 2"
+      planner_type: "BasePosTrajectoryLine"
+      frame_id: "base"
+      initial_pos: [-1.0, 0.]
+      target_pos: [ -1.0, -1.0 ]
+      cruise_speed: 1.
+      tracking_err_tol: 0.02
+    - name: "Base Pos 3"
+      planner_type: "BasePosTrajectoryLine"
+      frame_id: "base"
+      initial_pos: [ -1.0, -1.0 ]
+      target_pos: [ 0.5, 0.5]
+      cruise_speed: 1.
+      tracking_err_tol: 0.02
+  task_switching_time: [10., 20.]
+
+controller:
+  ST_MaxIntvl: 1
+  mpc_rate: 10
+  self_collision_avoidance_enabled: False
+  static_obstacles_collision_avoidance_enabled: False
+
+include:
+  - package: "mmseq_run"
+    path: "config/robot/thing.yaml"
+  - package: "mmseq_run"
+    path: "config/controller/HTMPC.yaml"
+  - package: "mmseq_run"
+    path: "config/sim/simulation.yaml"
+  - package: "mmseq_run"
+    path: "config/scene/empty.yaml"
+
+logging:
+  log_dir: "/home/tracy/Documents/PhD/data/debug"
+  log_level: 4 # 0 - not set, 10 - debug, 20 - info

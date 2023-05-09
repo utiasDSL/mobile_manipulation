@@ -28,9 +28,8 @@ class SoTBase(ABC):
 
         self.logger = logging.getLogger("Planner")
 
-    def activatePlanners(self, num_planners=2):
-        planners = self.getPlanners(num_planners)
-        for planner in planners:
+    def activatePlanners(self):
+        for planner in self.planners:
             planner.started = True
 
     @abstractmethod

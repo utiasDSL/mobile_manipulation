@@ -12,8 +12,8 @@ controller:
   cmd_vel_pub_rate: 100 # hz
   soft_cst: True
   penalize_du: True
-  self_collision_avoidance_enabled: False
-  static_obstacles_collision_avoidance_enabled: False
+  self_collision_avoidance_enabled: True
+  static_obstacles_collision_avoidance_enabled: True
 
   collision_safety_margin: 0.05
 
@@ -28,10 +28,10 @@ controller:
   # weights for each cost function
   cost_params:
     EEPos3:
-      Qk: 5.
+      Qk: 1.
       P: 10.
     BasePos2:
-      Qk: 5.
+      Qk: 1.
       P: 10.
     Effort:
       Qqa: 0.
@@ -41,7 +41,7 @@ controller:
       Qua: 0.01
       Qub: 0.01
       Qdua: 0.
-      Qdub: 0.
+      Qdub: 0.1
 
   # line search parameters
   beta: 0.5

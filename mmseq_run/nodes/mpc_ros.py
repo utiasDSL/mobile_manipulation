@@ -256,7 +256,7 @@ class ControllerROSNode:
             print("planner target:{}".format(planner.getTrackingPoint(0)))
 
         input("Press Enter to continue...")
-        self.sot.activatePlanners(num_planners=2)
+        self.sot.activatePlanners()
         t = rospy.Time.now().to_sec()
         t0 = t
 
@@ -272,9 +272,10 @@ class ControllerROSNode:
             planners = self.sot.getPlanners(num_planners=2)
             self.sot_lock.release()
 
-            tc1_ros = rospy.Time.now().to_sec()
+            tc1 = time.perf_counter()
             u, acc, u_bar = self.controller.control(t-t0, robot_states, planners)
-            tc2_ros = rospy.Time.now().to_sec()
+            tc2 = time.perf_counter()
+            self.controller_log.log(5, "Controller Run Time: {}".format(tc2 - tc1))
 
             self.lock.acquire()
             self.mpc_plan = u_bar
@@ -295,7 +296,7 @@ class ControllerROSNode:
             # log
             self.logger.append("ts", t)
             self.log_mpc_info(self.logger, self.controller)
-            self.logger.append("controller_run_time", tc2_ros - tc1_ros)
+            self.logger.append("controller_run_time", tc2 - tc1)
             r_ew_wd = []
             r_bw_wd = []
             for planner in planners:
@@ -341,6 +342,8 @@ class ControllerROSNode:
                 planner.target_pos = (R_wb @ np.hstack((planner.target_pos, 0)))[:2] + P[:2]
             elif planner.__class__.__name__ == "BasePosTrajectoryCircle":
                 planner.c = R_wb[:2,:2] @ planner.c + P[:2]
+                planner.plan = planner.plan @ R_wb[:2, :2].T + P[:2]
+            elif planner.__class__.__name__ == "BasePosTrajectoryLine":
                 planner.plan = planner.plan @ R_wb[:2, :2].T + P[:2]
 
 if __name__ == "__main__":
