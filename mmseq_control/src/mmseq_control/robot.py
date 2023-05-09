@@ -63,15 +63,17 @@ class PinocchioInterface:
         urdf_path = parsing.parse_and_compile_urdf(config["robot"]["urdf"])
         self.model, self.collision_model, self.visual_model = pin.buildModelsFromUrdf(urdf_path)
         # 2. add scene model
-        scene_urdf_path = parsing.parse_and_compile_urdf(config["scene"]["urdf"])
-        # here models are passed in so that scene models can be appended to robot model
-        pin.buildModelFromUrdf(scene_urdf_path, self.model)
-        pin.buildGeomFromUrdf(self.model, scene_urdf_path, pin.GeometryType.COLLISION, self.collision_model)
-        pin.buildGeomFromUrdf(self.model, scene_urdf_path, pin.GeometryType.VISUAL, self.visual_model)
+        if config["scene"]["enabled"]:
+            scene_urdf_path = parsing.parse_and_compile_urdf(config["scene"]["urdf"])
+            # here models are passed in so that scene models can be appended to robot model
+            pin.buildModelFromUrdf(scene_urdf_path, self.model)
+            pin.buildGeomFromUrdf(self.model, scene_urdf_path, pin.GeometryType.COLLISION, self.collision_model)
+            pin.buildGeomFromUrdf(self.model, scene_urdf_path, pin.GeometryType.VISUAL, self.visual_model)
         self.addGroundCollisionObject()
 
         self.collision_link_names = config["robot"]["collision_link_names"].copy()
-        self.collision_link_names.update(config["scene"]["collision_link_names"])
+        if config["scene"]["enabled"]:
+            self.collision_link_names.update(config["scene"]["collision_link_names"])
 
     def visualize(self, q):
         viz = visualizer(self.model, self.collision_model, self.visual_model)
@@ -213,7 +215,16 @@ class CasadiModelInterface:
                                                                             self.robot.collision_link_names["tool"])
 
         for obstacle in self.scene.collision_link_names.get("static_obstacles", []):
-            self.collision_pairs["static_obstacles"][obstacle] = self._addCollisionPairFromTwoGroups([obstacle],
+            if obstacle == "ground":
+                self.collision_pairs["static_obstacles"][obstacle] = self._addCollisionPairFromTwoGroups([obstacle],
+                                                                                                         self.robot.collision_link_names[
+                                                                                                             "wrist"] +
+                                                                                                         self.robot.collision_link_names[
+                                                                                                             "forearm"] +
+                                                                                                         self.robot.collision_link_names[
+                                                                                                             "upper_arm"])
+            else:
+                self.collision_pairs["static_obstacles"][obstacle] = self._addCollisionPairFromTwoGroups([obstacle],
                                                                             self.robot.collision_link_names["base"] +
                                                                             self.robot.collision_link_names["wrist"] +
                                                                             self.robot.collision_link_names["forearm"] +
@@ -276,10 +287,14 @@ class Scene:
 
         :param config:
         """
-        urdf_path = parsing.parse_and_compile_urdf(config["scene"]["urdf"])
-        urdf = open(urdf_path, 'r').read()
-        # we use cas_kin_dyn to build casadi forward kinematics functions
-        self.kindyn = cas_kin_dyn.CasadiKinDyn(urdf)  # construct main class
+        if config["scene"]["enabled"]:
+            urdf_path = parsing.parse_and_compile_urdf(config["scene"]["urdf"])
+            urdf = open(urdf_path, 'r').read()
+            # we use cas_kin_dyn to build casadi forward kinematics functions
+            self.kindyn = cas_kin_dyn.CasadiKinDyn(urdf)  # construct main class
+        else:
+            self.kindyn = None
+
         self.collision_link_names = config["scene"]["collision_link_names"]
         self._setupCollisionLinkKinSymMdl()
 

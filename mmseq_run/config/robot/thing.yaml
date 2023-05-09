@@ -106,16 +106,3 @@ controller:
       args:
         use_collision: "True"
         transform_params: "$(find mmseq_run)/config/robot/robot_transforms_real.yaml"
-
-  scene:
-    collision_link_names:
-      static_obstacles:
-        - "obstacle_link_1"
-        - "obstacle_link_2"
-        - "obstacle_link_3"
-        - "ground"
-    urdf:
-      package: "mmseq_assets"
-      path: "thing/urdf/scene.urdf"
-      includes:
-        - "$(find mmseq_assets)/thing/xacro/scenes/simple_obstacles.urdf.xacro"

@@ -1,0 +1,11 @@
+simulation:
+  static_obstacles:
+    enabled: False
+
+controller:
+  scene:
+    enabled: False
+
+    collision_link_names:
+      static_obstacles:
+        - "ground"

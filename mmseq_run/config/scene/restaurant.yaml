@@ -1,0 +1,27 @@
+simulation:
+  static_obstacles:
+    enabled: True
+
+    urdf:
+      package: "mmseq_assets"
+      path: "scenes/urdf/restaurant.urdf"
+      includes:
+        - "$(find mmseq_assets)/scenes/xacro/restaurant.urdf.xacro"
+
+controller:
+  scene:
+    enabled: True
+    collision_link_names:
+      static_obstacles:
+        - "ground"
+#        - "chair_1_collision_link"
+#        - "chair_2_collision_link"
+#        - "chair_3_collision_link"
+#        - "chair_4_collision_link"
+#        - "chair_5_collision_link"
+#        - "chair_6_collision_link"
+    urdf:
+      package: "mmseq_assets"
+      path: "scenes/urdf/restaurant.urdf"
+      includes:
+        - "$(find mmseq_assets)/scenes/xacro/restaurant.urdf.xacro"

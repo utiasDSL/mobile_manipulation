@@ -1,0 +1,11 @@
+<?xml version="1.0"?>
+<launch>
+
+  <param name="robot_description" command="$(find xacro)/xacro '$(find mmseq_assets)/scenes/xacro/restaurant.urdf.xacro'"/>
+
+  <node name="joint_state_publisher_gui" pkg="joint_state_publisher_gui" type="joint_state_publisher_gui" />
+  <node pkg="robot_state_publisher" type="robot_state_publisher" name="rob_st_pub_arm">
+  </node>
+
+  <node name="rviz" pkg="rviz" type="rviz" args="-d $(find mmseq_assets)/launch/view_model.rviz" required="true"/>
+</launch>

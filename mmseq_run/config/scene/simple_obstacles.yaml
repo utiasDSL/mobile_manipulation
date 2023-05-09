@@ -1,0 +1,24 @@
+simulation:
+  static_obstacles:
+    enabled: True
+
+    urdf:
+      package: "mmseq_assets"
+      path: "thing/urdf/scene.urdf"
+      includes:
+        - "$(find mmseq_assets)/scenes/xacro/simple_obstacles.urdf.xacro"
+
+controller:
+  scene:
+    enabled: True
+    collision_link_names:
+      static_obstacles:
+        #        - "obstacle_link_1"
+        - "obstacle_link_2"
+        - "obstacle_link_3"
+        - "ground"
+    urdf:
+      package: "mmseq_assets"
+      path: "thing/urdf/scene.urdf"
+      includes:
+        - "$(find mmseq_assets)/scenes/xacro/simple_obstacles.urdf.xacro"

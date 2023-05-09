@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="utf-8"?>
+<robot name="simple_obstacles" xmlns:xacro="http://wiki.ros.org/xacro">
+
+  <material name="red">
+    <color rgba="1.0 0.0 0.0 1.0"/>
+  </material>
+  <material name="seethrough">
+    <color rgba="1.0 0.0 0.0 0.25"/>
+  </material>
+
+  <xacro:macro name="obstacle_link" params="name material *geometry">
+    <link name="${name}">
+        <collision>
+          <origin rpy="0 0 0" xyz="0 0 0" />
+          <xacro:insert_block name="geometry" />
+        </collision>
+      <visual>
+        <origin rpy="0 0 0" xyz="0 0 0" />
+        <xacro:insert_block name="geometry" />
+        <material name="${material}"/>
+      </visual>
+    </link>
+  </xacro:macro>
+
+  <xacro:macro name="chair" params="name *origin">
+    <link name="${name}">
+        <collision>
+          <origin rpy="0 0 0" xyz="0 0 0" />
+          <geometry>
+<!--            <mesh filename="package://mmseq_assets/scenes/meshes/model.dae"/>-->
+            <mesh filename="file://$(find mmseq_assets)/scenes/meshes/model.dae"/>
+          </geometry>
+        </collision>
+      <visual>
+        <origin rpy="0 0 0" xyz="0 0 0" />
+        <geometry>
+            <mesh filename="file://$(find mmseq_assets)/scenes/meshes/model.dae"/>
+        </geometry>
+      </visual>
+    </link>
+
+    <joint name="${name}_joint" type="fixed">
+      <xacro:insert_block name="origin" />
+      <parent link="restaurant_base_link"/>
+      <child link="${name}"/>
+    </joint>
+
+    <xacro:obstacle_link name="${name}_collision_link" material="seethrough">
+      <geometry>
+        <cylinder radius="0.25" length="1."/>
+      </geometry>
+    </xacro:obstacle_link>
+    <joint name="${name}_collision_link_joint" type="fixed">
+      <origin rpy="0 0 0" xyz="0.175 0.175 0.5"/>
+      <parent link="${name}"/>
+      <child link="${name}_collision_link"/>
+    </joint>
+  </xacro:macro>
+
+  <link name="restaurant_base_link"/>
+
+  <xacro:chair name="chair_1">
+    <origin rpy="0 0 0" xyz="-3. -3. 0."/>
+  </xacro:chair>
+
+  <xacro:chair name="chair_2">
+    <origin rpy="0 0 0" xyz="-3. 0. 0."/>
+  </xacro:chair>
+
+  <xacro:chair name="chair_3">
+    <origin rpy="0 0 0" xyz="-3. 3. 0."/>
+  </xacro:chair>
+
+  <xacro:chair name="chair_4">
+    <origin rpy="0 0 0" xyz="3. -3. 0."/>
+  </xacro:chair>
+
+  <xacro:chair name="chair_5">
+    <origin rpy="0 0 0" xyz="3. 0. 0."/>
+  </xacro:chair>
+
+  <xacro:chair name="chair_6">
+    <origin rpy="0 0 0" xyz="3. 3. 0."/>
+  </xacro:chair>
+
+
+</robot>
