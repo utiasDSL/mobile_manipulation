@@ -34,11 +34,6 @@ planner:
     #   angular_offset: 1.0pi
     #   tracking_err_tol: 0.02
 
-controller:
-  cost_params:
-    BasePos2:
-      Qk: 5.
-      P: 10.
 
 include:
   - package: "mmseq_run"
