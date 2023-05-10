@@ -143,7 +143,7 @@ class HTMPC(MPC):
         for id, planner in enumerate(planners):
             r_bar = [planner.getTrackingPoint(t + k * self.dt, (self.x_bar[k, :self.DoF], self.x_bar[k, self.DoF:]))[0]
                      for k in range(self.N + 1)]
-            r_bars.append([[np.array(r_bar)], [self.u_prev]])
+            r_bars.append([[np.array(r_bar)], [-self.u_prev]])
 
             if planner.type == "EE" and planner.ref_data_type == "Vec3":
                 cost_fcns.append([self.EEPos3Cost, self.CtrlEffCost])
