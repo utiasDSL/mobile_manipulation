@@ -77,6 +77,8 @@ controller:
     tool_link_name: "gripped_object"
     base_type: omnidirectional
 
+    tool_vicon_name: "ThingContainer"
+
     collision_link_names:
       base:
         - "base_collision_link"

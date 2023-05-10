@@ -84,7 +84,7 @@ class ControllerROSNode:
 
         # ROS Related
         self.robot_interface = MobileManipulatorROSInterface()
-        self.vicon_tool_interface = ViconObjectInterface("ThingWoodTray")
+        self.vicon_tool_interface = ViconObjectInterface(ctrl_config["robot"]["tool_vicon_name"])
         # self.vicon_tool_interface = ViconObjectInterface("tool")
         self.visualization_pub = rospy.Publisher("mpc_visualization", Marker, queue_size=10)
         self.plan_visualization_pub = rospy.Publisher("plan_visualization", Marker, queue_size=10)
