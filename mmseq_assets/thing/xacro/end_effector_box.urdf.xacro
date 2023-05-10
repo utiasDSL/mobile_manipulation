@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<robot name="end_effector_box" xmlns:xacro="http://wiki.ros.org/xacro">
+
+   <joint name="gripped_object_joint" type="fixed">
+     <xacro:transformed_origin name="gripped_object_transform" />
+     <parent link="gripper"/>
+     <child link="gripped_object"/>
+   </joint>
+  <!-- Custom tool for box -->
+  <!-- When oriented forward, the frame has: z forward, x down, y left -->
+  <!-- When oriented up (i.e. for balancing): z up, x forward, y left -->
+  <link name="gripped_object">
+    <visual>
+      <origin rpy="0 0 0" xyz="0 0 0"/>
+      <geometry>
+        <box size="0.317 0.222 0.165"/>
+      </geometry>
+      <material name="green">
+        <color rgba="0 1 0 0.5"/>
+      </material>
+    </visual>
+
+
+    <inertial>
+      <origin rpy="0 0 0" xyz="0 0 0"/>
+      <mass value="0.01"/>
+      <!-- not accurate, but pybullet recomputes this by default -->
+      <inertia ixx="1" ixy="0" ixz="0" iyy="1" iyz="0" izz="1"/>
+    </inertial>
+  </link>
+</robot>
