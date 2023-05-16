@@ -519,12 +519,12 @@ class HTMPCLex(HTMPC):
                 if task_id > 0:
                     csts["ineq"] += hier_csts[:task_id]
                     for prev_task_id in range(task_id):
-                        csts_params["ineq"].append([r_bars[prev_task_id][0].T, e_bars[prev_task_id]])
+                        csts_params["ineq"].append([r_bars[prev_task_id][0][0].T, e_bars[prev_task_id]])
 
                 xbar_lopt, ubar_lopt, status = self.solveSTMPC(xo, xbar_l.copy(), ubar_l.copy(), cost_fcn, r_bars[task_id],
                                                                csts, csts_params, ht_iter=i, task_id=task_id)
 
-                e_bars_l = cost_fcn[0].e_bar_fcn(xbar_lopt.T, ubar_lopt.T, r_bars[task_id][0].T)
+                e_bars_l = cost_fcn[0].e_bar_fcn(xbar_lopt.T, ubar_lopt.T, r_bars[task_id][0][0].T)
                 e_bars.append(e_bars_l.toarray().flatten())
                 xbar_l = xbar_lopt.copy()
                 ubar_l = ubar_lopt.copy()
@@ -539,7 +539,13 @@ class HTMPCLex(HTMPC):
         # f (x)
         f_eqn = cs.DM.zeros()
         for cost_id, cost in enumerate(cost_fcn):
-            J_eqn = cost.J_fcn(self.x_bar_sym, self.u_bar_sym, cost_fcn_params[cost_id].T)
+            if cost.__class__.__name__ != "ControlEffortCostFunciton":
+                J_eqn = cost.J_fcn(self.x_bar_sym, self.u_bar_sym, cost_fcn_params[cost_id][0].T)
+            else:
+                Jxu_eqn = cost.xu_cost.J_fcn(self.x_bar_sym, self.u_bar_sym, np.zeros(self.QPsize))
+                Jdu_eqn = cost.du_cost.J_fcn(self.x_bar_sym, self.u_bar_sym,
+                                             np.hstack((cost_fcn_params[cost_id][0], np.zeros(self.nu * (self.N-1)))))
+                J_eqn = Jxu_eqn + Jdu_eqn
 
             f_eqn += J_eqn
 
@@ -563,11 +569,15 @@ class HTMPCLex(HTMPC):
             gub = cs.vertcat(gub, cs.DM.zeros(p))
 
         nlp = {'x': self.z_bar_sym, 'f': f_eqn, 'g': g_eqn}
-        opts = {"ipopt": {'linear_solver': "ma86", 'print_level': 0}}  # , 'constr_viol_tol': 1e-5, 'tol': 1e-5}}
+        opts = {"ipopt": {'linear_solver': "ma86", 'print_level': 0, "warm_start_init_point":'yes'}}  # , 'constr_viol_tol': 1e-5, 'tol': 1e-5}}
         S = cs.nlpsol('S', 'ipopt', nlp, opts)
 
         # Solve NLP
-        x_init = np.hstack((xbar.flatten(), ubar.flatten()))
+
+        u_init_base = np.ones((self.N, 2)) * 2
+        u_init = np.hstack((u_init_base, np.zeros((self.N, self.nu - 2))))
+        x_init = self._predictTrajectories(xo, u_init)
+        x_init = np.hstack((x_init.flatten(), u_init.flatten()))
         res = S(x0=x_init, lbx=self.xuCst.lb, ubx=self.xuCst.ub, lbg=glb, ubg=gub)
         z_opt = res['x']
 

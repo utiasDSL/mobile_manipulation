@@ -7,12 +7,37 @@ import time
 
 import numpy as np
 from pyb_utils.ghost import GhostSphere, GhostCylinder
+from spatialmath.base import rotz
 
 from mmseq_control.HTMPC import HTMPC, HTMPCLex
 from mmseq_simulator import simulation
 from mmseq_plan.TaskManager import SoTStatic
 from mmseq_utils import parsing
 from mmseq_utils.logging import DataLogger, DataPlotter
+
+
+def planner_coord_transform(q, ree, planners):
+    R_wb = rotz(q[2])
+    for planner in planners:
+        P = np.zeros(3)
+        if planner.frame_id == "base":
+            P = np.hstack((q[:2], 0))
+        elif planner.frame_id == "EE":
+            P = ree
+
+        if planner.__class__.__name__ == "EESimplePlanner":
+            planner.target_pos = R_wb @ planner.target_pos + P
+        elif planner.__class__.__name__ == "EEPosTrajectoryCircle":
+            planner.c = R_wb @ planner.c + P
+            planner.plan = planner.plan @ R_wb.T + P
+
+        elif planner.__class__.__name__ == "BaseSingleWaypoint":
+            planner.target_pos = (R_wb @ np.hstack((planner.target_pos, 0)))[:2] + P[:2]
+        elif planner.__class__.__name__ == "BasePosTrajectoryCircle":
+            planner.c = R_wb[:2, :2] @ planner.c + P[:2]
+            planner.plan = planner.plan @ R_wb[:2, :2].T + P[:2]
+        elif planner.__class__.__name__ == "BasePosTrajectoryLine":
+            planner.plan = planner.plan @ R_wb[:2, :2].T + P[:2]
 
 def main():
     np.set_printoptions(precision=3, suppress=True)
@@ -65,6 +90,7 @@ def main():
         controller = HTMPCLex(ctrl_config)
 
     sot = SoTStatic(planner_config)
+    planner_coord_transform(robot.joint_states()[0], robot.link_pose()[0], sot.planners)
 
     # set py logger level
     ch = logging.StreamHandler()
@@ -97,19 +123,21 @@ def main():
     for planner in sot.planners:
         pd = planner.target_pos
         print(planner.name)
-        if planner.type == "EE":
+        if planner.__class__.__name__ == "EESimplePlanner":
             sim.ghosts.append(GhostSphere(planner.tracking_err_tol, pd))
-        else:
+        elif planner.__class__.__name__ == "BaseSingleWaypoint":
             sim.ghosts.append(GhostCylinder(position=np.hstack((pd, 0))))
 
     planners = sot.getPlanners(num_planners=2)
+    u = np.zeros(9)
     while t <= sim.duration:
         # open-loop command
         robot_states = robot.joint_states(add_noise=False)
-
+        print("base position: {}".format(robot_states[0][:2]))
         # print(robot_states[0])
         t0 = time.perf_counter()
-        u, acc = controller.control(t, robot_states, planners)
+        _, acc, _ = controller.control(t, robot_states, planners)
+        u += acc * sim.timestep
         t1 = time.perf_counter()
         print("Controller time: {}".format(t1-t0))
         robot.command_velocity(u)
@@ -130,6 +158,7 @@ def main():
                 r_bw_wd, _ = planner.getTrackingPoint(t, robot_states)
         logger.append("ts", t)
         logger.append("xs", np.hstack(robot_states))
+        logger.append("controller_run_time", t1 - t0)
         logger.append("cmd_vels", u)
         if len(r_ew_wd)>0:
             logger.append("r_ew_w_ds", r_ew_wd)
