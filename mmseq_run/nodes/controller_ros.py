@@ -116,12 +116,10 @@ class ControllerROSNode:
         input("Press Enter to continue...")
         t = rospy.Time.now().to_sec()
         t0 = t
-
+        t_prev = t
+        u_prev = 0
         while not self.ctrl_c:
-            t1 = rospy.Time.now().to_sec()
-            if t1 - t > (1./ self.ctrl_rate)*5:
-                self.controller_log.debug("Controller running slow. Last interval {}".format(t1 -t))
-            t = t1
+            t = rospy.Time.now().to_sec()
 
             # open-loop command
             robot_states = (self.robot_interface.q, self.robot_interface.v)
@@ -135,7 +133,7 @@ class ControllerROSNode:
 
             # Update Task Manager
             states = {"base": robot_states[0][:3], "EE": (self.vicon_tool_interface.position, self.vicon_tool_interface.orientation)}
-            self.sot.update(t, states)
+            self.sot.update(t-t0, states)
             # log
             self.logger.append("ts", t)
             self.logger.append("controller_run_time", tc2 - tc1)
@@ -151,6 +149,13 @@ class ControllerROSNode:
             if len(r_bw_wd) > 0:
                 self.logger.append("r_bw_w_ds", r_bw_wd)
             self.logger.append("cmd_vels", u)
+            if t - t_prev != 0:
+                self.logger.append("cmd_accs", (u - u_prev) / (t - t_prev))
+            else:
+                self.logger.append("cmd_accs", (u - u_prev) / self.ctrl_rate)
+
+            u_prev = u
+            t_prev = t
 
             rate.sleep()
 

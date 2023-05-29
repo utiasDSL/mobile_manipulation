@@ -65,12 +65,8 @@ class IKCPrioritized:
         ## EE
         Abar = np.zeros((0, 9))
         bbar = np.zeros((0))
-        Cqlim = np.vstack((np.eye(9), -np.eye(9)))
-        dqlim = np.hstack((self.ub_qdot, -self.lb_qdot))
-        # Cbar = np.zeros((0,9))
-        # dbar = np.zeros((0))
-        Cbar = Cqlim
-        dbar = dqlim
+        Cbar = np.vstack((np.eye(9), -np.eye(9)))
+        dbar = np.hstack((self.ub_qdot, -self.lb_qdot))
         for i, planner in enumerate(planners):
             if planner.type == "EE":
                 # if planner.ref_type == "pose":
@@ -87,13 +83,13 @@ class IKCPrioritized:
                 vee = self.params["lambda_ee"] * (Pee_d - Pee) + Vee_d
                 Jee = self.Jee(q).toarray()
 
-                (Abar, bbar, Cbar, dbar), z = PLSN.getSubsetEq(Jee, vee, Abar, bbar, Cbar, dbar, 1e-5,
+                (Abar, bbar, Cbar, dbar), z = PLSN.getSubsetEq(Jee, vee, Abar, bbar, Cbar, dbar, 1e-3,
                                                                init_vals=self.prev_control)
             else:
                 Pb_d, Vb_d = planner.getTrackingPoint(t)
                 vb = self.params["lambda_base"] * (Pb_d - q[:2]) + Vb_d
                 Jb = np.hstack((np.eye(2), np.zeros((2, 7))))
-                (Abar, bbar, Cbar, dbar), z = PLSN.getSubsetEq(Jb, vb, Abar, bbar, Cbar, dbar, 1e-5,
+                (Abar, bbar, Cbar, dbar), z = PLSN.getSubsetEq(Jb, vb, Abar, bbar, Cbar, dbar, 1e-3,
                                                                init_vals=self.prev_control)
         H = np.eye(9)
         H[:3, :3] = np.eye(3) * self.params["wb"]

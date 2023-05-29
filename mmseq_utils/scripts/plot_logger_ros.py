@@ -6,26 +6,46 @@ from mmseq_utils.logging import DataLogger, DataPlotter
 import matplotlib.pyplot as plt
 
 def plot_tracking(plotters):
-    ee_axes = plotters["control"].plot_ee_position()
-    base_axes = plotters["control"].plot_base_position()
-    plotters["sim"].plot_ee_position(ee_axes)
-    plotters["sim"].plot_base_position(base_axes)
-
-def plot_cmd_vel(plotters):
-    axes = plotters["control"].plot_cmds(legend="controller_")
-    plotters["sim"].plot_cmds(axes=axes, legend="sim_")
-    plotters["control"].plot_du()
+    # ee_axes = plotters["control"].plot_ee_position()
+    # base_axes = plotters["control"].plot_base_position()
+    # plotters["sim"].plot_ee_position(ee_axes)
+    # plotters["sim"].plot_base_position(base_axes)
+    plotters.plot_ee_position()
+    plotters.plot_base_position()
+    plotters.plot_tracking_err()
 
 def construct_logger(path_to_folder):
-    data = {}
-    for filename in os.listdir(path_to_folder):
-        d = os.path.join(path_to_folder, filename)
-        key = filename.split("_")[0]
-        if os.path.isdir(d):
-            path_to_npz = os.path.join(d, "data.npz")
-            data[key] = DataPlotter.from_npz(path_to_npz)
+    return DataPlotter.from_ROS_results(path_to_folder)
+    # data = {}
+    # for filename in os.listdir(path_to_folder):
+    #     d = os.path.join(path_to_folder, filename)
+    #     key = filename.split("_")[0]
+    #     if os.path.isdir(d):
+    #         path_to_npz = os.path.join(d, "data.npz")
+    #         data[key] = DataPlotter.from_npz(path_to_npz)
+    #
+    # return data
 
-    return data
+def plot_comparisons(args):
+    plotters = []
+    for filename in os.listdir(args.folder):
+        d = os.path.join(args.folder, filename)
+        if os.path.isdir(d):
+            plotter = construct_logger(d)
+            plotters.append(plotter)
+
+    # plot tracking error
+    axes = None
+    for id, p in enumerate(plotters):
+        axes = p.plot_tracking_err(axes, id)
+
+    # plot commanded velocity and acceleration
+    axes = None
+    for id, p in enumerate(plotters):
+        axes = p.plot_cmds(axes, id)
+
+    plt.show()
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -36,14 +56,19 @@ if __name__ == "__main__":
     parser.add_argument("--robot", action="store_true",
                         help="plot tracking data")
 
+    parser.add_argument("--compare", action="store_true",
+                        help="plot comparisons")
     args = parser.parse_args()
-    data_plotter_dict = construct_logger(args.folder)
-    if args.htmpc:
-        data_plotter_dict["control"].plot_mpc()
-    if args.tracking:
-        plot_tracking(data_plotter_dict)
-    if args.robot:
-        data_plotter_dict["sim"].plot_robot()
-        plot_cmd_vel(data_plotter_dict)
 
-    plt.show()
+    if args.compare:
+        plot_comparisons(args)
+    else:
+        data_plotter = construct_logger(args.folder)
+        if args.htmpc:
+            data_plotter.plot_mpc()
+        if args.tracking:
+            plot_tracking(data_plotter)
+        if args.robot:
+            data_plotter.plot_robot()
+
+        plt.show()

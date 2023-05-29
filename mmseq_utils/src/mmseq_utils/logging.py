@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 from pathlib import Path
 import yaml
 import rosbag
+import os
 from spatialmath.base import rotz, r2q
 
 from mmseq_utils.parsing import parse_path, load_config
@@ -108,6 +109,31 @@ class DataPlotter:
             data_name = folder_name.split("_")[:-2]
             data_name = "_".join(data_name)
             data["name"] = data_name
+        return cls(data)
+
+    @classmethod
+    def from_ROS_results(cls, folder_path):
+        data_decoupled = {}
+        for filename in os.listdir(folder_path):
+            d = os.path.join(folder_path, filename)
+            key = filename.split("_")[0]
+            if os.path.isdir(d):
+                path_to_npz = os.path.join(d, "data.npz")
+                data_decoupled[key] = dict(np.load(path_to_npz))
+
+        data = data_decoupled["control"]
+
+        t = data["ts"]
+        t_sim = data_decoupled["sim"]["ts"]
+        for key, value in data_decoupled["sim"].items():
+            if key in ["ts", "sim_timestep", "nq", "nv", "nx", "nu", "duration", "dir_path", "cmd_vels"]:
+                continue
+            else:
+                value = np.array(value)
+                f_interp = interp1d(t_sim, value, axis=0, fill_value="extrapolate")
+                data[key] = f_interp(t)
+        data["ts"] -= data["ts"][0]
+        data["name"] = folder_path.split("/")[-1]
         return cls(data)
 
     def plot_ee_position(self, axes=None, index=0, legend=None):
@@ -228,12 +254,15 @@ class DataPlotter:
         if len(r_bw_ws) > 0 and len(r_bw_w_ds) > 0:
             plot_base_err = True
             err_base = np.linalg.norm(r_bw_ws - r_bw_w_ds, axis=1)
+            rms_base = np.mean(err_base * err_base) ** 0.5
+
 
         r_ew_w_ds = self.data.get("r_ew_w_ds", [])
         r_ew_ws = self.data.get("r_ew_ws", [])
         if len(r_ew_ws) > 0 and len(r_ew_w_ds) > 0:
             plot_ee_err = True
             err_ee = np.linalg.norm(r_ew_ws - r_ew_w_ds, axis=1)
+            rms_ee = np.mean(err_ee * err_ee) ** 0.5
 
         if axes is None:
             axes = []
@@ -242,19 +271,22 @@ class DataPlotter:
         if legend is None:
             legend = self.data["name"]
 
+        prop_cycle = plt.rcParams["axes.prop_cycle"]
+        colors = prop_cycle.by_key()["color"]
+
         if plot_base_err:
-            axes.plot(ts, err_base, label=legend+"$err_{base}$", linestyle="--")
+            axes.plot(ts, err_base, label=legend+" $err_{base}, rms_{base} = $" + str(rms_base), linestyle="--", color=colors[index])
         if plot_ee_err:
-            axes.plot(ts, err_ee, label=legend+"$err_{ee}$",  linestyle="--")
+            axes.plot(ts, err_ee, label=legend+" $err_{ee}, rms_{ee} = $" + str(rms_ee),  linestyle="-", color=colors[index])
         axes.grid()
         axes.legend()
         axes.set_xlabel("Time (s)")
-        axes.set_ylabel("RMS Err (m)")
+        axes.set_ylabel("Err (m)")
         axes.set_title("Tracking Error vs Time")
 
         return axes
 
-    def plot_cmds(self, axes=None, legend=None):
+    def plot_cmds(self, axes=None, index=0, legend=None):
         ts = self.data["ts"]
         cmd_vels = self.data["cmd_vels"]
         cmd_accs = self.data.get("cmd_accs")
@@ -278,9 +310,9 @@ class DataPlotter:
                 ts,
                 cmd_vels[:, i],
                 '-x',
-                label=legend + f"$v_{{cmd_{i + 1}}}$",
+                label=legend + f"$v_{{cmd_{i + 1}}}$" + f"max = " + str(max(cmd_vels[:, i])),
                 linestyle="--",
-                color=colors[i],
+                color=colors[index],
             )
 
             ax[i].grid()
@@ -295,9 +327,9 @@ class DataPlotter:
                     ts,
                     cmd_accs[:, i],
                     '-x',
-                    label=legend + f"$a_{{cmd_{i + 1}}}$",
+                    label=legend + f"$a_{{cmd_{i + 1}}}$" + f"max = " + str(max(cmd_accs[:, i])),
                     linestyle="--",
-                    color=colors[i],
+                    color=colors[index],
                 )
 
                 ax[i].grid()
@@ -309,34 +341,34 @@ class DataPlotter:
 
     def plot_du(self, axes=None, legend=None):
         ts = self.data["ts"]
-        cmd_accs = self.data["cmd_accs"]
-        cmd_dacc = cmd_accs[1:, :] - cmd_accs[:-1, :]
-        nq = int(self.data["nq"])
-        nv = int(self.data["nv"])
+        cmd_accs = self.data.get("cmd_accs")
+        if cmd_accs is not None:
+            cmd_dacc = cmd_accs[1:, :] - cmd_accs[:-1, :]
+            nq = int(self.data["nq"])
+            nv = int(self.data["nv"])
 
-        if axes is None:
-            axes = []
-            f, axes = plt.subplots(nv, 1, sharex=True)
-        if legend is None:
-            legend = self.data["name"]
+            if axes is None:
+                axes = []
+                f, axes = plt.subplots(nv, 1, sharex=True)
+            if legend is None:
+                legend = self.data["name"]
 
-        prop_cycle = plt.rcParams["axes.prop_cycle"]
-        colors = prop_cycle.by_key()["color"]
+            prop_cycle = plt.rcParams["axes.prop_cycle"]
+            colors = prop_cycle.by_key()["color"]
 
-        for i in range(nv):
-            axes[i].plot(
-                ts[:-1],
-                cmd_dacc[:, i],
-                '-x',
-                label=legend + f"$v_{{cmd_{i + 1}}}$",
-                color=colors[i],
-            )
+            for i in range(nv):
+                axes[i].plot(
+                    ts[:-1],
+                    cmd_dacc[:, i],
+                    '-x',
+                    label=legend + f"$v_{{cmd_{i + 1}}}$",
+                    color=colors[i],
+                )
 
-            axes[i].grid()
-            axes[i].legend()
-        axes[-1].set_xlabel("Time (s)")
-        axes[0].set_title("Commanded joint acceleration time difference (rad/s^3)")
-
+                axes[i].grid()
+                axes[i].legend()
+            axes[-1].set_xlabel("Time (s)")
+            axes[0].set_title("Commanded joint acceleration time difference (rad/s^3)")
 
         return axes
 
@@ -596,6 +628,8 @@ class DataPlotter:
     def plot_robot(self):
         self.plot_cmd_vs_real_vel()
         self.plot_state()
+        self.plot_cmds()
+        self.plot_du()
 
     def plot_tracking(self):
         self.plot_ee_position()
