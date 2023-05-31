@@ -6,11 +6,13 @@ controller:
   ρ: 0.01
   ctrl_rate: 100
 
+  # options
+  enable_joint_acc_bound: true
 
   # task parameters
   base_tracking:
-    κ: 0.5
+    κ: 1.
   ee_tracking:
-    κ: 0.5
+    κ: 1.
   joint_angle_bound_task:
-    κ: 0.5
+    κ: 1.

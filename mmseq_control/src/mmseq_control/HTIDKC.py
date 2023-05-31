@@ -7,7 +7,7 @@ Created on Wed May 31 10:16:00 2023
 """
 
 from mmseq_control.robot import MobileManipulator3D as MM
-from mmseq_control.IDKCTasks import EEPositionTracking, BasePositionTracking, JointVelocityBound, JointAngleBound
+from mmseq_control.IDKCTasks import EEPositionTracking, BasePositionTracking, JointVelocityBound, JointAngleBound, JointAccelerationBound
 from mmseq_control.HQP import PrioritizedLinearSystemsNew as PLSN
 
 from mmseq_utils import parsing
@@ -64,16 +64,26 @@ class IDKC():
         return qdot_d, np.zeros(self.robot.DoF)
 
 class HTIDKC():
+    """ Hierarchical Task Inversed Difference Control
+
+        Reference:
+        Escande, Adrien, Nicolas Mansard, and Pierre-Brice Wieber. “Hierarchical Quadratic Programming: Fast Online
+        Humanoid-Robot Motion Generation.” The International Journal of Robotics Research 33, no. 7 (June 1, 2014): 1006–28.
+        https://doi.org/10.1177/0278364914521306.
+
+    """
 
     def __init__(self, config):
         self.robot = MM(config)
         self.params = config
         self.QPsize = self.robot.DoF
+        self.qdot_prev = cs.DM.zeros(self.robot.DoF)
 
         self.ee_pos_tracking = EEPositionTracking(self.robot, config)
         self.base_pos_tracking = BasePositionTracking(self.robot, config)
         self.qdot_bound = JointVelocityBound(self.robot, config)
         self.q_bound = JointAngleBound(self.robot, config)
+        self.qddot_bound = JointAccelerationBound(self.robot, config)
 
     def control(self, t, robot_states, planners):
         q, _ = robot_states
@@ -81,10 +91,15 @@ class HTIDKC():
         eds = []
         task_types = []
 
-        # joint angle bound
-        Jq, edq = self.q_bound.linearize(q, [])
-        Js.append(Jq)
-        eds.append(edq)
+        # initial joint angle and acc bound
+        J_joint, ed_joint = self.q_bound.linearize(q, [])
+        if self.params["enable_joint_acc_bound"]:
+            Jqddot, edqddot = self.qddot_bound.linearize(q, self.qdot_prev)
+            J_joint = cs.vertcat(J_joint, Jqddot)
+            ed_joint = cs.vertcat(ed_joint, edqddot)
+
+        Js.append(J_joint)
+        eds.append(ed_joint)
         task_types.append("Ineq")
 
         for pid, planner in enumerate(planners):
@@ -103,17 +118,20 @@ class HTIDKC():
             eds.append(ed)
             task_types.append("Eq")
 
-        qdot_d = self.hqp(Js, eds, task_types)
+        qdot = self.hqp(Js, eds, task_types)
+        self.qdot_prev = qdot
 
-        return qdot_d, np.zeros(self.robot.DoF)
+        return qdot, np.zeros(self.robot.DoF)
 
     def hqp(self, Js, eds, task_types):
         """ Cascaded QP for solving lexicographic quadratic programming problem
+            lex-quad formulation see Eq.(22) in (Escande, 2014)
+            task formulation see Eq.(69) - Eq.(71) in (Escande, 2014)
 
-        :param Js:
-        :param eds:
-        :param task_types:
-        :return:
+        :param Js: list of task jacobians
+        :param eds: list of error feedback signal (desired twist)
+        :param task_types: a list, indicating task type, equality or inequality
+        :return: qdot_opt: optimal solution
         """
         Abar = cs.DM.zeros(0, self.QPsize)
         bbar = cs.DM.zeros(0)
@@ -133,6 +151,7 @@ class HTIDKC():
             w = opti.variable(J.shape[0])
 
             opti.minimize(0.5 * w.T @ w + 0.5 * self.params["ρ"] * qdot.T @ qdot)
+            opti.subject_to(opti.bounded(-self.qdot_bound.ub[self.QPsize:], qdot, self.qdot_bound.ub[:self.QPsize]))
             if Abar.shape[0] > 0:
                 opti.subject_to(Abar @ qdot == bbar)
             if Cbar.shape[0] > 0:

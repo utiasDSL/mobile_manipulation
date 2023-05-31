@@ -187,7 +187,35 @@ class JointVelocityBound(IDKCTaskBase):
     def evalute(self, q, qdot, *params):
         return self.J @ qdot - self.ub, self.J @ qdot - self.ub
 
+class JointAccelerationBound(IDKCTaskBase):
 
+    def __init__(self, robot, params):
+        nq = robot.DoF
+        super().__init__(nq, "Ineq", "JointAccelerationBound")
+        self.dt = 1./ params["ctrl_rate"]
+        self.J = cs.vertcat(cs.DM.eye(nq), -cs.DM.eye(nq))
+
+        self.ub = cs.vertcat(robot.ub_u, -robot.lb_u) * self.dt
+
+    def linearize(self, q, *params):
+        qdot_prev = params[0]
+        return self.J, self.ub + self.J @ qdot_prev
+
+    def evalute(self, q, qdot, *params):
+        vio = self.J @ (qdot - params[0]) - self.ub
+        return vio, vio
+
+def test_joint_acc_bound(config):
+    print("-------------Testing Joint Velocity Bound Task---------------- ")
+    robot = MobileManipulator3D(config["controller"])
+    joint_acc_task = JointAccelerationBound(robot, config["controller"])
+    nq = robot.DoF
+    qdot_prev = np.random.randn(nq) * 3
+    J, e = joint_acc_task.linearize([], qdot_prev)
+    print(J.toarray(), e)
+
+    qdot = np.random.randn(nq) * 3
+    print(joint_acc_task.evalute([], qdot, qdot_prev))
 
 def test_joint_vel_bound(config):
     print("-------------Testing Joint Velocity Bound Task---------------- ")
@@ -264,5 +292,5 @@ if __name__ == "__main__":
     config = parsing.load_config("/home/tracy/Projects/mm_catkin_ws/src/mm_sequential_tasks/mmseq_run/config/simple_experiment.yaml")
     # test_position_tracking(config)
     # test_joint_angle_bound(config)
-    test_joint_vel_bound(config)
-
+    # test_joint_vel_bound(config)
+    test_joint_acc_bound(config)
