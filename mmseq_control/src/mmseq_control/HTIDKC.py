@@ -7,14 +7,15 @@ Created on Wed May 31 10:16:00 2023
 """
 
 from mmseq_control.robot import MobileManipulator3D as MM
-from mmseq_control.IDKCTasks import EEPositionTracking, BasePositionTracking, JointVelocityBound, JointAngleBound, JointAccelerationBound
+from mmseq_control.robot import CasadiModelInterface as ModelInterface
+from mmseq_control.IDKCTasks import EEPositionTracking, BasePositionTracking, JointVelocityBound, JointAngleBound, JointAccelerationBound, CollisionAvoidance
 from mmseq_control.HQP import PrioritizedLinearSystemsNew as PLSN
 
 from mmseq_utils import parsing
 
 import numpy as np
 import casadi as cs
-
+import time
 from mmseq_control.HQP import PrioritizedLinearSystemsNew as PLSN
 # from mmseq_control.HQP import PrioritizedLinearSystems as PLS
 from qpsolvers import solve_qp, qpoases_solve_qp
@@ -74,7 +75,8 @@ class HTIDKC():
     """
 
     def __init__(self, config):
-        self.robot = MM(config)
+        self.model_interface = ModelInterface(config)
+        self.robot = self.model_interface.robot
         self.params = config
         self.QPsize = self.robot.DoF
         self.qdot_prev = cs.DM.zeros(self.robot.DoF)
@@ -84,6 +86,7 @@ class HTIDKC():
         self.qdot_bound = JointVelocityBound(self.robot, config)
         self.q_bound = JointAngleBound(self.robot, config)
         self.qddot_bound = JointAccelerationBound(self.robot, config)
+        self.collision_avoidance = CollisionAvoidance(self.model_interface, config)
 
     def control(self, t, robot_states, planners):
         q, _ = robot_states
@@ -91,16 +94,24 @@ class HTIDKC():
         eds = []
         task_types = []
 
-        # initial joint angle and acc bound
-        J_joint, ed_joint = self.q_bound.linearize(q, [])
-        if self.params["enable_joint_acc_bound"]:
-            Jqddot, edqddot = self.qddot_bound.linearize(q, self.qdot_prev)
-            J_joint = cs.vertcat(J_joint, Jqddot)
-            ed_joint = cs.vertcat(ed_joint, edqddot)
-
-        Js.append(J_joint)
-        eds.append(ed_joint)
+        # initial joint angle
+        Jq, eq = self.q_bound.linearize(q, [])
+        Js.append(Jq)
+        eds.append(eq)
         task_types.append("Ineq")
+
+        if self.params["self_collision_avoidance_enabled"] or self.params["static_obstacles_collision_avoidance_enabled"]:
+            Jcol, edcol = self.collision_avoidance.linearize(q, [])
+
+            Js.append(Jcol)
+            eds.append(edcol)
+            task_types.append("Ineq")
+
+        if self.params["joint_acc_bound_enabled"]:
+            Jqddot, edqddot = self.qddot_bound.linearize(q, self.qdot_prev)
+            Js.append(Jqddot)
+            eds.append(edqddot)
+            task_types.append("Ineq")
 
         for pid, planner in enumerate(planners):
             rd, vd = planner.getTrackingPoint(t, robot_states)
@@ -143,6 +154,8 @@ class HTIDKC():
             dbar = cs.DM.zeros(0)
 
         for tid in range(len(task_types)):
+            if tid == 0 and task_types[0] == "Ineq":
+                continue
             J = Js[tid]
             ed = eds[tid]
 
@@ -162,7 +175,7 @@ class HTIDKC():
                 opti.subject_to(J @ qdot == ed + w)
 
             p_opts = {"error_on_fail": True, "expand": True}
-            s_opts = {"OutputFlag": 0, "LogToConsole": 0, "Presolve": 1, "BarConvTol": 1e-8,
+            s_opts = {"OutputFlag": 1, "LogToConsole": 1, "Presolve": 1, "BarConvTol": 1e-8,
                                "OptimalityTol": 1e-6}
             opti.solver('gurobi', p_opts, s_opts)
 

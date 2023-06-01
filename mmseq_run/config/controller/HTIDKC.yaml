@@ -4,15 +4,20 @@ controller:
 
   # regularization parameter
   ρ: 0.01
-  ctrl_rate: 100
+  ctrl_rate: 80
 
   # options
-  enable_joint_acc_bound: true
+  joint_acc_bound_enabled: True
+  self_collision_avoidance_enabled: True
+  static_obstacles_collision_avoidance_enabled: False
 
   # task parameters
   base_tracking:
-    κ: 1.
+    κ: 0.5
   ee_tracking:
-    κ: 1.
-  joint_angle_bound_task:
-    κ: 1.
+    κ: 0.5
+  joint_angle_bound:
+    κ: 0.05
+  collision_avoidance:
+    κ: 0.05
+    safety_margin: 0.05

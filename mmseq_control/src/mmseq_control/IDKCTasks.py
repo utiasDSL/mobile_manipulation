@@ -159,6 +159,31 @@ class EEPositionTracking(PositionTrackingTask):
 
         super().__init__(fk, robot.DoF, 3, κ, "EEPositionTracking")
 
+class CollisionAvoidance(IneqTask):
+
+    def __init__(self, model_interface, params):
+        self.collision_link_names = ["self"] if params["self_collision_avoidance_enabled"] else []
+        self.collision_link_names += model_interface.scene.collision_link_names["static_obstacles"] \
+            if params["static_obstacles_collision_avoidance_enabled"] else []
+
+        if len(self.collision_link_names) > 0:
+            self.sd_fcns = {}
+            for name in self.collision_link_names:
+                sd_fcn = model_interface.getSignedDistanceSymMdls(name)
+                self.sd_fcns[name] = sd_fcn
+
+            q_sym = model_interface.robot.q_sym
+            e_eqn_list = []
+            for _, sd_fcn in self.sd_fcns.items():
+                e_eqn = params["collision_avoidance"]["safety_margin"] - sd_fcn(q_sym)
+                e_eqn_list.append(e_eqn)
+
+            e_eqn = cs.vertcat(*e_eqn_list)
+            e_fcn = cs.Function("sd", [q_sym], [e_eqn])
+
+            super().__init__(e_fcn, cs.DM.zeros(e_eqn.shape[0]), q_sym.shape[0], params["collision_avoidance"]["κ"],
+                             1./params["ctrl_rate"], "CollisionAvoidance")
+
 class JointAngleBound(IneqTask):
 
     def __init__(self, robot, params):
@@ -169,7 +194,7 @@ class JointAngleBound(IneqTask):
         e_fcn = cs.Function("e_fcn", [robot.q_sym], [cs.vertcat(robot.q_sym, -robot.q_sym)])
         ub = np.hstack((ub_q, -lb_q))
 
-        super().__init__(e_fcn, ub, nq, params["joint_angle_bound_task"]["κ"], 1./params["ctrl_rate"], "JointAngleBound")
+        super().__init__(e_fcn, ub, nq, params["joint_angle_bound"]["κ"], 1./params["ctrl_rate"], "JointAngleBound")
 
 class JointVelocityBound(IDKCTaskBase):
 
@@ -204,6 +229,18 @@ class JointAccelerationBound(IDKCTaskBase):
     def evalute(self, q, qdot, *params):
         vio = self.J @ (qdot - params[0]) - self.ub
         return vio, vio
+
+def test_collision_avoidance(config):
+    print("-------------Testing Joint Velocity Bound Task---------------- ")
+    model_interface = CasadiModelInterface(config["controller"])
+    collision_avoidance_task = CollisionAvoidance(model_interface, config["controller"])
+
+    nq = model_interface.robot.DoF
+    q = np.random.randn(nq)
+    qdot_prev = np.random.randn(nq) * 3
+    J, e = collision_avoidance_task.linearize(q, [])
+    print(J.toarray(), e)
+
 
 def test_joint_acc_bound(config):
     print("-------------Testing Joint Velocity Bound Task---------------- ")
@@ -241,7 +278,7 @@ def test_joint_angle_bound(config):
     kappa = config["controller"]["joint_angle_bound_task"]["κ"]
     dt = 1./ config["controller"]["ctrl_rate"]
 
-    J_sym, e_sym = joint_angle_task.linearize(q, config["controller"])
+    J_sym, e_sym = joint_angle_task.linearize(q, [])
     J = np.vstack((np.eye(nq), -np.eye(nq)))
     eu = kappa / dt * (robot.ub_x[:nq] - q)
     el = kappa / dt * (robot.lb_x[:nq] - q)
@@ -287,10 +324,11 @@ def test_position_tracking(config):
 
 if __name__ == "__main__":
     from mmseq_utils import parsing
-    from mmseq_control.robot import MobileManipulator3D
+    from mmseq_control.robot import MobileManipulator3D, CasadiModelInterface
 
     config = parsing.load_config("/home/tracy/Projects/mm_catkin_ws/src/mm_sequential_tasks/mmseq_run/config/simple_experiment.yaml")
     # test_position_tracking(config)
     # test_joint_angle_bound(config)
     # test_joint_vel_bound(config)
-    test_joint_acc_bound(config)
+    # test_joint_acc_bound(config)
+    test_collision_avoidance(config)
