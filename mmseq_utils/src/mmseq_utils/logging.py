@@ -601,6 +601,45 @@ class DataPlotter:
 
         return axes
 
+    def plot_task_violation(self, axes=None, index=0, legend=None):
+        task_names = self.data.get("task_names")
+        if task_names is None:
+            return
+        else:
+            task_names = task_names[0]
+        ws = []
+        for name in task_names:
+            ws.append(self.data.get("task_violations_" + name))
+
+        task_num = len(task_names)
+        if axes is None:
+            f, axes = plt.subplots(task_num, 1, sharex=True)
+        else:
+            if len(axes) != task_num:
+                raise ValueError("Given axes number ({}) does not match task number ({}).".format(len(axes), task_num))
+
+        if legend is None:
+            legend = self.data['name']
+
+        t_sim = self.data["ts"]
+        N = len(t_sim)
+        prop_cycle = plt.rcParams["axes.prop_cycle"]
+        colors = prop_cycle.by_key()["color"]
+        for tid in range(task_num):
+            w = ws[tid]
+
+            if tid == 0:
+                saturation_num = np.sum(w > 1e-3, axis=1)
+                axes[tid].plot(t_sim, saturation_num, color=colors[index], label=legend)
+                axes[tid].set_ylabel("# Inequalities Saturated \n out of {}".format(w.shape[1]))
+            else:
+                axes[tid].plot(t_sim, np.linalg.norm(w, axis=1), color=colors[index], label=legend)
+                axes[tid].set_ylabel("Task Violation")
+
+            axes[tid].set_title("Task " + str(tid) + " " + task_names[tid])
+
+        return axes
+
     def show(self):
         plt.show()
 

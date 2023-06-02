@@ -93,21 +93,11 @@ class HTIDKC():
         Js = []
         eds = []
         task_types = []
-
-        # # joint angle bound
-        # Jq, eq = self.q_bound.linearize(q, [])
-        # Js.append(Jq)
-        # eds.append(eq)
-        # task_types.append("Ineq")
-        #
-        # # joint velocity bound
-        # Jqdot, eqdot = self.qdot_bound.linearize(q, [])
-        # Js.append(Jqdot)
-        # eds.append(eqdot)
-        # task_types.append("Ineq")
+        task_names = []
 
         Js_ineq = []
         eds_ineq = []
+        names_ineq = []
 
         J_joint = cs.DM.zeros((0, self.QPsize))
         ed_joint = cs.DM.zeros(0)
@@ -117,47 +107,59 @@ class HTIDKC():
             J_joint = cs.vertcat(J_joint, Jq)
             ed_joint = cs.vertcat(ed_joint, edq)
 
+        if self.params["joint_acc_bound_enabled"]:
+            Jqddot, edqddot = self.qddot_bound.linearize(q, self.qdot_prev)
+            J_joint = cs.vertcat(J_joint, Jqddot)
+            ed_joint = cs.vertcat(ed_joint, edqddot)
+
         Js_ineq.append(J_joint)
         eds_ineq.append(ed_joint)
+        names_ineq.append("Joints")
 
         if self.params["self_collision_avoidance_enabled"] or self.params["static_obstacles_collision_avoidance_enabled"]:
             Jcol, edcol = self.collision_avoidance.linearize(q, [])
             Js_ineq.append(Jcol)
             eds_ineq.append(edcol)
-
-        if self.params["joint_acc_bound_enabled"]:
-            Jqddot, edqddot = self.qddot_bound.linearize(q, self.qdot_prev)
-            Js_ineq.append(Jqddot)
-            eds_ineq.append(edqddot)
+            names_ineq.append("Collision")
 
         if self.params["one_inequality_constraint_enabled"]:
             Js.append(cs.vertcat(*Js_ineq))
             eds.append(cs.vertcat(*eds_ineq))
             task_types.append("Ineq")
+            task_names.append("Joints&Collision")
         else:
-            for J, ed in zip(Js_ineq, eds_ineq):
+            for J, ed, name in zip(Js_ineq, eds_ineq, names_ineq):
                 Js.append(J)
                 eds.append(ed)
                 task_types.append("Ineq")
+                task_names.append(name)
 
         for pid, planner in enumerate(planners):
             rd, vd = planner.getTrackingPoint(t, robot_states)
 
             if planner.type == "EE" and planner.ref_data_type == "Vec3":
                     J, ed = self.ee_pos_tracking.linearize(q, rd, vd)
+                    name = self.ee_pos_tracking.name
             elif planner.type == "base" and planner.ref_data_type == "Vec2":
                     J, ed = self.base_pos_tracking.linearize(q, rd, vd)
+                    name = self.base_pos_tracking.name
             else:
                 print("Planner of Type {} and Data type {} Not supported".format(planner.type, planner.ref_data_type))
                 J = np.eye(self.robot.DoF)
                 ed = np.zeros(self.robot.DoF)
+                name = "Empty"
 
             Js.append(J)
             eds.append(ed)
             task_types.append("Eq")
+            task_names.append(name)
 
-        qdot = self.hqp(Js, eds, task_types)
+        qdot, ws = self.hqp(Js, eds, task_types)
+
+        # bookkeeping
         self.qdot_prev = qdot
+        self.ws = ws.copy()
+        self.task_names = task_names.copy()
 
         return qdot, np.zeros(self.robot.DoF)
 
@@ -179,6 +181,8 @@ class HTIDKC():
         # else:
         Cbar = cs.DM.zeros(0, self.QPsize)
         dbar = cs.DM.zeros(0)
+
+        w_opts = []
 
         for tid in range(len(task_types)):
             # if tid == 0 and task_types[0] == "Ineq":
@@ -216,6 +220,7 @@ class HTIDKC():
             w_opt = sol.value(w)
             qdot_opt = sol.value(qdot)
 
+            w_opts.append(w_opt)
             if task_types[tid] == "Ineq":
                 Cbar = cs.vertcat(Cbar, J)
                 dbar = cs.vertcat(dbar, ed + w_opt)
@@ -223,7 +228,7 @@ class HTIDKC():
                 Abar = cs.vertcat(Abar, J)
                 bbar = cs.vertcat(bbar, ed + w_opt)
 
-        return qdot_opt
+        return qdot_opt, w_opts
 
 
 

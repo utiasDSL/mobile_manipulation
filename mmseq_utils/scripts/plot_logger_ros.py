@@ -68,6 +68,7 @@ if __name__ == "__main__":
             data_plotter.plot_mpc()
         if args.tracking:
             plot_tracking(data_plotter)
+            data_plotter.plot_task_violation()
         if args.robot:
             data_plotter.plot_robot()
 
