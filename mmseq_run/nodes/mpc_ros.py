@@ -201,9 +201,9 @@ class ControllerROSNode:
                 marker_plan = self._make_marker(Marker.LINE_STRIP, pid, rgba=color + [1], scale=[0.1, 0.1, 0.1])
 
                 if planner.ref_data_type == "Vec3":
-                    marker_plan.points = [Point(*pt) for pt in planner.plan]
+                    marker_plan.points = [Point(*pt) for pt in planner.plan['p']]
                 elif planner.ref_data_type == "Vec2":
-                    marker_plan.points = [Point(*pt, 0) for pt in planner.plan]
+                    marker_plan.points = [Point(*pt, 0) for pt in planner.plan['p']]
 
             marker_plan.lifetime = rospy.Duration.from_sec(0.1)
             self.plan_visualization_pub.publish(marker_plan)
@@ -243,7 +243,6 @@ class ControllerROSNode:
                 return
 
         print("Controller received joint states. Proceed ... ")
-        # self.sot = SoTStatic(self.planner_config)
         planner_class = getattr(TaskManager, self.planner_config["sot_type"])
         self.sot = planner_class(self.planner_config)
         self.planner_coord_transform(self.robot_interface.q, self.vicon_tool_interface.position, self.sot.planners)
@@ -335,15 +334,15 @@ class ControllerROSNode:
                 planner.target_pos = R_wb @ planner.target_pos + P
             elif planner.__class__.__name__ == "EEPosTrajectoryCircle":
                 planner.c = R_wb @ planner.c + P
-                planner.plan = planner.plan @ R_wb.T + P
+                planner.plan['p'] = planner.plan['p'] @ R_wb.T + P
 
             elif planner.__class__.__name__ == "BaseSingleWaypoint":
                 planner.target_pos = (R_wb @ np.hstack((planner.target_pos, 0)))[:2] + P[:2]
             elif planner.__class__.__name__ == "BasePosTrajectoryCircle":
                 planner.c = R_wb[:2,:2] @ planner.c + P[:2]
-                planner.plan = planner.plan @ R_wb[:2, :2].T + P[:2]
+                planner.plan['p'] = planner.plan['p'] @ R_wb[:2, :2].T + P[:2]
             elif planner.__class__.__name__ == "BasePosTrajectoryLine":
-                planner.plan = planner.plan @ R_wb[:2, :2].T + P[:2]
+                planner.plan['p'] = planner.plan['p'] @ R_wb[:2, :2].T + P[:2]
 
 if __name__ == "__main__":
     rospy.init_node("controller_ros")
