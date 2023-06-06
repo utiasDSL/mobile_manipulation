@@ -79,7 +79,8 @@ class HTIDKC():
         self.robot = self.model_interface.robot
         self.params = config
         self.QPsize = self.robot.DoF
-        self.qdot_prev = cs.DM.zeros(self.robot.DoF)
+        self.qdot_prev = np.zeros(self.robot.DoF)
+        self.ctrl_rate = config["ctrl_rate"]
 
         self.ee_pos_tracking = EEPositionTracking(self.robot, config)
         self.base_pos_tracking = BasePositionTracking(self.robot, config)
@@ -155,13 +156,13 @@ class HTIDKC():
             task_names.append(name)
 
         qdot, ws = self.hqp(Js, eds, task_types)
-
+        qddot = (qdot - self.qdot_prev) * self.ctrl_rate
         # bookkeeping
         self.qdot_prev = qdot
         self.ws = ws.copy()
         self.task_names = task_names.copy()
 
-        return qdot, np.zeros(self.robot.DoF)
+        return qdot, qddot
 
     def hqp(self, Js, eds, task_types):
         """ Cascaded QP for solving lexicographic quadratic programming problem
@@ -206,7 +207,7 @@ class HTIDKC():
                 opti.subject_to(J @ qdot == ed + w)
 
             p_opts = {"error_on_fail": True, "expand": True}
-            s_opts = {"OutputFlag": 1, "LogToConsole": 1, "Presolve": 1, "BarConvTol": 1e-8,
+            s_opts = {"OutputFlag": 0, "LogToConsole": 0, "Presolve": 1, "BarConvTol": 1e-8,
                                "OptimalityTol": 1e-6}
             opti.solver('gurobi', p_opts, s_opts)
 
