@@ -133,9 +133,9 @@ class NonlinearConstraint(Constraint):
         indx = np.where(g > self.tol)[0]
         if len(indx) > 0:
             self.py_logger.debug(self.name + " Constraint is violated at {}".format(indx))
-            return False
+            return False, g.toarray().flatten()
         else:
-            return True
+            return True, g.toarray().flatten()
 
 class HierarchicalTrackingConstraint(NonlinearConstraint):
     def __init__(self, cost_fcn_obj, name="Hierarchy"):
