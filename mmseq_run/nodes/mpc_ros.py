@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+import os
 import argparse
 import datetime
 import logging
@@ -28,18 +29,29 @@ class ControllerROSNode:
         argv = rospy.myargv(argv=sys.argv)
         parser = argparse.ArgumentParser()
         parser.add_argument("--config", required=True, help="Path to configuration file.")
-        parser.add_argument("--type", type=str, default=None,
-                            help="controller type, HTMPCSQP or HTMPCLex. This overwrites the yaml settings")
+        parser.add_argument("--ctrl_config", type=str,
+                            help="controller config. This overwrites the yaml settings in config if not set to default")
+        parser.add_argument("--planner_config", type=str,
+                            help="plannner config. This overwrites the yaml settings in config if not set to default")
+        parser.add_argument("--logging_sub_folder", type=str,
+                            help="save data in a sub folder of logging director")
         args = parser.parse_args(argv[1:])
 
 
         # load configuration and overwrite with args
         config = parsing.load_config(args.config)
-        if args.type is not None:
-            config["controller"]["type"] = args.type
+        if args.ctrl_config != "default":
+            ctrl_config = parsing.load_config(args.ctrl_config)
+            config = parsing.recursive_dict_update(config, ctrl_config)
+        if args.planner_config != "default":
+            planner_config = parsing.load_config(args.planner_config)
+            config = parsing.recursive_dict_update(config, planner_config)
 
         if config["controller"]["type"] == "HTMPCLex":
             config["controller"]["HT_MaxIntvl"] = 1
+
+        if args.logging_sub_folder != "default":
+            config["logging"]["log_dir"] = os.path.join(config["logging"]["log_dir"], args.logging_sub_folder)
 
         self.ctrl_config = config["controller"]
         self.planner_config = config["planner"]
@@ -340,11 +352,5 @@ if __name__ == "__main__":
     rospy.init_node("controller_ros")
 
     node = ControllerROSNode()
-    try:
-        node.run()
-    except rospy.ROSInterruptException:
-        node.cmd_vel_timer.shutdown()
-        node.robot_interface.brake()
-        node.robot_interface.brake()
-        timestamp = datetime.datetime.now()
-        node.logger.save(timestamp, "ctrl")
+    node.run()
+

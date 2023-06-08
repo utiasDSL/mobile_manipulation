@@ -11,4 +11,7 @@ class Planner(ABC):
     @abstractmethod
     def getTrackingPoint(self, t, robot_states=None):
         pass
-    
+
+    @staticmethod
+    def getDefaultParams():
+        return {}

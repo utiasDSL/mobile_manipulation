@@ -738,6 +738,23 @@ def test_pinocchio_interface(args):
     robot.visualize(q)
     input()
 
+def check_maximum_reach(args):
+    config = parsing.load_config(args.config)
+    sim_config = config["simulation"]
+    ctrl_config = config["controller"]
+    # Create Sym Mdl
+    robot = MobileManipulator3D(ctrl_config)
+    fee = robot.kinSymMdls[robot.tool_link_name]
+    q_home = [ 0., -0, 0., 0.5*np.pi, -0.25*np.pi, 0.5*np.pi, -0.25*np.pi, 0.5*np.pi, 0.417*np.pi ]
+    q_straight = [0, 0, 0, 0.5*np.pi, 0., 0., 0., 0.5*np.pi, 0.]
+    q_upright = [0, 0, 0, 0.5*np.pi, -0.5*np.pi, 0, -0, 0.5*np.pi, 0]
+
+    print("EE position under different configuration")
+    print("home: {}".format(fee(q_home)[0]))
+    print("straight front: {}".format(fee(q_straight)[0]))
+    print("upright: {}".format(fee(q_upright)[0]))
+
+
 def test_casadi_interface(args):
     # load configuration
     config = parsing.load_config(args.config)
@@ -776,10 +793,11 @@ if __name__ == "__main__":
         help="Record video. Optionally specify prefix for video directory.",
     )
     args = parser.parse_args()
-    test_robot_mdl(args)
+    # test_robot_mdl(args)
     # test_obstacle_mdl(args)
     # test_pinocchio_interface(args)
     # test_casadi_interface(args)
+    check_maximum_reach(args)
 
             
         

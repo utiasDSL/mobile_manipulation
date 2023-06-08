@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+import os
 import argparse
 import datetime
 import logging
@@ -28,14 +29,25 @@ class ControllerROSNode:
         argv = rospy.myargv(argv=sys.argv)
         parser = argparse.ArgumentParser()
         parser.add_argument("--config", required=True, help="Path to configuration file.")
-        parser.add_argument("--type", type=str, default=None,
-                            help="controller type, HTMPCSQP or HTMPCLex. This overwrites the yaml settings")
+        parser.add_argument("--ctrl_config", type=str,
+                            help="controller config. This overwrites the yaml settings in config if not set to default")
+        parser.add_argument("--planner_config", type=str,
+                            help="plannner config. This overwrites the yaml settings in config if not set to default")
+        parser.add_argument("--logging_sub_folder", type=str,
+                            help="save data in a sub folder of logging director")
         args = parser.parse_args(argv[1:])
 
         # load configuration and overwrite with args
         config = parsing.load_config(args.config)
-        if args.type is not None:
-            config["controller"]["type"] = args.type
+        if args.ctrl_config != "default":
+            ctrl_config = parsing.load_config(args.ctrl_config)
+            config = parsing.recursive_dict_update(config, ctrl_config)
+        if args.planner_config != "default":
+            planner_config = parsing.load_config(args.planner_config)
+            config = parsing.recursive_dict_update(config, planner_config)
+
+        if args.logging_sub_folder != "default":
+            config["logging"]["log_dir"] = os.path.join(config["logging"]["log_dir"], args.logging_sub_folder)
 
         ctrl_config = config["controller"]
         self.planner_config = config["planner"]
@@ -74,7 +86,6 @@ class ControllerROSNode:
         self.plan_visualization_pub = rospy.Publisher("plan_visualization", Marker, queue_size=10)
         self.tracking_point_pub = rospy.Publisher("controller_tracking_pt", MultiDOFJointTrajectory, queue_size=5)
 
-        rospy.Timer(rospy.Duration(0, int(1e8)), self._publish_planner_data)
         self.sot_lock = threading.Lock()
         rospy.on_shutdown(self.shutdownhook)
         self.ctrl_c = False
@@ -101,6 +112,8 @@ class ControllerROSNode:
         planner_class = getattr(TaskManager, self.planner_config["sot_type"])
         self.sot = planner_class(self.planner_config)
         self.planner_coord_transform(self.robot_interface.q, self.vicon_tool_interface.position, self.sot.planners)
+
+        rospy.Timer(rospy.Duration(0, int(1e8)), self._publish_planner_data)
 
         print("robot coord: {}".format(self.robot_interface.q))
         for planner in self.sot.planners:

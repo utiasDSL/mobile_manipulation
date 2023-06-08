@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+import os
 import argparse
 import datetime
 import logging
@@ -27,6 +28,8 @@ def main():
         const="",
         help="Record video. Optionally specify prefix for video directory.",
     )
+    parser.add_argument("--logging_sub_folder", type=str,
+                        help="save data in a sub folder of logging director")
     parser.add_argument("--GUI", action="store_true",
                         help="STMPC type, SQP or lex. This overwrites the yaml settings")
     args = parser.parse_args(argv[1:])
@@ -36,6 +39,8 @@ def main():
 
     if args.GUI:
         config["simulation"]["pybullet_connection"] = "GUI"
+    if args.logging_sub_folder != "default":
+        config["logging"]["log_dir"] = os.path.join(config["logging"]["log_dir"], args.logging_sub_folder)
 
     sim_config = config["simulation"]
 
@@ -106,10 +111,6 @@ def main():
 
     timestamp = datetime.datetime.now()
     logger.save(timestamp, "sim")
-    # plotter = DataPlotter.from_logger(logger)
-    # plotter.plot_cmd_vs_real_vel()
-    # plotter.plot_ee_position()
-    # plotter.show()
 
 if __name__ == "__main__":
     main()

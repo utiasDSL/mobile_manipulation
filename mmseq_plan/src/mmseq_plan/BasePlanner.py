@@ -36,6 +36,17 @@ class BaseSingleWaypoint(Planner):
         self.finished = False
         self.py_logger.info(self.name + " planner reset.")
 
+    @staticmethod
+    def getDefaultParams():
+        config = {}
+        config["name"] = "Base Position"
+        config["planner_type"] = "BaseSingleWaypoint"
+        config["frame_id"] = "base"
+        config["target_pos"] = [0, 0]
+        config["tracking_err_tol"] = 0.02
+
+        return config
+
 class BasePosTrajectoryCircle(Planner):
     def __init__(self, config):
         self.name = config["name"]

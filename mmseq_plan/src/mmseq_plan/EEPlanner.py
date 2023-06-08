@@ -54,6 +54,19 @@ class EESimplePlanner(Planner):
         self.started = False
         self.py_logger.info(self.name + " Planner Reset.")
 
+    @staticmethod
+    def getDefaultParams():
+        config = {}
+        config["name"] = "EE Position"
+        config["planner_type"] = "EESimplePlanner"
+        config["frame_id"] = "EE"
+        config["target_pos"] = [0, 0, 0]
+        config["hold_period"] = 3.
+        config["tracking_err_tol"] = 0.02
+
+        return config
+
+
 
 class EEPosTrajectoryCircle(Planner):
     def __init__(self, config):
