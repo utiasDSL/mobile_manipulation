@@ -6,14 +6,12 @@ import logging
 import time
 
 import numpy as np
-from pyb_utils.ghost import GhostSphere, GhostCylinder
 from spatialmath.base import rotz
 
 import mmseq_control.HTMPC as HTMPC
 import mmseq_control.HTIDKC as HTIDKC
 import mmseq_plan.TaskManager as TaskManager
 from mmseq_simulator import simulation
-from mmseq_plan.TaskManager import SoTStatic
 from mmseq_utils import parsing
 from mmseq_utils.logging import DataLogger, DataPlotter
 
@@ -186,10 +184,6 @@ def main():
     data_name = ctrl_config["type"]
     timestamp = datetime.datetime.now()
     logger.save(timestamp, data_name)
-    plotter = DataPlotter.from_logger(logger)
-    plotter.plot_all()
-    # plotter.plot_cmd_vs_real_vel()
-    plotter.show()
 
 if __name__ == "__main__":
     main()
