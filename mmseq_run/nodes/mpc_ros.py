@@ -345,7 +345,7 @@ class ControllerROSNode:
             elif planner.__class__.__name__ == "BasePosTrajectoryCircle":
                 planner.c = R_wb[:2,:2] @ planner.c + P[:2]
                 planner.plan['p'] = planner.plan['p'] @ R_wb[:2, :2].T + P[:2]
-            elif planner.__class__.__name__ == "BasePosTrajectoryLine":
+            elif planner.__class__.__name__ == "BasePosTrajectoryLine" or planner.__class__.__name__ == "BasePosTrajectorySqaureWave":
                 planner.plan['p'] = planner.plan['p'] @ R_wb[:2, :2].T + P[:2]
 
 if __name__ == "__main__":
