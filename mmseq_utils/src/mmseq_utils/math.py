@@ -189,7 +189,7 @@ def integrate_zoh(ts, data):
     dts = np.hstack((dts, dts[-1]))
     integral = np.sum(data*dts, axis=0)
 
-    return integral
+    return integral / (ts[-1] - ts[0])
 
 def statistics(data):
     mean = np.mean(data, axis=0)

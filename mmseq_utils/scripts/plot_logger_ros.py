@@ -9,7 +9,7 @@ from mmseq_utils.logging import DataLogger, DataPlotter, multipage
 import matplotlib.pyplot as plt
 from pandas import DataFrame, concat
 
-STATS = [("err_ee_normalized", "integral"), ("err_ee_normalized", "rms"), ("err_base_normalized", "integral"),
+STATS = [("err_ee", "integral"), ("err_ee", "rms"), ("err_base_normalized", "integral"),
          ("err_base_normalized", "rms"),
          ("cmd_accs_saturation", "mean"), ("run_time", "mean"), ("constraints_violation", "mean")]
 
@@ -111,7 +111,7 @@ def benchmark(folder_path):
     df_summary = concat([df_mpc.mean(), df_idkc.mean()], keys=["HTMPC", "HTIDKC"], axis=1)
     df_summary.to_csv(os.path.join(folder_path, "stats_summary.csv"))
 
-    diff_ee = (df_mpc["err_ee_normalized_integral"] - df_idkc["err_ee_normalized_integral"]) / df_idkc["err_ee_normalized_integral"] * 100
+    diff_ee = (df_mpc["err_ee_integral"] - df_idkc["err_ee_integral"]) / df_idkc["err_ee_integral"] * 100
     diff_base = (df_mpc["err_base_normalized_integral"] - df_idkc["err_base_normalized_integral"]) / df_idkc["err_base_normalized_integral"] * 100
     dJ = [diff_ee.to_numpy() , diff_base.to_numpy()]
 

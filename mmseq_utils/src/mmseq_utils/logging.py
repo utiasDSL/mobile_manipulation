@@ -12,12 +12,12 @@ import os
 from spatialmath.base import rotz, r2q
 
 from mmseq_utils.parsing import parse_path, load_config
-from mmseq_control.robot import CasadiModelInterface
+from mmseq_control.robot import CasadiModelInterface, MobileManipulator3D
 from mmseq_utils import parsing, math
 from matplotlib.backends.backend_pdf import PdfPages
 from mobile_manipulation_central import ros_utils
 
-VICON_TOOL_NAME = "ThingContainer"
+VICON_TOOL_NAME = "ThingWoodLumber"
 
 def multipage(filename, figs=None, dpi=200):
     pp = PdfPages(filename)
@@ -224,6 +224,22 @@ class DataPlotter:
         constraints_violation = np.hstack((constraints_violation, np.expand_dims(0.05 - self.data["signed_distance"], axis=1) / 0.05))
         self.data["constraints_violation"] = self._get_mean_violation(constraints_violation)
 
+        # singularity
+        man_fcn = self.model_interface.robot.manipulability_fcn
+        man_fcn_map = man_fcn.map(len(self.data["ts"]))
+        manipulability = man_fcn_map(self.data["xs"][:, :nq].T)
+        self.data["manipulability"] = manipulability.toarray().flatten()
+
+        arm_man_fcn = self.model_interface.robot.arm_manipulability_fcn
+        arm_man_fcn_map = arm_man_fcn.map(len(self.data["ts"]))
+        arm_manipulability = arm_man_fcn_map(self.data["xs"][:, :nq].T)
+        self.data["arm_manipulability"] = arm_manipulability.toarray().flatten()
+
+        # jerk
+        self.data["cmd_jerks"] = (self.data["cmd_accs"][1:, :] - self.data["cmd_accs"][:-1, :]) / \
+                                 np.expand_dims(self.data["ts"][1:] - self.data["ts"][:-1], axis=1)
+
+
     def _get_statistics(self):
         self.data["statistics"] = {}
         # EE tracking error
@@ -266,11 +282,25 @@ class DataPlotter:
         cmd_accs_stats = math.statistics(np.abs(self.data["cmd_accs_normalized"].flatten()))
         self.data["statistics"]["cmd_accs_saturation"] = {"mean": cmd_accs_stats[0], "max": cmd_accs_stats[1], "min": cmd_accs_stats[2]}
 
+        cmd_jerks_base_linear_stats = math.statistics(np.linalg.norm(self.data["cmd_jerks"][:, :2], axis=1).flatten())
+        self.data["statistics"]["cmd_jerks_base_linear"] = {"mean": cmd_jerks_base_linear_stats[0], "max": cmd_jerks_base_linear_stats[1],
+                                                          "min": cmd_jerks_base_linear_stats[2]}
+        cmd_jerks_base_angular_stats = math.statistics(np.abs(self.data["cmd_jerks"][:, 2]))
+        self.data["statistics"]["cmd_jerks_base_angular"] = {"mean": cmd_jerks_base_angular_stats[0],
+                                                            "max": cmd_jerks_base_angular_stats[1],
+                                                            "min": cmd_jerks_base_angular_stats[2]}
+
+        cmd_jerks_stats = math.statistics(self.data["cmd_jerks"])
+        self.data["statistics"]["cmd_jerks"] = {"mean": cmd_jerks_stats[0],
+                                                            "max": cmd_jerks_stats[1],
+                                                            "min": cmd_jerks_stats[2]}
+
         violation_stats = math.statistics(self.data["constraints_violation"])
         self.data["statistics"]["constraints_violation"] = {"mean": violation_stats[0], "max": violation_stats[1], "min": violation_stats[2]}
 
         run_time_states = math.statistics(self.data["controller_run_time"])
         self.data["statistics"]["run_time"] = {"mean": run_time_states[0], "max": run_time_states[1], "min": run_time_states[2]}
+
     def summary(self, stat_names):
         """ get a summary of statistics
 
@@ -437,12 +467,13 @@ class DataPlotter:
         ts = self.data["ts"]
         cmd_vels = self.data["cmd_vels"]
         cmd_accs = self.data.get("cmd_accs")
+        cmd_jerks = self.data.get("cmd_jerks")
         nq = int(self.data["nq"])
         nv = int(self.data["nv"])
 
         if axes is None:
             axes = []
-            for i in range(2):
+            for i in range(3):
                 f, ax = plt.subplots(nv, 1, sharex=True, figsize=(13, 23))
                 axes.append(ax)
         if legend is None:
@@ -483,6 +514,23 @@ class DataPlotter:
                 ax[i].legend()
             ax[-1].set_xlabel("Time (s)")
             ax[0].set_title("Commanded joint acceleration (rad/s^2)")
+
+        if cmd_jerks is not None:
+            ax = axes[2]
+            for i in range(nv):
+                ax[i].plot(
+                    ts[:-1],
+                    cmd_jerks[:, i],
+                    '-x',
+                    label=legend + f"$j_{{cmd_{i + 1}}}$" + f"max = " + str(self.data["statistics"]["cmd_jerks"]["max"][i]),
+                    linestyle="--",
+                    color=colors[index],
+                )
+
+                ax[i].grid()
+                ax[i].legend()
+            ax[-1].set_xlabel("Time (s)")
+            ax[0].set_title("Commanded joint jerk (rad/s^3)")
 
         return axes
 
@@ -799,9 +847,9 @@ class DataPlotter:
 
     def plot_task_performance(self, axes=None, index=0, legend=None):
         if axes is None:
-            f, axes = plt.subplots(3, 1, sharex=True)
+            f, axes = plt.subplots(4, 1, sharex=True)
         else:
-            if len(axes) != 3:
+            if len(axes) != 4:
                 raise ValueError("Given axes number ({}) does not match task number ({}).".format(len(axes), 4))
 
         if legend is None:
@@ -831,7 +879,10 @@ class DataPlotter:
         axes[2].plot(t_sim, self.data["err_base"],
                      label=legend + " acc = {:.3f}".format(self.data["statistics"]["err_base"]["integral"]), color=colors[index])
         axes[2].set_ylabel("Base Err (m)")
-        axes[2].set_xlabel("Time (s)")
+
+        axes[3].plot(t_sim, self.data["arm_manipulability"], label=legend)
+        axes[3].set_ylabel("Arm Manipulability")
+        axes[3].set_xlabel("Time (s)")
 
         for a in axes:
             a.legend()
@@ -850,9 +901,9 @@ class DataPlotter:
 
         task_num = len(task_names)
         if axes is None:
-            f, axes = plt.subplots(task_num, 1, sharex=True)
+            f, axes = plt.subplots(task_num+1, 1, sharex=True)
         else:
-            if len(axes) != task_num:
+            if len(axes) != task_num+1:
                 raise ValueError("Given axes number ({}) does not match task number ({}).".format(len(axes), task_num))
 
         if legend is None:
@@ -872,9 +923,21 @@ class DataPlotter:
                 axes[tid].set_ylabel("# Inequalities Saturated \n out of {}".format(w.shape[1]))
             else:
                 axes[tid].plot(t_sim, np.linalg.norm(w, axis=1), color=colors[index], label=legend)
-                axes[tid].set_ylabel("Task Violation")
 
             axes[tid].set_title("Task " + str(tid) + " " + task_names[tid])
+
+        axes[-1].plot(t_sim, self.data["arm_manipulability"], color=colors[index], label=legend )
+        axes[-1].set_title("Arm Manipulability")
+        axes[-1].set_xlabel("Time (s)")
+        plt.legend()
+
+        plt.figure()
+        w0 = ws[0]
+        plt.plot(t_sim, np.linalg.norm(w0[:, :18], axis=1),label=legend + "_joint_vel")
+        plt.plot(t_sim, np.linalg.norm(w0[:, 18:36], axis=1),label=legend + "_joint_angle")
+        plt.plot(t_sim, np.linalg.norm(w0[:, 36:54], axis=1),label=legend + "_joint_acc")
+        plt.plot(t_sim, np.linalg.norm(w0[:, 54:], axis=1),label=legend + "_collision")
+        plt.legend()
 
         return axes
 
@@ -1144,7 +1207,7 @@ class ROSBagPlotter:
             for i in range(3):
                 ax.plot(t_ref, rees[:, i], '--', label=labels[i] + "d" +subscript, color=colors[i])
                 ax.plot(self.data["vicon"][VICON_TOOL_NAME]["ts"],
-                    self.data["vicon"][VICON_TOOL_NAME]["qs"][:, i], '-',
+                    self.data["vicon"][VICON_TOOL_NAME]["pos"][:, i], '-',
                     label=labels[i] + subscript, color=colors[i])
             ax.set_xlabel("Time (s)")
             ax.set_ylabel("Positions")

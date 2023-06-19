@@ -1,0 +1,29 @@
+simulation:
+  duration: 16
+
+planner:
+  sot_type: SoTStatic
+  tasks:
+  - frame_id: EE
+    hold_period: 3.0
+    name: EE Position
+    planner_type: EESimplePlanner
+    target_pos: [0, 0, 0]
+    tracking_err_tol: 0.02
+  - frame_id: base
+    name: Base Position
+    planner_type: BaseSingleWaypoint
+    target_pos: [4, 0]
+    tracking_err_tol: 0.02
+
+include:
+  - package: "mmseq_run"
+    path: "config/robot/thing.yaml"
+  - package: "mmseq_run"
+    path: "config/sim/simulation.yaml"
+  - package: "mmseq_run"
+    path: "config/scene/empty.yaml"
+
+logging:
+  log_dir: "/home/tracy/Documents/PhD/data/htmpc_vs_htidkc_sqaurewave"
+  log_level: 20 # 0 - not set, 10 - debug, 20 - info
