@@ -10,13 +10,12 @@ do
     esac
 done
 use_mpc=false
-if "$controller_type"="HTMPC"
-then
+if [ "$controller_type" = "HTMPC" ]; then
   use_mpc=true
 fi
 
 test_files=()
-for (( fid=0; fid<=file_num; fid++ ))
+for (( fid=0; fid<file_num; fid++ ))
 do
   test_files+=("$path_to_folder""/test_cases/test_""$fid"".yaml")
 done

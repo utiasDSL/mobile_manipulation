@@ -2,8 +2,9 @@
 # -*- coding: utf-8 -*-
 
 import numpy as np
-from mmseq_plan.PlanBaseClass import Planner
+from mmseq_plan.PlanBaseClass import Planner, TrajectoryPlanner
 from mmseq_utils.parsing import parse_number
+from mmseq_utils.trajectory_generation import sqaure_wave
 
 class BaseSingleWaypoint(Planner):
 
@@ -47,7 +48,7 @@ class BaseSingleWaypoint(Planner):
 
         return config
 
-class BasePosTrajectoryCircle(Planner):
+class BasePosTrajectoryCircle(TrajectoryPlanner):
     def __init__(self, config):
         self.name = config["name"]
         self.type = "base"
@@ -89,25 +90,7 @@ class BasePosTrajectoryCircle(Planner):
         plan_vel[:, 0] = vx
         plan_vel[:, 1] = vy
 
-        return {"p": plan_pos, "v": plan_vel}
-
-    def _interpolate(self, t, plan, dt):
-        plan_len = len(plan["p"])
-        indx = int(t / dt)
-        if indx > plan_len - 2:
-            return plan['p'][-1], np.zeros_like(plan['p'][-1])
-        elif indx < 0:
-            return plan['p'][0], np.zeros_like(plan['p'][0])
-
-        p0 = plan["p"][indx]
-        p1 = plan["p"][indx + 1]
-        p = (p1 - p0) / dt * (t - indx * dt) + p0
-
-        v0 = plan["v"][indx]
-        v1 = plan["v"][indx + 1]
-        v = (v1 - v0) / dt * (t - indx * dt) + v0
-
-        return p, v
+        return {"t": ts, "p": plan_pos, "v": plan_vel}
 
     def getTrackingPoint(self, t, robot_states=None):
 
@@ -116,7 +99,7 @@ class BasePosTrajectoryCircle(Planner):
 
         te = t - self.start_time
 
-        p, v = self._interpolate(te, self.plan, self.dt)
+        p, v = self._interpolate(te, self.plan)
 
         return p, v
 
@@ -131,7 +114,7 @@ class BasePosTrajectoryCircle(Planner):
         self.finished = False
         self.started = False
 
-class BasePosTrajectoryLine(Planner):
+class BasePosTrajectoryLine(TrajectoryPlanner):
     def __init__(self, config):
         self.name = config["name"]
         self.type = "base"
@@ -161,25 +144,7 @@ class BasePosTrajectoryLine(Planner):
 
         plan_vel = np.tile(n * self.cruise_speed, (int(self.T/self.dt), 1))
 
-        return {'p': plan_pos, 'v': plan_vel}
-
-    def _interpolate(self, t, plan, dt):
-        plan_len = len(plan["p"])
-        indx = int(t / dt)
-        if indx > plan_len - 2:
-            return plan['p'][-1], np.zeros_like(plan['p'][-1])
-        elif indx < 0:
-            return plan['p'][0], np.zeros_like(plan['p'][0])
-
-        p0 = plan["p"][indx]
-        p1 = plan["p"][indx + 1]
-        p = (p1 - p0) / dt * (t - indx * dt) + p0
-
-        v0 = plan["v"][indx]
-        v1 = plan["v"][indx + 1]
-        v = (v1 - v0) / dt * (t - indx * dt) + v0
-
-        return p, v
+        return {'t': ts, 'p': plan_pos, 'v': plan_vel}
 
     def getTrackingPoint(self, t, robot_states=None):
 
@@ -188,7 +153,7 @@ class BasePosTrajectoryLine(Planner):
 
         te = t - self.start_time
 
-        p,v = self._interpolate(te, self.plan, self.dt)
+        p, v = self._interpolate(te, self.plan)
 
         return p, v
 
@@ -202,7 +167,58 @@ class BasePosTrajectoryLine(Planner):
         self.finished = False
         self.started = False
         self.start_time = 0
-            
-            
-            
-        
+
+class BasePosTrajectorySqaureWave(TrajectoryPlanner):
+    def __init__(self, config):
+        self.name = config["name"]
+        self.type = "base"
+        self.ref_type = "trajectory"
+        self.ref_data_type = "Vec2"
+        self.tracking_err_tol = config["tracking_err_tol"]
+        self.frame_id = config["frame_id"]
+
+        self.finished = False
+        self.started = False
+        self.start_time = 0
+
+        self.dt = 0.01
+        self.plan = sqaure_wave(config["peak_pos"], config["valley_pos"], config["period"], config["round"], self.dt)
+
+
+        super().__init__()
+
+    def getTrackingPoint(self, t, robot_states=None):
+
+        if self.started and self.start_time == 0:
+            self.start_time = t
+
+        te = t - self.start_time
+
+        p, v = self._interpolate(te, self.plan)
+
+        return p, v
+
+    def checkFinished(self, t, base_curr_pos):
+        if np.linalg.norm(base_curr_pos - self.plan['p'][-1]) < self.tracking_err_tol:
+            self.finished = True
+            self.py_logger.info(self.name + " Planner Finished")
+        return self.finished
+
+    def reset(self):
+        self.finished = False
+        self.started = False
+        self.start_time = 0
+
+    @staticmethod
+    def getDefaultParams():
+        config = {}
+        config["name"] = "Base Position"
+        config["planner_type"] = "BasePosTrajectorySqaureWave"
+        config["frame_id"] = "base"
+        config["peak_pos"] = [0, 0]
+        config["valley_pos"] = [0, 0]
+        config["period"] = 10
+        config["round"] = 1
+        config["tracking_err_tol"] = 0.02
+
+        return config
