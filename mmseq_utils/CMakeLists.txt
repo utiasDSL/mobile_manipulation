@@ -17,6 +17,7 @@ catkin_install_python(PROGRAMS
    scripts/plot_logger_ros.py
    scripts/plot_logger_pybullet.py
    scripts/plot_benchmark_result_squarewave.py
+   scripts/plot_path_comparison.py
    scripts/plot_rosbag.py
    scripts/plot_plan.py
    DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}

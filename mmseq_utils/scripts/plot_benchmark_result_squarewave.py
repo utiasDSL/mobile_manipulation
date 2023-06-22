@@ -55,7 +55,8 @@ class SquareWaveDataPlotter(DataPlotter):
         N = np.argwhere(np.linalg.norm(self.data["r_bw_w_ds"] - [0, 0], axis=1) < 1e-5).flatten()[0]
         self.data["err_ee_1"] = self.data["err_ee"][:N]
         self.data["err_ee_2"] = self.data["err_ee"][N:]
-        self.data["err_base_normalized_1"] = (self.data["err_base"][:N] - self.data["err_base"][N-1]) / self.data["err_base"][0]
+        # assume that controller achieves optimal error 10 steps before the second waypoint
+        self.data["err_base_normalized_1"] = (self.data["err_base"][:N] - self.data["err_base"][N-10]) / (self.data["err_base"][0] - self.data["err_base"][N-10])
         self.data["err_base_normalized_2"] = self.data["err_base"][N:] / self.data["err_base"][N]
 
         data_names = ["err_ee_1", "err_ee_2", "err_base_normalized_1", "err_base_normalized_2"]
@@ -68,6 +69,46 @@ class SquareWaveDataPlotter(DataPlotter):
                                                    "integral": math.integrate_zoh(t, self.data[name]),
                                                    "mean": stats[0], "max": stats[1],
                                                    "min": stats[2]}
+
+    def plot_task_performance(self, axes=None, index=0, legend=None):
+        if axes is None:
+            f, axes = plt.subplots(4, 1, sharex=True)
+        else:
+            if len(axes) != 4:
+                raise ValueError("Given axes number ({}) does not match task number ({}).".format(len(axes), 4))
+
+        if legend is None:
+            legend = self.data["name"]
+
+        prop_cycle = plt.rcParams["axes.prop_cycle"]
+        colors = prop_cycle.by_key()["color"]
+
+        t_sim = self.data["ts"]
+        nq = int(self.data["nq"])
+        xs_sat, us_sat = self.model_interface.robot.checkBounds(self.data["xs"], self.data["cmd_accs"], -1e-3)
+        axes[0].plot(t_sim, self.data["constraints_violation"]*100, label=legend + " mean = {:.3f}".format(self.data["statistics"]["constraints_violation"]["mean"]*100), color=colors[index])
+        axes[0].set_ylabel("constraints violation (%)")
+
+        axes[1].plot(t_sim, self.data["err_ee"],
+                     label=legend + " acc = {:.3f}".format(self.data["statistics"]["err_ee"]["integral"]), color=colors[index])
+        axes[1].set_ylabel("EE Err (m)")
+
+        N = np.argwhere(np.linalg.norm(self.data["r_bw_w_ds"] - [0, 0], axis=1) < 1e-5).flatten()[0]
+        axes[2].plot(t_sim[:N], self.data["err_base_normalized_1"],
+                     label=legend + " part 1 acc = {:.3f}".format(self.data["statistics"]["err_base_normalized_1"]["integral"]), color=colors[index])
+        axes[2].plot(t_sim[N:], self.data["err_base_normalized_2"], linestyle="--",
+                     label=legend + " part 2 acc = {:.3f}".format(self.data["statistics"]["err_base_normalized_2"]["integral"]),
+                     color=colors[index])
+        axes[2].set_ylabel("Base Err (m)")
+
+        axes[3].plot(t_sim, self.data["arm_manipulability"], label=legend)
+        axes[3].set_ylabel("Arm Manipulability")
+        axes[3].set_xlabel("Time (s)")
+
+        for a in axes:
+            a.legend()
+
+        return axes
 
 
 class BenchmarkDataPlotter():
@@ -137,9 +178,10 @@ class BenchmarkDataPlotter():
         :param names:
         :return:
         """
+        num_dfs = len(dfs)
         # End Effector
         f1, axes1 = plt.subplots(2, 1, sharex=True)
-        for i in range(2):
+        for i in range(num_dfs):
             axes1[0].hist(dfs[i]["err_ee_1_integral"], bins=100, label=names[i], alpha=0.5)
             axes1[1].hist(dfs[i]["err_ee_2_integral"], bins=100, label=names[i], alpha=0.5)
 
@@ -149,7 +191,7 @@ class BenchmarkDataPlotter():
 
         # Base
         f2, axes2 = plt.subplots(2, 1, sharex=True)
-        for i in range(2):
+        for i in range(num_dfs):
             axes2[0].hist(dfs[i]["err_base_normalized_1_integral"], bins=100, label=names[i], alpha=0.5)
             axes2[1].hist(dfs[i]["err_base_normalized_2_integral"], bins=100, label=names[i], alpha=0.5)
 
@@ -172,12 +214,27 @@ class BenchmarkDataPlotter():
 
 def benchmark(folder_path):
     data_plotter = BenchmarkDataPlotter(folder_path)
-    methods = ["HTIDKC", "HTMPC"]
+    methods = ["HTMPC_2", "HTMPC"]
 
     dfs = data_plotter.summarize(methods)
     data_plotter.plot_mean_error(dfs, methods)
     data_plotter.box_plot("cmd_jerks_base_linear_max", dfs, methods, "Maximum Commanded Base Jerk (Linear) (m/s^3)")
     data_plotter.box_plot("run_time_mean", dfs, methods, "Run Time (s)")
+
+    plt.show()
+
+def tracking(folder_path):
+    plotters = []
+    for filename in os.listdir(folder_path):
+        d = os.path.join(folder_path, filename)
+        if os.path.isdir(d):
+            plotter = construct_logger(d)
+            plotters.append(plotter)
+
+    axes = None
+    for pid, plotter in enumerate(plotters):
+        axes = plotter.plot_task_performance(axes=axes, index=pid)
+
     plt.show()
 
 if __name__ == "__main__":
@@ -185,8 +242,12 @@ if __name__ == "__main__":
     parser.add_argument('-f', "--folder", required=True, help="Path to data folder.")
     parser.add_argument("--compare", action="store_true",
                         help="plot comparisons")
+    parser.add_argument("--tracking", action="store_true",
+                        help="plot tracking comparisons")
     args = parser.parse_args()
-
-    benchmark(args.folder)
+    if args.tracking:
+        tracking(args.folder)
+    else:
+        benchmark(args.folder)
 
 
