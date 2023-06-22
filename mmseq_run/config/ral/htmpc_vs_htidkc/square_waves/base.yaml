@@ -25,5 +25,5 @@ include:
     path: "config/scene/empty.yaml"
 
 logging:
-  log_dir: "/home/tracy/Documents/PhD/data/htmpc_vs_htidkc_sqaurewave"
+  log_dir: "/home/tracy/Documents/PhD/data/htmpc_vs_htidkc_squarewave"
   log_level: 20 # 0 - not set, 10 - debug, 20 - info
