@@ -13,8 +13,9 @@ controller:
   soft_cst: True
   penalize_du: True
   self_collision_avoidance_enabled: True
-  static_obstacles_collision_avoidance_enabled: True
+  static_obstacles_collision_avoidance_enabled: False
   ee_upward_constraint_enabled: False
+  cst_tol_schedule_enabled: False
 
   collision_safety_margin: 0.05
   ee_upward_deviation_angle_max: 0.26    #rad, 0.26 rad ~ 15 degree
@@ -24,8 +25,8 @@ controller:
     mu: 0.001
     zeta: 0.005
   collision_soft:
-    mu: 0.001
-    zeta: 0.008
+    mu: 0.00005
+    zeta: 0.006
   ee_upward_soft:
     mu: 0.001
     zeta: 0.005

@@ -3,7 +3,7 @@ controller:
   type: "HTIDKC"
 
   # regularization parameter
-  ρ: 0.03
+  ρ: 0.01
   ctrl_rate: 50
 
   # options
