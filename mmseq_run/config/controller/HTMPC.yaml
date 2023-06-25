@@ -25,8 +25,8 @@ controller:
     mu: 0.001
     zeta: 0.005
   collision_soft:
-    mu: 0.00005
-    zeta: 0.006
+    mu: 0.0001
+    zeta: 0.005
   ee_upward_soft:
     mu: 0.001
     zeta: 0.005
@@ -34,7 +34,7 @@ controller:
   # weights for each cost function
   cost_params:
     EEPos3:
-      Qk: 1.
+      Qk: 2.
       P: 10.
     BasePos2:
       Qk: 1.
