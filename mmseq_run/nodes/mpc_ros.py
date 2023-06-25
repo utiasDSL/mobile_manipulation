@@ -16,6 +16,7 @@ from geometry_msgs.msg import Point, Transform, Twist
 from trajectory_msgs.msg import MultiDOFJointTrajectory, MultiDOFJointTrajectoryPoint
 
 import mmseq_control.HTMPC as HTMPC
+from mmseq_control.robot import MobileManipulator3D
 import mmseq_plan.TaskManager as TaskManager
 from mmseq_utils import parsing
 from mmseq_utils.logging import DataLogger
@@ -242,17 +243,29 @@ class ControllerROSNode:
         rate = rospy.Rate(self.ctrl_rate)
 
 
-        while not self.robot_interface.ready() or not self.vicon_tool_interface.ready():
+        while not self.robot_interface.ready():
             self.robot_interface.brake()
             rate.sleep()
 
             if rospy.is_shutdown():
                 return
-
         print("Controller received joint states. Proceed ... ")
+
+        use_vicon_tool_data = True
+        if not self.vicon_tool_interface.ready():
+            use_vicon_tool_data = False
+            print("Controller did not receive vicon tool " + self.ctrl_config["robot"]["tool_vicon_name"] + ". Using Robot Model")
+            self.robot = MobileManipulator3D(self.ctrl_config)
+        else:
+            print("Controlelr received vicon tool " + self.ctrl_config["robot"]["tool_vicon_name"])
+
         planner_class = getattr(TaskManager, self.planner_config["sot_type"])
         self.sot = planner_class(self.planner_config)
-        self.planner_coord_transform(self.robot_interface.q, self.vicon_tool_interface.position, self.sot.planners)
+        if use_vicon_tool_data:
+            self.planner_coord_transform(self.robot_interface.q, self.vicon_tool_interface.position, self.sot.planners)
+        else:
+            ee_pos, _ = self.robot.getEE(self.robot_interface.q)
+            self.planner_coord_transform(self.robot_interface.q, ee_pos, self.sot.planners)
 
         rospy.Timer(rospy.Duration(0, int(1e8)), self._publish_planner_data)
 
@@ -289,7 +302,11 @@ class ControllerROSNode:
             self._publish_trajectory_tracking_pt(t-t0, robot_states, planners)
 
             # Update Task Manager
-            states = {"base": robot_states[0][:3], "EE": (self.vicon_tool_interface.position, self.vicon_tool_interface.orientation)}
+            if use_vicon_tool_data:
+                ee_states = (self.vicon_tool_interface.position, self.vicon_tool_interface.orientation)
+            else:
+                ee_states = self.robot.getEE(robot_states[0])
+            states = {"base": robot_states[0][:3], "EE": ee_states}
 
             self.sot_lock.acquire()
             self.sot.update(t-t0, states)

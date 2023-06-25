@@ -16,6 +16,7 @@ from geometry_msgs.msg import Point, Transform, Twist
 from trajectory_msgs.msg import MultiDOFJointTrajectory, MultiDOFJointTrajectoryPoint
 
 import mmseq_control.HTIDKC as HTIDKC
+from mmseq_control.robot import MobileManipulator3D
 import mmseq_plan.TaskManager as TaskManager
 from mmseq_utils import parsing
 from mmseq_utils.logging import DataLogger, DataPlotter
@@ -49,13 +50,13 @@ class ControllerROSNode:
         if args.logging_sub_folder != "default":
             config["logging"]["log_dir"] = os.path.join(config["logging"]["log_dir"], args.logging_sub_folder)
 
-        ctrl_config = config["controller"]
+        self.ctrl_config = config["controller"]
         self.planner_config = config["planner"]
 
         # controller
-        control_class = getattr(HTIDKC, ctrl_config["type"], None)
-        self.controller = control_class(ctrl_config)
-        self.ctrl_rate = ctrl_config["ctrl_rate"]
+        control_class = getattr(HTIDKC, self.ctrl_config["type"], None)
+        self.controller = control_class(self.ctrl_config)
+        self.ctrl_rate = self.ctrl_config["ctrl_rate"]
 
         # set py logger level
         ch = logging.StreamHandler()
@@ -75,14 +76,14 @@ class ControllerROSNode:
         self.logger.add("sim_timestep", config["simulation"]["timestep"])
         self.logger.add("duration", config["simulation"]["duration"])
 
-        self.logger.add("nq", ctrl_config["robot"]["dims"]["q"])
-        self.logger.add("nv", ctrl_config["robot"]["dims"]["v"])
-        self.logger.add("nx", ctrl_config["robot"]["dims"]["x"])
-        self.logger.add("nu", ctrl_config["robot"]["dims"]["u"])
+        self.logger.add("nq", self.ctrl_config["robot"]["dims"]["q"])
+        self.logger.add("nv", self.ctrl_config["robot"]["dims"]["v"])
+        self.logger.add("nx", self.ctrl_config["robot"]["dims"]["x"])
+        self.logger.add("nu", self.ctrl_config["robot"]["dims"]["u"])
 
         # ROS Related
         self.robot_interface = MobileManipulatorROSInterface()
-        self.vicon_tool_interface = ViconObjectInterface(ctrl_config["robot"]["tool_vicon_name"])
+        self.vicon_tool_interface = ViconObjectInterface(self.ctrl_config["robot"]["tool_vicon_name"])
         self.plan_visualization_pub = rospy.Publisher("plan_visualization", Marker, queue_size=10)
         self.tracking_point_pub = rospy.Publisher("controller_tracking_pt", MultiDOFJointTrajectory, queue_size=5)
 
@@ -101,7 +102,7 @@ class ControllerROSNode:
         rate = rospy.Rate(self.ctrl_rate)
 
 
-        while not self.robot_interface.ready() or not self.vicon_tool_interface.ready():
+        while not self.robot_interface.ready():
             self.robot_interface.brake()
             rate.sleep()
 
@@ -109,9 +110,22 @@ class ControllerROSNode:
                 return
 
         print("Controller received joint states. Proceed ... ")
+
+        use_vicon_tool_data = True
+        if not self.vicon_tool_interface.ready():
+            use_vicon_tool_data = False
+            print("Controller did not receive vicon tool " + self.ctrl_config["robot"]["tool_vicon_name"] + ". Using Robot Model")
+            self.robot = MobileManipulator3D(self.ctrl_config)
+        else:
+            print("Controlelr received vicon tool " + self.ctrl_config["robot"]["tool_vicon_name"])
+
         planner_class = getattr(TaskManager, self.planner_config["sot_type"])
         self.sot = planner_class(self.planner_config)
-        self.planner_coord_transform(self.robot_interface.q, self.vicon_tool_interface.position, self.sot.planners)
+        if use_vicon_tool_data:
+            self.planner_coord_transform(self.robot_interface.q, self.vicon_tool_interface.position, self.sot.planners)
+        else:
+            ee_pos, _ = self.robot.getEE(self.robot_interface.q)
+            self.planner_coord_transform(self.robot_interface.q, ee_pos, self.sot.planners)
 
         rospy.Timer(rospy.Duration(0, int(1e8)), self._publish_planner_data)
 
@@ -138,7 +152,12 @@ class ControllerROSNode:
             self.robot_interface.publish_cmd_vel(u)
 
             # Update Task Manager
-            states = {"base": robot_states[0][:3], "EE": (self.vicon_tool_interface.position, self.vicon_tool_interface.orientation)}
+            if use_vicon_tool_data:
+                ee_states = (self.vicon_tool_interface.position, self.vicon_tool_interface.orientation)
+            else:
+                ee_states = self.robot.getEE(robot_states[0])
+            states = {"base": robot_states[0][:3], "EE": ee_states}
+
             self.sot_lock.acquire()
             self.sot.update(t-t0, states)
             self.sot_lock.release()
