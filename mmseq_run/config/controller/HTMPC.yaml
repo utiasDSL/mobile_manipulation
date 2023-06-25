@@ -4,7 +4,7 @@ controller:
 
   # MPC params
   dt: 0.1
-  prediction_horizon: 1.
+  prediction_horizon: 1.0
   HT_MaxIntvl: 1
   ST_MaxIntvl: 1
   hierarchy_constraint_type: "HierarchicalTrackingConstraint"    # error, cost_value, cost_value_sum
@@ -45,7 +45,7 @@ controller:
       Qva: 0.01
       Qvb: 0.01
       Qua: 0.01
-      Qub: 0.01
+      Qub: 0.1
       Qdua: 0.
       Qdub: 0.1
 
