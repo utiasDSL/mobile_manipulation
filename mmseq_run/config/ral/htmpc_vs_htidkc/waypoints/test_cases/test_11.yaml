@@ -1,0 +1,19 @@
+planner:
+  sot_type: SoTStatic
+  tasks:
+  - frame_id: EE
+    hold_period: 3.0
+    name: EE Position
+    planner_type: EESimplePlanner
+    target_pos:
+    - -0.1844974093890161
+    - -0.26465779446277693
+    - 0.006583205079564225
+    tracking_err_tol: 0.02
+  - frame_id: EE
+    name: Base Position
+    planner_type: BaseSingleWaypoint
+    target_pos:
+    - -0.08775626599571161
+    - 2.4962693969007517
+    tracking_err_tol: 0.02
