@@ -3,12 +3,16 @@
 
 <launch>
   <arg name="config"/>
-
+  <arg name="ctrl_config" default="default" doc="alternative controller config overwriting the one in config"/>
+  <arg name="planner_config" default="default" doc="alternative controller config overwriting the one in config"/>
+  <arg name="use_mpc" default="false" doc="use mpc as controller"/>
+  <arg name="logging_sub_folder"  default="default" doc="save data to a sub folder if set"/>
   <!-- Simulation -->
   <include file="$(find mmseq_run)/launch/simulation.launch" pass_all_args="true"/>
 
   <!-- Controller -->
-  <node pkg="mmseq_run" type="mpc_ros.py" name="controller" output="screen" required="true" args="--config $(arg config)"/>
+  <node pkg="mmseq_run" type="controller_ros.py" name="controller_idk" output="screen" required="true" args="--config $(arg config) --ctrl_config $(arg ctrl_config) --planner_config $(arg planner_config) --logging_sub_folder $(arg logging_sub_folder)" unless="$(arg use_mpc)"/>
+  <node pkg="mmseq_run" type="mpc_ros.py" name="controller_mpc" output="screen" required="true" args="--config $(arg config) --ctrl_config $(arg ctrl_config)  --planner_config $(arg planner_config) --logging_sub_folder $(arg logging_sub_folder)" if="$(arg use_mpc)"/>
 
   <!-- TF -->
   <include file="$(find mobile_manipulation_central)/launch/thing_description.launch">

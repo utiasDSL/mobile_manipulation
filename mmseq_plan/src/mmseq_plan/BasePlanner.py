@@ -2,8 +2,9 @@
 # -*- coding: utf-8 -*-
 
 import numpy as np
-from mmseq_plan.PlanBaseClass import Planner
+from mmseq_plan.PlanBaseClass import Planner, TrajectoryPlanner
 from mmseq_utils.parsing import parse_number
+from mmseq_utils.trajectory_generation import sqaure_wave
 
 class BaseSingleWaypoint(Planner):
 
@@ -36,7 +37,18 @@ class BaseSingleWaypoint(Planner):
         self.finished = False
         self.py_logger.info(self.name + " planner reset.")
 
-class BasePosTrajectoryCircle(Planner):
+    @staticmethod
+    def getDefaultParams():
+        config = {}
+        config["name"] = "Base Position"
+        config["planner_type"] = "BaseSingleWaypoint"
+        config["frame_id"] = "base"
+        config["target_pos"] = [0, 0]
+        config["tracking_err_tol"] = 0.02
+
+        return config
+
+class BasePosTrajectoryCircle(TrajectoryPlanner):
     def __init__(self, config):
         self.name = config["name"]
         self.type = "base"
@@ -63,30 +75,22 @@ class BasePosTrajectoryCircle(Planner):
         super().__init__()
 
     def _generatePlan(self):
-        plan = np.repeat([self.c], self.N, axis=0)
+        plan_pos = np.repeat([self.c], self.N, axis=0)
 
         ts = np.linspace(0, self.T * self.round, self.N)
         ptx = self.r * np.cos(self.omega * ts + self.phi)
         pty = self.r * np.sin(self.omega * ts + self.phi)
 
-        plan[:, 0] += ptx
-        plan[:, 1] += pty
+        plan_pos[:, 0] += ptx
+        plan_pos[:, 1] += pty
 
-        return plan
+        plan_vel = np.zeros_like(plan_pos)
+        vx = -self.r * np.sin(self.omega * ts + self.phi) * self.omega
+        vy = self.r * np.cos(self.omega * ts + self.phi) * self.omega
+        plan_vel[:, 0] = vx
+        plan_vel[:, 1] = vy
 
-    def _interpolate(self, t, plan, dt):
-        indx = int(t / dt)
-        if indx > len(plan)-2:
-            return plan[-1]
-        elif indx < 0:
-            return plan[0]
-
-        p0 = plan[indx]
-        p1 = plan[indx + 1]
-
-        p = (p1 - p0) / dt * (t - indx * dt) + p0
-
-        return p
+        return {"t": ts, "p": plan_pos, "v": plan_vel}
 
     def getTrackingPoint(self, t, robot_states=None):
 
@@ -95,9 +99,9 @@ class BasePosTrajectoryCircle(Planner):
 
         te = t - self.start_time
 
-        p = self._interpolate(te, self.plan, self.dt)
+        p, v = self._interpolate(te, self.plan)
 
-        return p, np.zeros(3)
+        return p, v
 
     def checkFinished(self, t, ee_curr_pos):
         if t - self.start_time > self.T * (self.round - 1):
@@ -110,7 +114,7 @@ class BasePosTrajectoryCircle(Planner):
         self.finished = False
         self.started = False
 
-class BasePosTrajectoryLine(Planner):
+class BasePosTrajectoryLine(TrajectoryPlanner):
     def __init__(self, config):
         self.name = config["name"]
         self.type = "base"
@@ -136,23 +140,11 @@ class BasePosTrajectoryLine(Planner):
     def _generatePlan(self):
         ts = np.linspace(0, self.T, int(self.T/self.dt)).reshape((-1, 1))
         n = (self.final_pos - self.initial_pos) / np.linalg.norm(self.initial_pos - self.final_pos)
-        plan = n * ts * self.cruise_speed + self.initial_pos
+        plan_pos = n * ts * self.cruise_speed + self.initial_pos
 
-        return plan
+        plan_vel = np.tile(n * self.cruise_speed, (int(self.T/self.dt), 1))
 
-    def _interpolate(self, t, plan, dt):
-        indx = int(t / dt)
-        if indx > len(plan)-2:
-            return plan[-1]
-        elif indx < 0:
-            return plan[0]
-
-        p0 = plan[indx]
-        p1 = plan[indx + 1]
-
-        p = (p1 - p0) / dt * (t - indx * dt) + p0
-
-        return p
+        return {'t': ts, 'p': plan_pos, 'v': plan_vel}
 
     def getTrackingPoint(self, t, robot_states=None):
 
@@ -161,12 +153,12 @@ class BasePosTrajectoryLine(Planner):
 
         te = t - self.start_time
 
-        p = self._interpolate(te, self.plan, self.dt)
+        p, v = self._interpolate(te, self.plan)
 
-        return p, np.zeros(3)
+        return p, v
 
     def checkFinished(self, t, base_curr_pos):
-        if np.linalg.norm(base_curr_pos - self.plan[-1]) < self.tracking_err_tol:
+        if np.linalg.norm(base_curr_pos - self.plan['p'][-1]) < self.tracking_err_tol:
             self.finished = True
             self.py_logger.info(self.name + " Planner Finished")
         return self.finished
@@ -175,7 +167,58 @@ class BasePosTrajectoryLine(Planner):
         self.finished = False
         self.started = False
         self.start_time = 0
-            
-            
-            
-        
+
+class BasePosTrajectorySqaureWave(TrajectoryPlanner):
+    def __init__(self, config):
+        self.name = config["name"]
+        self.type = "base"
+        self.ref_type = "trajectory"
+        self.ref_data_type = "Vec2"
+        self.tracking_err_tol = config["tracking_err_tol"]
+        self.frame_id = config["frame_id"]
+
+        self.finished = False
+        self.started = False
+        self.start_time = 0
+
+        self.dt = 0.01
+        self.plan = sqaure_wave(config["peak_pos"], config["valley_pos"], config["period"], config["round"], self.dt)
+
+
+        super().__init__()
+
+    def getTrackingPoint(self, t, robot_states=None):
+
+        if self.started and self.start_time == 0:
+            self.start_time = t
+
+        te = t - self.start_time
+
+        p, v = self._interpolate(te, self.plan)
+
+        return p, v
+
+    def checkFinished(self, t, base_curr_pos):
+        if np.linalg.norm(base_curr_pos - self.plan['p'][-1]) < self.tracking_err_tol:
+            self.finished = True
+            self.py_logger.info(self.name + " Planner Finished")
+        return self.finished
+
+    def reset(self):
+        self.finished = False
+        self.started = False
+        self.start_time = 0
+
+    @staticmethod
+    def getDefaultParams():
+        config = {}
+        config["name"] = "Base Position"
+        config["planner_type"] = "BasePosTrajectorySqaureWave"
+        config["frame_id"] = "base"
+        config["peak_pos"] = [0, 0]
+        config["valley_pos"] = [0, 0]
+        config["period"] = 10
+        config["round"] = 1
+        config["tracking_err_tol"] = 0.02
+
+        return config

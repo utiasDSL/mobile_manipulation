@@ -59,9 +59,9 @@ controller:
         lower: [ -2.5, -2.5, -1., -2.16, -2.16, -3.15, -3.2, -3.2, -3.2 ]
         upper: [ 2.5, 2.5, 1., 2.16, 2.16, 3.15, 3.2, 3.2, 3.2 ]
       state:
-        lower: [ -10, -10, -1pi, -0.25pi, -1pi, -1pi, -1pi, -1pi, -1pi,
+        lower: [ -10, -10, -1pi, -0.pi, -1pi, -1pi, -1pi, -1pi, -1pi,
                  -1.1, -1.1, -2, -2, -2, -3, -3, -3, -3 ]
-        upper: [ 10, 10, 1pi, 1.2pi, 1pi, 1pi, 1pi, 1pi, 1pi,
+        upper: [ 10, 10, 1pi, 1.pi, 1pi, 1pi, 1pi, 1pi, 1pi,
                  1.1, 1.1, 2, 2, 2, 3, 3, 3, 3 ]
 
     link_names:
@@ -75,13 +75,16 @@ controller:
       - "ur10_arm_wrist_3_link"
       - "gripped_object"
     tool_link_name: "gripped_object"
+    base_link_name: "base"
     base_type: omnidirectional
 
-    tool_vicon_name: "ThingWoodLumber"
+    tool_vicon_name: "ThingContainer"
 
     collision_link_names:
       base:
         - "base_collision_link"
+      rack:
+        - "rack_collision_link"
       upper_arm:
         - "ur10_arm_upper_arm_collision_link"
         - "ur10_arm_upper_arm_collision_sphere_link1"

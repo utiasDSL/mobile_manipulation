@@ -1,0 +1,18 @@
+simulation:
+  robot:
+    home: [ 0., -0, 0.pi, 0.5pi, -0.25pi, 0.5pi, -0.25pi, 0.5pi, 0.417pi ]  # standard
+  duration: 10
+
+include:
+  - package: "mmseq_run"
+    path: "config/robot/thing.yaml"
+  - package: "mmseq_run"
+    path: "config/controller/HTMPC.yaml"
+  - package: "mmseq_run"
+    path: "config/sim/simulation.yaml"
+  - package: "mmseq_run"
+    path: "config/scene/empty.yaml"
+
+logging:
+  log_dir: "/home/tracy/Documents/PhD/data/mmseq_vs_motm_time_async"
+  log_level: 20 # 0 - not set, 10 - debug, 20 - info

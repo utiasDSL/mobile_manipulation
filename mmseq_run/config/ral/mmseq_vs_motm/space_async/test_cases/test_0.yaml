@@ -1,0 +1,23 @@
+planner:
+  sot_type: "SoTStatic"
+  tasks:
+    - name: "EE Pos 1"
+      planner_type: "EESimplePlanner"
+      frame_id: "base"
+      target_pos: [1.5, -2.0, 0.8]
+      hold_period: 0.75
+      tracking_err_tol: 0.05
+    - name: "Base Pos 2"
+      planner_type: "BasePosTrajectoryLine"
+      frame_id: "base"
+      initial_pos: [-0.0, -0.0]
+      target_pos: [3.0, 0.]
+      cruise_speed: 0.5
+      tracking_err_tol: 0.02
+    - name: "EE Pos 1"
+      planner_type: "EESimplePlanner"
+      frame_id: "base"
+      target_pos: [ 4., .0, 0.7 ]
+      hold_period: 3.
+      tracking_err_tol: 0.02
+

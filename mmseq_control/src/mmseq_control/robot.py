@@ -212,7 +212,8 @@ class CasadiModelInterface:
                                                                             self.robot.collision_link_names["tool"])
         # forearm
         self.collision_pairs["self"] += self._addCollisionPairFromTwoGroups(self.robot.collision_link_names["forearm"][:2],
-                                                                            self.robot.collision_link_names["tool"])
+                                                                            self.robot.collision_link_names["tool"] +
+                                                                            self.robot.collision_link_names["rack"])
 
         for obstacle in self.scene.collision_link_names.get("static_obstacles", []):
             if obstacle == "ground":
@@ -280,6 +281,22 @@ class CasadiModelInterface:
         print(name + " signed distance function does not exist")
         return None
 
+    def evaluteSignedDistance(self, qs):
+        sd = {}
+        names = ["self"]
+        names += [n for n in self.collision_pairs["static_obstacles"].keys()]
+
+        N = len(qs)
+        for name in names:
+            sd_fcn = self.getSignedDistanceSymMdls(name)
+            sdn_fcn = sd_fcn.map(N, 'thread', 2)
+            # sds dimension: num collision pairs x num time step
+            sds = sdn_fcn(qs.T).toarray()
+            sd_mins = np.min(sds, axis=0)
+            sd[name] = sd_mins
+
+        return sd
+
 
 class Scene:
     def __init__(self, config):
@@ -334,6 +351,7 @@ class MobileManipulator3D:
 
         self.link_names = config["robot"]["link_names"]
         self.tool_link_name = config["robot"]["tool_link_name"]
+        self.base_link_name = config["robot"]["base_link_name"]
         self.collision_link_names = config["robot"]["collision_link_names"]
 
         self.qb_sym = cs.MX.sym('qb', 3)
@@ -348,6 +366,8 @@ class MobileManipulator3D:
         self._setupSSSymMdlDI()
         # create self.jacSymMdls dict:{robot links name: cs functions of its jacobian}
         self._setupJacobianSymMdl()
+        # create self.manipulability_fcn
+        self._setupManipulabilitySymMdl()
 
     def _setupSSSymMdlDI(self):
         """ Create State-space symbolic model for MM
@@ -414,6 +434,16 @@ class MobileManipulator3D:
             Jk_eqn = cs.jacobian(fk_pos_eqn, self.q_sym)
             self.jacSymMdls[name] = cs.Function(name + "_jac_fcn", [self.q_sym], [Jk_eqn], ["q"], ["J(q)"])
 
+    def _setupManipulabilitySymMdl(self):
+        Jee_fcn = self.jacSymMdls[self.tool_link_name]
+        qsym = cs.SX.sym("qsx", self.DoF)
+        Jee_eqn = Jee_fcn(qsym)
+        man_eqn = cs.det(Jee_eqn @ Jee_eqn.T) ** 0.5
+
+        self.manipulability_fcn = cs.Function("manipulability_fcn", [qsym], [man_eqn])
+        arm_man_eqn = cs.det(Jee_eqn[:, 3:] @ Jee_eqn[:, 3:].T) ** 0.5
+        self.arm_manipulability_fcn = cs.Function("arm_manipulability_fcn", [qsym], [arm_man_eqn])
+
     def _getFk(self, link_name, base_frame=False):
         """ Create symbolic function for a link named link_name
             The symbolic function returns the position of its parent joint in and rotation w.r.t the world frame.
@@ -421,7 +451,7 @@ class MobileManipulator3D:
 
         """
         # TODO: Should we handle base through pinocchio by adopting the cartesian base urdf file?
-        if link_name == "base":
+        if link_name == self.base_link_name:
             return cs.Function(link_name + "_fcn", [self.q_sym], [self.qb_sym[:2], self.qb_sym[2]], ["q"], ["pos2", "heading"])
 
         Hwb = cs.MX.eye(4)
@@ -483,6 +513,30 @@ class MobileManipulator3D:
             x_bar = np.hstack((np.expand_dims(xo, -1), x_bar)).T
 
         return x_bar
+
+    def checkBounds(self, xs, us, tol=1e-2):
+        """
+
+        :param xs:
+        :param us:
+        :return:
+        """
+
+        # check state
+        ub_x_check = xs < self.ub_x + tol
+        lb_x_check = xs > self.lb_x - tol
+        xs_num_violation = np.sum(1 - ub_x_check * lb_x_check, axis=1)
+        print(lb_x_check.shape)
+
+        # check input
+        ub_u_check = us < self.ub_u + tol
+        lb_u_check = us > self.lb_u - tol
+        us_num_violation = np.sum(1-ub_u_check * lb_u_check, axis=1)
+        print(lb_u_check.shape)
+
+        return xs_num_violation, us_num_violation
+
+
 
 def verify_link_transforms(robot_sim, sysMdls, link_names):
     for name in link_names:
@@ -654,7 +708,8 @@ def test_robot_mdl(args):
     # mm.command_velocity(np.zeros(9))
     # sim.settle(1.0)
     # verify_link_transforms(mm, robot.kinSymMdlsBaseFrame, collision_link_names)
-
+    # verify manipulability
+    m = robot.manipulability_fcn(mm.home)
     print("Testing motion model integrator")
     dt = 0.1
     a = 1.
@@ -686,6 +741,8 @@ def test_robot_mdl(args):
     print("finished")
 
 
+
+
 def test_pinocchio_interface(args):
     # load configuration
     config = parsing.load_config(args.config)
@@ -696,6 +753,23 @@ def test_pinocchio_interface(args):
     q = pin.randomConfiguration(robot.model)
     robot.visualize(q)
     input()
+
+def check_maximum_reach(args):
+    config = parsing.load_config(args.config)
+    sim_config = config["simulation"]
+    ctrl_config = config["controller"]
+    # Create Sym Mdl
+    robot = MobileManipulator3D(ctrl_config)
+    fee = robot.kinSymMdls[robot.tool_link_name]
+    q_home = [ 0., -0, 0., 0.5*np.pi, -0.25*np.pi, 0.5*np.pi, -0.25*np.pi, 0.5*np.pi, 0.417*np.pi ]
+    q_straight = [0, 0, 0, 0.5*np.pi, 0., 0., 0., 0.5*np.pi, 0.]
+    q_upright = [0, 0, 0, 0.5*np.pi, -0.5*np.pi, 0, -0, 0.5*np.pi, 0]
+
+    print("EE position under different configuration")
+    print("home: {}".format(fee(q_home)[0]))
+    print("straight front: {}".format(fee(q_straight)[0]))
+    print("upright: {}".format(fee(q_upright)[0]))
+
 
 def test_casadi_interface(args):
     # load configuration
@@ -735,10 +809,11 @@ if __name__ == "__main__":
         help="Record video. Optionally specify prefix for video directory.",
     )
     args = parser.parse_args()
-    # test_robot_mdl(args)
+    test_robot_mdl(args)
     # test_obstacle_mdl(args)
     # test_pinocchio_interface(args)
-    test_casadi_interface(args)
+    # test_casadi_interface(args)
+    # check_maximum_reach(args)
 
             
         

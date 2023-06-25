@@ -67,6 +67,10 @@ class CostFunctions(ABC):
         """
         pass
 
+    @abstractmethod
+    def get_hess_fcn(self):
+        pass
+
 class LinearLeastSquare(CostFunctions):
     def __init__(self, dt, nx, nu, N, nr, params):
         """ Linear least square cost function
@@ -106,6 +110,9 @@ class LinearLeastSquare(CostFunctions):
 
         return H, g
 
+    def get_hess_fcn(self):
+        return self.hess_fcn
+
 
 class TrackingCostFunction(CostFunctions):
     def __init__(self, dt, nx, nu, N, nr, f_fcn, params):
@@ -132,18 +139,20 @@ class TrackingCostFunction(CostFunctions):
         self._setupSymMdl()
 
     def _setupSymMdl(self):
-        self.J_eqn, self.e_bar_eqn = self._getCostSymEqn(self.f_fcn, self.x_bar_sym, self.u_bar_sym, self.r_bar_sym)
+        self.J_eqn, self.e_bar_eqn, self.J_bar_eqn = self._getCostSymEqn(self.f_fcn, self.x_bar_sym, self.u_bar_sym, self.r_bar_sym)
         self.hess_eqn, self.grad_eqn = cs.hessian(self.J_eqn, self.z_bar_sym)
         self.debardz_eqn = cs.jacobian(self.e_bar_eqn, self.z_bar_sym)
         self.hess_approx_eqn = self.debardz_eqn.T @ self.W @self.debardz_eqn
 
         self.J_fcn = cs.Function('J', [self.x_bar_sym, self.u_bar_sym, self.r_bar_sym], [self.J_eqn], ["x_bar", "u_bar", "r_bar"], ["J"]).expand()
+        self.J_bar_fcn = cs.Function('J_vec', [self.x_bar_sym, self.u_bar_sym, self.r_bar_sym], [self.J_bar_eqn], ["x_bar", "u_bar", "r_bar"], ["J"]).expand()
         self.e_bar_fcn = cs.Function('e_bar', [self.x_bar_sym, self.u_bar_sym, self.r_bar_sym], [self.e_bar_eqn], ["x_bar", "u_bar", "r_bar"], ["e_bar"]).expand()
         self.grad_fcn = cs.Function('dJdz', [self.z_bar_sym, self.r_bar_sym], [self.grad_eqn]).expand()
         self.hess_fcn = cs.Function('ddJddz', [self.z_bar_sym, self.r_bar_sym], [self.hess_eqn]).expand()
         self.hess_approx_fcn = cs.Function('dJdzdJdzT', [self.z_bar_sym, self.r_bar_sym], [self.hess_approx_eqn]).expand()
 
     def _getCostSymEqn(self, f_fcn, x_bar_sym, u_bar_sym, r_bar_sym):
+        J_list = []
         J = cs.MX.zeros(1)
         e_bar_eqn = cs.MX([])
 
@@ -155,11 +164,14 @@ class TrackingCostFunction(CostFunctions):
             e_bar_eqn = cs.vertcat(e_bar_eqn, ek)
 
             if k < self.N:
-                J += 0.5 * ek.T @ self.Qk @ ek
+                # J += 0.5 * ek.T @ self.Qk @ ek
+                J_list.append(0.5 * ek.T @ self.Qk @ ek)
             else:
-                J += 0.5 * ek.T @ self.P @ ek
+                # J += 0.5 * ek.T @ self.P @ ek
+                J_list.append(0.5 * ek.T @ self.P @ ek)
 
-        return J, e_bar_eqn
+
+        return sum(J_list)[0], e_bar_eqn, cs.vertcat(*J_list)
 
     def evaluate(self, x_bar, u_bar, *params):
         return self.J_fcn(x_bar.T, u_bar.T, params[0].T).toarray()[0][0]
@@ -170,9 +182,13 @@ class TrackingCostFunction(CostFunctions):
         g = self.grad_fcn(z_bar, params[0].T)
         return H, g
 
+    def get_hess_fcn(self):
+        return self.hess_approx_fcn
+
 
 class EEPos3CostFunction(TrackingCostFunction):
     def __init__(self, dt, N, robot_mdl, params):
+        self.name = "EEPos3"
         ss_mdl = robot_mdl.ssSymMdl
         nx = ss_mdl["nx"]
         nu = ss_mdl["nu"]
@@ -187,6 +203,7 @@ class EEPos3CostFunction(TrackingCostFunction):
 
 class BasePos2CostFunction(TrackingCostFunction):
     def __init__(self, dt, N, robot_mdl, params):
+        self.name = "BasePos2"
         ss_mdl = robot_mdl.ssSymMdl
         nx = ss_mdl["nx"]
         nu = ss_mdl["nu"]
@@ -199,8 +216,9 @@ class BasePos2CostFunction(TrackingCostFunction):
 
         super().__init__(dt, nx, nu, N, nr, f_fcn, cost_params)
 
-class ControlEffortCostFunciton(CostFunctions):
+class ControlEffortCostFuncitonNew(CostFunctions):
     def __init__(self, dt, N, robot_mdl, params):
+        self.name = "ControlEffort"
 
         ss_mdl = robot_mdl.ssSymMdl
         nx = ss_mdl["nx"]
@@ -243,6 +261,37 @@ class ControlEffortCostFunciton(CostFunctions):
         Hxu, gxu = self.xu_cost.quad(x_bar, u_bar, np.zeros(self.QPsize))
         Hdu, gdu = self.du_cost.quad(x_bar, u_bar, np.hstack((*params, np.zeros((self.N-1)*self.nu))))
         return Hxu + Hdu, gxu + gdu
+
+    def get_hess_fcn(self):
+        pass
+
+class ControlEffortCostFunciton(LinearLeastSquare):
+    def __init__(self, dt, N, robot_mdl, params):
+        self.name = "ControlEffort"
+
+        ss_mdl = robot_mdl.ssSymMdl
+        nx = ss_mdl["nx"]
+        nu = ss_mdl["nu"]
+        nr = nx * (N+1) + nu * N
+
+
+        # x u penalizaiton
+        Qq = [params["Qqb"]] * (robot_mdl.DoF - robot_mdl.numjoint) + [params["Qqa"]] * robot_mdl.numjoint
+        Qv = [params["Qvb"]] * (nu - robot_mdl.numjoint) + [params["Qva"]] * robot_mdl.numjoint
+        Qx = np.diag((Qq + Qv) * N + [0] * nx)
+
+        Qu = [params["Qub"]] * (nu - robot_mdl.numjoint) + [params["Qua"]] * robot_mdl.numjoint
+        Qu = np.diag(Qu * N)
+        ll_params = {}
+        ll_params["W"] = block_diag(Qx, Qu)
+        ll_params["A"] = np.eye(nr)
+        super().__init__(dt, nx, nu, N, nr, ll_params)
+
+    def evaluate(self, x_bar, u_bar, *params):
+        return super().evaluate(x_bar, u_bar, *[np.zeros(self.QPsize)])
+
+    def quad(self, x_bar, u_bar, *params):
+        return super().quad(x_bar, u_bar, *[np.zeros(self.QPsize)])
 
 class SoftConstraintsRBFCostFunction(CostFunctions):
     def __init__(self, mu, zeta, cst_obj, name="SoftConstraint"):
@@ -289,6 +338,49 @@ class SoftConstraintsRBFCostFunction(CostFunctions):
         g = self.grad_fcn(z_bar, *params, s)
         return H, g
 
+    def get_hess_fcn(self):
+        return self.hess_approx_fcn
+
+class SumOfCostFunctions(CostFunctions):
+
+    def __init__(self, cost_fcn_obj):
+        self.name = "Sum"
+        self.cost_fcn_obj = cost_fcn_obj
+        J_fcns = [c.J_fcn for c in cost_fcn_obj]
+        self.J_fcn = self._sum_cs_fcns(J_fcns)
+        self.hess_fcn = self._sum_cs_fcns([c.get_hess_fcn() for c in cost_fcn_obj], n_comm_in=1)
+        self.grad_fcn = self._sum_cs_fcns([c.grad_fcn for c in cost_fcn_obj], n_comm_in=1)
+
+    def evaluate(self, x_bar, u_bar, *params):
+        params = [p.T for p in params]
+        return self.J_fcn(x_bar.T, u_bar.T, *params)
+
+    def quad(self, x_bar, u_bar, *params):
+        z_bar = np.hstack((x_bar.flatten(), u_bar.flatten()))
+        params = [p.T for p in params]
+
+        H = self.hess_fcn(z_bar, *params)
+        g = self.grad_fcn(z_bar, *params)
+
+        return H, g
+
+    def _sum_cs_fcns(self, fcns, n_comm_in=2):
+        common_input_sysms = fcns[0].mx_in()[:n_comm_in]
+        param_syms = []
+        output_syms = []
+        for f in fcns:
+            f_params = f.mx_in()[n_comm_in:]
+            f_in = common_input_sysms + f_params
+            f_out = f(*f_in)
+            output_syms.append(f_out)
+            param_syms += f_params
+
+        sum_fcn = cs.Function('sum', common_input_sysms + param_syms, [sum(output_syms)])
+
+        return sum_fcn
+
+    def get_hess_fcn(self):
+        return self.hess_fcn
 
 def time_quad():
     setup = """
@@ -341,22 +433,24 @@ if __name__ == "__main__":
     cost_base = BasePos2CostFunction(dt, N, robot, config["controller"]["cost_params"]["BasePos2"])
     cost_ee = EEPos3CostFunction(dt, N, robot, config["controller"]["cost_params"]["EEPos3"])
     cost_eff = ControlEffortCostFunciton(dt, N, robot, config["controller"]["cost_params"]["Effort"])
-    cost_fcn = cost_eff
+    cost_fcn = cost_ee
 
     q = [0.0, 0.0, 0.0] + [0.0, -2.3562, -1.5708, -2.3562, -1.5708, 1.5708]
     v = np.zeros(9)
     x = np.hstack((np.array(q), v))
+    QPsize = 18 * (N+1) + 9 * N
     x_bar = np.tile(x, (N+1, 1))
     u_bar = np.zeros((N, 9))
-    # r_bar = np.array([1] * cost_fcn.nr)
-    # r_bar = np.tile(r_bar, (N+1, 1))
-    r_bar = np.ones(9)
+    r_bar = np.array([1] * cost_fcn.nr)
+    r_bar = np.tile(r_bar, (N+1, 1))
+    # r_bar = np.ones(9)
 
     J_sym = cost_fcn.evaluate(x_bar, u_bar, r_bar)
     H_sym, g_sym = cost_fcn.quad(x_bar, u_bar, r_bar)
     g_num = np.zeros(cost_fcn.QPsize)
 
     eps = 1e-7
+
     for i in range(x_bar.shape[0]):
         for j in range(x_bar.shape[1]):
             x_bar_p = x_bar.copy()
@@ -374,5 +468,29 @@ if __name__ == "__main__":
 
     print("Difference in gradient:{}".format(np.linalg.norm(g_num - g_sym)))
     print(H_sym)
+
+    print("------------ Testing SumOfCostFunctions ---------------")
+
+    ree_bar = np.array([1] * 3)
+    ree_bar = np.tile(ree_bar, (N + 1, 1))
+    rbase_bar = np.array([1] * 2)
+    rbase_bar = np.tile(rbase_bar, (N + 1, 1))
+
+    cost_fcns = [cost_ee, cost_base, cost_eff]
+    params = [ree_bar, rbase_bar, np.zeros(QPsize)]
+    sum_cost_functions = SumOfCostFunctions(cost_fcns)
+    J_sum = sum_cost_functions.evaluate(x_bar, u_bar, *params)
+    J_sum_baseline = [cost_fcns[k].evaluate(x_bar, u_bar, params[k]) for k in range(3)]
+    print("J diff:{}".format(J_sum - sum(J_sum_baseline)))
+
+    H_sum, g_sum = sum_cost_functions.quad(x_bar, u_bar, *[ree_bar, rbase_bar, np.zeros(QPsize)])
+    H_sum_baseline = np.zeros((QPsize, QPsize))
+    g_sum_baseline = np.zeros(QPsize)
+    for k in range(3):
+        H,g = cost_fcns[k].quad(x_bar, u_bar, params[k])
+        H_sum_baseline += H
+        g_sum_baseline += g
+
+    print("H diff: {}, g_diff {}".format(np.linalg.norm(H_sum - H_sum_baseline), np.linalg.norm(g_sum - g_sum_baseline)))
     # time_quad()
 

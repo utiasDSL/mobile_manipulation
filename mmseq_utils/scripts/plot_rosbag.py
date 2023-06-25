@@ -15,7 +15,7 @@ def main():
 
     plotter1 = ROSBagPlotter(args.bagfiles[0])
     # plotter2 = ROSBagPlotter(args.bagfiles[1])
-    # plotter.plot_joint_states()
+    plotter1.plot_joint_states()
     plotter1.plot_joint_vel_tracking()
     plotter1.plot_tracking()
     # plotter2.plot_tracking(subscript="_damped")

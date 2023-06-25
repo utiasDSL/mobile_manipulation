@@ -152,6 +152,32 @@ class SoTTimed(SoTBase):
 
             self.logger.info("SoT on base task %d.", self.curr_base_task_id)
 
+class SoTBottomTaskFixed(SoTBase):
+    def __init__(self, config):
+        super().__init__(config)
+        self.fixed_task_id = self.planner_num - 1
+        self.curr_task_id = 0
+
+
+    def getPlanners(self, num_planners=2):
+        return [self.planners[self.curr_task_id], self.planners[self.fixed_task_id]]
+
+    def update(self, t, states):
+        Pee = states["EE"][0]
+        Pb = states["base"][:2]
+        # check if current task is finished
+        planner = self.planners[self.curr_task_id]
+        finished = False
+        if planner.type == "EE":
+            finished = planner.checkFinished(t, Pee)
+        elif planner.type == "base":
+            finished = planner.checkFinished(t, Pb)
+
+        if finished and self.curr_task_id < self.fixed_task_id - 1:
+            self.curr_task_id += 1
+
+            self.logger.info("SoT on base task %d.", self.curr_task_id)
+
 if __name__ == "__main__":
     config_path = "$PROJECTMM3D_HOME/experiments/config/sim/simulation.yaml"
     config = parsing.load_config(config_path)

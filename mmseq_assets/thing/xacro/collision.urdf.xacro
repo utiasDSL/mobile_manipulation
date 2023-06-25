@@ -26,6 +26,26 @@
     </link>
   </xacro:macro>
 
+    <xacro:macro name="collision_link_cylinder" params="name radius">
+    <link name="${name}">
+      <xacro:if value="$(arg use_collision)">
+        <collision>
+          <origin rpy="0 0 0" xyz="0 0 0" />
+          <geometry>
+            <cylinder  radius="${radius}" length="1"/>
+          </geometry>
+        </collision>
+      </xacro:if>
+      <visual>
+        <origin rpy="0 0 0" xyz="0 0 0" />
+        <geometry>
+          <cylinder  radius="${radius}" length="1"/>
+        </geometry>
+        <material name="${material}"/>
+      </visual>
+    </link>
+  </xacro:macro>
+
   <!-- Collision sphere for the base -->
   <xacro:collision_link_sphere name="base_collision_link" radius="0.6"/>
   <joint name="base_collision_joint" type="fixed">
@@ -33,6 +53,14 @@
     <parent link="base_link"/>
     <child link="base_collision_link"/>
   </joint>
+
+  <xacro:collision_link_cylinder name="rack_collision_link" radius="0.275"/>
+  <joint name="rack_collision_joint" type="fixed">
+    <origin rpy="0 0 0" xyz="-0.45 -0. 0.75"/>
+    <parent link="base_link"/>
+    <child link="rack_collision_link"/>
+  </joint>
+
 
   <!-- Collision sphere for the upper arm -->
   <xacro:collision_link_sphere name="ur10_arm_upper_arm_collision_link" radius="0.15"/>

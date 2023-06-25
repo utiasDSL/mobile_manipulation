@@ -133,9 +133,9 @@ class NonlinearConstraint(Constraint):
         indx = np.where(g > self.tol)[0]
         if len(indx) > 0:
             self.py_logger.debug(self.name + " Constraint is violated at {}".format(indx))
-            return False
+            return False, g.toarray().flatten()
         else:
-            return True
+            return True, g.toarray().flatten()
 
 class HierarchicalTrackingConstraint(NonlinearConstraint):
     def __init__(self, cost_fcn_obj, name="Hierarchy"):
@@ -156,6 +156,26 @@ class HierarchicalTrackingConstraint(NonlinearConstraint):
         g_eqn = cs.vertcat(e_bar_eqn, -e_bar_eqn) - cs.vertcat(e_bar_p_abs_eqn, e_bar_p_abs_eqn)
         g_fcn = cs.Function("g_"+name, [cost_fcn_obj.x_bar_sym, cost_fcn_obj.u_bar_sym, cost_fcn_obj.r_bar_sym, e_bar_p_sym], [g_eqn])
         params_sym = [cost_fcn_obj.r_bar_sym, e_bar_p_sym]
+
+        super().__init__(dt, nx, nu, ng, N, g_fcn, params_sym, name+"_h", 1e-2)
+
+class HierarchicalTrackingConstraintCostValue(NonlinearConstraint):
+    def __init__(self, cost_fcn_obj, name="HierarchyCostValue"):
+        """ Hierarchy constraint J_bar(x_bar, u_bar, r_bar) < J_bar_p
+
+        :param cost_fcn_obj: an instance of class ctrl.MPCCostFunctions.TrackingCostFunction
+        :param name: name to identify the constraint
+        """
+        dt = cost_fcn_obj.dt
+        N = cost_fcn_obj.N
+        nx = cost_fcn_obj.nx
+        nu = cost_fcn_obj.nu
+        ng = cost_fcn_obj.J_bar_eqn.size(1)
+
+        J_bar_p_sym = cs.MX.sym("J_bar_p", ng)
+        g_eqn = cost_fcn_obj.J_bar_eqn - J_bar_p_sym
+        g_fcn = cs.Function("g_"+name, [cost_fcn_obj.x_bar_sym, cost_fcn_obj.u_bar_sym, cost_fcn_obj.r_bar_sym, J_bar_p_sym], [g_eqn])
+        params_sym = [cost_fcn_obj.r_bar_sym, J_bar_p_sym]
 
         super().__init__(dt, nx, nu, ng, N, g_fcn, params_sym, name+"_h", 1e-2)
 
@@ -224,8 +244,56 @@ class SignedDistanceCollisionConstraint(NonlinearConstraint):
         g_sym = cs.vertcat(*g_sym_list)
         ng = g_sym.size()[0]
 
-        g_fcn = cs.Function("f_"+self.name, [self.x_bar_sym, self.u_bar_sym], [g_sym], ["x_bar", "u_bar"], ["g_collision"])
+        g_fcn = cs.Function("g_"+self.name, [self.x_bar_sym, self.u_bar_sym], [g_sym], ["x_bar", "u_bar"], ["g_collision"])
         super().__init__(dt, nx, nu, nq, N, g_fcn, [], self.name)
+
+class EEUpwardConstraint(NonlinearConstraint):
+    def __init__(self, robot_mdl, psi_max, dt, N, name="EEUpward", tol=1e-2):
+        """ End Effector tool upward constraint
+                   - z_ee^T @ e_3 < - cos(psi_max)
+
+        :param robot_mdl: class mmseq_control.robot.MobileManipulator3D
+        :param psi_max: maximum diviation from world z axis
+        :param dt: discretization time step
+        :param N: prediction window size
+        :param name: name of this set of collision pairs
+        :param tol: tolerence for this constraint
+        """
+
+        nx = robot_mdl.ssSymMdl["nx"]
+        nu = robot_mdl.ssSymMdl["nu"]
+        nq = robot_mdl.q_sym.size()[0]
+
+        Constraint.__init__(self, dt, nx, nu, N, name + "_collision")
+
+        fee = robot_mdl.kinSymMdls[robot_mdl.tool_link_name]
+
+        g_sym_list = [- fee(self.x_bar_sym[:nq, k])[1][2, 2] + np.cos(psi_max) for k in range(N+1)]
+        g_sym = cs.vertcat(*g_sym_list) * 5
+
+        g_fcn = cs.Function("g_" + self.name, [self.x_bar_sym, self.u_bar_sym], [g_sym], ["x_bar", "u_bar"], ["g_" + self.name])
+        super().__init__(dt, nx, nu, nq, N, g_fcn, [], self.name)
+
+def testEEUpwardConstraint(config):
+    from mmseq_control.robot import  CasadiModelInterface
+    from mmseq_control.MPCCostFunctions import SoftConstraintsRBFCostFunction
+    casadi_model_interface = CasadiModelInterface(config["controller"])
+    dt = 0.1
+    N = 2
+    robot_mdl = casadi_model_interface.robot
+    const = EEUpwardConstraint(robot_mdl, 0.26, dt, N)
+    q0 = parsing.parse_array(config["simulation"]["robot"]["home"])
+    v0 = np.zeros(9)
+    x0 = np.hstack((q0, v0))
+    x_bar = np.vstack((x0, x0, x0))
+    u_bar = np.zeros((N, 9))
+
+    const.check(x_bar, u_bar, *[])
+    mu = config["controller"]["ee_upward_soft"]["mu"]
+    zeta = config["controller"]["ee_upward_soft"]["zeta"]
+    soft_const = SoftConstraintsRBFCostFunction(mu, zeta, const, "ee_upward")
+    J = soft_const.evaluate(x_bar, u_bar)
+    print(J)
 
 def testCollisionConstraint(config):
     from mmseq_control.robot import  CasadiModelInterface
@@ -357,24 +425,27 @@ def testBoxConstraintNew(config):
     print("C diff:{}".format(Cdiff))
     print("d diff:{}".format(ddiff))
 
-def testHiearchicalConstraint():
+def testHiearchicalConstraint(config):
     dt = 0.1
-    N = 1
+    N = 2
     # robot mdl
-    robot = MobileManipulator3D()
+    robot = MobileManipulator3D(config["controller"])
+    nx = robot.ssSymMdl["nx"]
+    nu = robot.ssSymMdl["nu"]
+    Qpsize = (N + 1) * nx + N * nu
+    cst = StateControlBoxConstraintNew(dt, robot, N)
+    x_bar = np.ones((N + 1, nx))
+    u_bar = np.ones((N, nu))
+    z_bar = np.hstack((x_bar.flatten(), u_bar.flatten()))
+    u_prev = -1 * np.ones(nu)
 
-    # cost function params
-    cost_params = {}
-    cost_params["EE"] = {"Qk": 1., "P": 1.}
-    cost_params["base"] = {"Qk": 1., "P": 1.}
-    cost_params["effort"] = {"Qqa": 0., "Qqb": 0.,
-                             "Qva": 1e-2, "Qvb": 2e-2,
-                             "Qua": 1e-1, "Qub": 1e-1}
-
-    cost_base = BasePos2CostFunction(dt, N, robot, cost_params["base"])
-    cost_ee = EEPos3CostFunction(dt, N, robot, cost_params["EE"])
+    cost_base = BasePos2CostFunction(dt, N, robot, config["controller"]["cost_params"]["BasePos2"])
+    cost_ee = EEPos3CostFunction(dt, N, robot, config["controller"]["cost_params"]["EEPos3"])
     base_h_cst = HierarchicalTrackingConstraint(cost_base, "base")
     ee_h_cst = HierarchicalTrackingConstraint(cost_ee, "ee")
+
+    base_h_cst_cost_val = HierarchicalTrackingConstraintCostValue(cost_base, "base")
+    ee_h_cst_cost_val = HierarchicalTrackingConstraintCostValue(cost_ee, "ee")
 
 
 def testNonlinearConstraint():
@@ -461,7 +532,8 @@ if __name__ == "__main__":
     print(motion_cst.check(x_bar, u_bar, *params))
 
     # testNonlinearConstraint()
-    # testHiearchicalConstraint()
+    testHiearchicalConstraint(config)
     # testBoxConstraintNew(config)
-    testSoftConstraint(config)
+    # testSoftConstraint(config)
+    # testEEUpwardConstraint(config)
     # testCollisionConstraint(config)

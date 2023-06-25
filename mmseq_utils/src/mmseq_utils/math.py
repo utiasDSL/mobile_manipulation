@@ -163,9 +163,54 @@ def wrap_pi_array(thetas):
 
     return np.array(thetas_wrapped)
 
-# TODO
-# def project_points_on_axes(vertices, point, axes):
-#     return (axes @ (vertices - point).T).T
-#
-# def unproject_points_on_axes(vertices, point, axes):
-#     pass
+
+def rms_continuous(ts, data):
+    """ RMS of data over a period of time
+
+    :param ts: 1D array of length N, time stamp of each row of data
+    :param data: 2D array, N x data dimension
+    :return:
+    """
+    dts = ts[1:] - ts[:-1]
+    dts = np.hstack((dts, dts[-1]))
+    rms = (np.sum(data ** 2 * dts, axis=0) / (ts[-1] - ts[0])) ** 0.5
+
+    return rms
+
+
+def integrate_zoh(ts, data):
+    """ Numerical integration(ZOH) of data over a period of time
+
+    :param ts: 1D array of length N, time stamp of each row of data
+    :param data: 2D array, N x data dimension
+    :return:
+    """
+    dts = ts[1:] - ts[:-1]
+    dts = np.hstack((dts, dts[-1]))
+    integral = np.sum(data*dts, axis=0)
+
+    return integral / (ts[-1] - ts[0])
+
+def statistics(data):
+    mean = np.mean(data, axis=0)
+    max = np.max(data, axis=0)
+    min = np.min(data, axis=0)
+
+    return mean, max, min
+
+def normalize_wrt_bounds(lower_bound, upper_bound, data):
+    """ Normalize data wrt bounds
+        # -1 --> saturate lower bounds
+        # 1  --> saturate upper bounds
+        # 0  --> mean
+    :param lower_bound: 1D array same length of data (n)
+    :param upper_bound: 1D array same length of data (n)
+    :param data: 2D array time dim (N) x data dim (n)
+    :return: data_normalized
+    """
+
+    mean_bound = (upper_bound + lower_bound) / 2
+    bound_width = upper_bound - mean_bound
+    data_normalized = (data - mean_bound) / bound_width
+
+    return data_normalized

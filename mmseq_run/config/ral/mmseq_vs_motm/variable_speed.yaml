@@ -1,0 +1,43 @@
+simulation:
+  robot:
+    home: [ 0., -0, 0.pi, 0.5pi, -0.25pi, 0.5pi, -0.25pi, 0.5pi, 0.417pi ]  # standard
+  duration: 10
+
+planner:
+  sot_type: "SoTStatic"
+  tasks:
+    - name: "EE Pos 1"
+      planner_type: "EESimplePlanner"
+      frame_id: "base"
+      target_pos: [1., -0.8, 0.8]
+      hold_period: 0.5
+      tracking_err_tol: 0.03
+    - name: "Base Pos 2"
+      planner_type: "BasePosTrajectoryLine"
+      frame_id: "base"
+      initial_pos: [ -0.0, -0.0 ]
+      target_pos: [ 3., 0. ]
+      cruise_speed: 1.0
+      tracking_err_tol: 0.02
+    - name: "EE Pos 1"
+      planner_type: "EESimplePlanner"
+      frame_id: "base"
+      target_pos: [3.8, 0.0, 0.8 ]
+      hold_period: 3.
+      tracking_err_tol: 0.02
+
+
+
+include:
+  - package: "mmseq_run"
+    path: "config/robot/thing.yaml"
+  - package: "mmseq_run"
+    path: "config/controller/HTMPC.yaml"
+  - package: "mmseq_run"
+    path: "config/sim/simulation.yaml"
+  - package: "mmseq_run"
+    path: "config/scene/empty.yaml"
+
+logging:
+  log_dir: "/home/tracy/Documents/PhD/data/htmpc_vs_motm_variable_speed"
+  log_level: 20 # 0 - not set, 10 - debug, 20 - info

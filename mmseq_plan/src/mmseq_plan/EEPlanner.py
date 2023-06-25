@@ -54,6 +54,19 @@ class EESimplePlanner(Planner):
         self.started = False
         self.py_logger.info(self.name + " Planner Reset.")
 
+    @staticmethod
+    def getDefaultParams():
+        config = {}
+        config["name"] = "EE Position"
+        config["planner_type"] = "EESimplePlanner"
+        config["frame_id"] = "EE"
+        config["target_pos"] = [0, 0, 0]
+        config["hold_period"] = 3.
+        config["tracking_err_tol"] = 0.02
+
+        return config
+
+
 
 class EEPosTrajectoryCircle(Planner):
     def __init__(self, config):
@@ -87,26 +100,38 @@ class EEPosTrajectoryCircle(Planner):
         pt1 = self.r * np.cos(self.omega * ts + self.phi)
         pt2 = self.r * np.sin(self.omega * ts + self.phi)
         pt = [pt1, pt2]
-        plan = np.repeat([self.c], self.N, axis=0)
+        plan_pos = np.repeat([self.c], self.N, axis=0)
 
         for i, pid in enumerate(self.plane_id):
-            plan[:, pid] += pt[i]
+            plan_pos[:, pid] += pt[i]
 
-        return plan
+        v1 = -self.r * np.sin(self.omega * ts + self.phi) * self.omega
+        v2 = self.r * np.cos(self.omega * ts + self.phi) * self.omega
+        v = np.array([v1, v2])
+        plan_vel = np.zeros_like(plan_pos)
+
+        for i, pid in enumerate(self.plane_id):
+            plan_vel[:, pid] += v[i]
+
+        return {"p": plan_pos, "v": plan_vel}
 
     def _interpolate(self, t, plan, dt):
+        plan_len = len(plan["p"])
         indx = int(t / dt)
-        if indx > len(plan)-2:
-            return plan[-1]
+        if indx > plan_len-2:
+            return plan['p'][-1], np.zeros_like(plan['p'][-1])
         elif indx < 0:
-            return plan[0]
+            return plan['p'][0], np.zeros_like(plan['p'][0])
 
-        p0 = plan[indx]
-        p1 = plan[indx + 1]
-
+        p0 = plan["p"][indx]
+        p1 = plan["p"][indx + 1]
         p = (p1 - p0) / dt * (t - indx * dt) + p0
 
-        return p
+        v0 = plan["v"][indx]
+        v1 = plan["v"][indx + 1]
+        v = (v1 - v0) / dt * (t - indx * dt) + v0
+
+        return p, v
 
     def getTrackingPoint(self, t, robot_states=None):
 
@@ -115,9 +140,9 @@ class EEPosTrajectoryCircle(Planner):
 
         te = t - self.start_time
 
-        p = self._interpolate(te, self.plan, self.dt)
+        p, v = self._interpolate(te, self.plan, self.dt)
 
-        return p, np.zeros(3)
+        return p, v
 
     def checkFinished(self, t, ee_curr_pos):
         if t - self.start_time > self.T * (self.round - 1):
