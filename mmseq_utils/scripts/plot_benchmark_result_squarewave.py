@@ -15,6 +15,13 @@ STATS = [("err_ee", "integral"), ("err_base_normalized", "integral"),
          ("cmd_jerks_base_linear", "max"),
          ("run_time", "mean"), ("constraints_violation", "mean")]
 
+EE_HEIGHT = 0.708
+REACHABLE_RADIUS = 1.8682347282929948
+
+def get_optimal_base_err(r_bw_wd, r_ew_wd):
+    r_bw_w_opt = (r_bw_wd - r_ew_wd[:2]) / np.linalg.norm(r_bw_wd - r_ew_wd[:2]) * REACHABLE_RADIUS + r_ew_wd[:2]
+
+    return np.linalg.norm(r_bw_wd - r_bw_w_opt)
 
 def construct_logger(path_to_folder):
     """ Path to data folder
@@ -45,6 +52,8 @@ def construct_logger(path_to_folder):
         # there is only one folder and one ros bag
         return SquareWaveDataPlotter.from_ROSEXP_results(path_to_folder)
 
+    return print("Faile to construt logger at " + path_to_folder)
+
 def statistics(plotters):
 
     stats_dict = {}
@@ -62,11 +71,13 @@ class SquareWaveDataPlotter(DataPlotter):
         self._get_statistics_squarewave()
 
     def _get_statistics_squarewave(self):
-        N = np.argwhere(np.linalg.norm(self.data["r_bw_w_ds"] - [0, 0], axis=1) < 1e-5).flatten()[0]
+        N = np.argwhere(np.linalg.norm(self.data["r_bw_w_ds"] - self.data["r_bw_w_ds"][-10], axis=1) < 1e-3).flatten()[0]
         self.data["err_ee_1"] = self.data["err_ee"][:N]
         self.data["err_ee_2"] = self.data["err_ee"][N:]
         # assume that controller achieves optimal error 10 steps before the second waypoint
-        self.data["err_base_normalized_1"] = (self.data["err_base"][:N] - self.data["err_base"][N-10]) / (self.data["err_base"][0] - self.data["err_base"][N-10])
+        eb_opt = get_optimal_base_err(self.data["r_bw_w_ds"][-10], self.data["r_ew_w_ds"][-10])
+
+        self.data["err_base_normalized_1"] = (self.data["err_base"][:N] - eb_opt) / (self.data["err_base"][0] - eb_opt)
         self.data["err_base_normalized_2"] = self.data["err_base"][N:] / self.data["err_base"][N]
 
         data_names = ["err_ee_1", "err_ee_2", "err_base_normalized_1", "err_base_normalized_2"]
@@ -75,8 +86,8 @@ class SquareWaveDataPlotter(DataPlotter):
         for name in data_names:
             stats = math.statistics(self.data[name])
             t = t1 if name.split("_")[-1] == "1" else t2
-            self.data["statistics"][name] = {"rms": math.rms_continuous(t, self.data[name]),
-                                                   "integral": math.integrate_zoh(t, self.data[name]),
+            self.data["statistics"][name] = {"rms": math.rms_continuous(t, np.abs(self.data[name])),
+                                                   "integral": math.integrate_zoh(t, np.abs(self.data[name])),
                                                    "mean": stats[0], "max": stats[1],
                                                    "min": stats[2]}
 
@@ -103,7 +114,7 @@ class SquareWaveDataPlotter(DataPlotter):
                      label=legend + " acc = {:.3f}".format(self.data["statistics"]["err_ee"]["integral"]), color=colors[index])
         axes[1].set_ylabel("EE Err (m)")
 
-        N = np.argwhere(np.linalg.norm(self.data["r_bw_w_ds"] - [0, 0], axis=1) < 1e-5).flatten()[0]
+        N = np.argwhere(np.linalg.norm(self.data["r_bw_w_ds"] - self.data["r_bw_w_ds"][-10], axis=1) < 1e-3).flatten()[0]
         axes[2].plot(t_sim[:N], self.data["err_base_normalized_1"],
                      label=legend + " part 1 acc = {:.3f}".format(self.data["statistics"]["err_base_normalized_1"]["integral"]), color=colors[index])
         axes[2].plot(t_sim[N:], self.data["err_base_normalized_2"], linestyle="--",
