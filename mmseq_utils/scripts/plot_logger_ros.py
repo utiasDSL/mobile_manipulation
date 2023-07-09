@@ -56,6 +56,26 @@ def plot_comparisons(folder_path, show=True):
     plt.close('all')
     return df
 
+def plot_comparisons_idkc(folder_path, show=True):
+    plotters = []
+    for filename in os.listdir(folder_path):
+        if filename.split("_")[0] != "HTIDKC":
+            continue
+        else:
+            print(filename)
+            d = os.path.join(folder_path, filename)
+            if os.path.isdir(d):
+                plotter = construct_logger(d)
+                plotters.append(plotter)
+
+    # plot tracking error
+    axes = None
+    for id, p in enumerate(plotters):
+        axes = p.plot_task_violation(axes, id)
+
+    if show:
+        plt.show()
+
 def benchmark(folder_path):
     """
 
@@ -126,12 +146,16 @@ if __name__ == "__main__":
 
     parser.add_argument("--compare", action="store_true",
                         help="plot comparisons")
+    parser.add_argument("--compareidkc", action="store_true",
+                        help="plot comparisons")
     parser.add_argument("--benchmark", action="store_true", help="gather benchmark results")
 
     args = parser.parse_args()
 
     if args.compare:
         plot_comparisons(args.folder, args.show)
+    if args.compareidkc:
+        plot_comparisons_idkc(args.folder, args.show)
     elif args.benchmark:
         benchmark(args.folder)
     else:
