@@ -3,6 +3,7 @@
 import numpy as np
 from numpy import linalg
 from liegroups import SE3, SO3
+from spatialmath.base import rotz
 
 from mmseq_plan.PlanBaseClass import Planner
 from mmseq_utils.transformation import *
@@ -65,6 +66,72 @@ class EESimplePlanner(Planner):
         config["tracking_err_tol"] = 0.02
 
         return config
+
+class EESimplePlannerBaseFrame(Planner):
+    def __init__(self, planner_params):
+        self.name = planner_params["name"]
+        self.target_pos = np.array(planner_params["target_pos"])
+        self.type = "EE"
+        self.ref_type = "waypoint"
+        self.ref_data_type = "Vec3"
+        self.frame_id = planner_params["frame_id"]
+
+        self.started = False
+        self.finished = False
+        self.reached_target = False
+        self.t_reached_target = 0
+        self.hold_period = planner_params["hold_period"]
+        self.tracking_err_tol = planner_params["tracking_err_tol"]
+
+        super().__init__()
+
+    def getTrackingPoint(self, t, robot_states=None):
+        q,_ = robot_states
+        target_pos = self.target_pos.copy()
+        target_pos[:2] -= q[:2]
+        Rwb = rotz(q[2])
+        target_pos= Rwb.T @ target_pos
+        print(target_pos)
+
+        return target_pos, np.zeros(3)
+    
+    def checkFinished(self, t, ee_curr_pos):
+        if np.linalg.norm(ee_curr_pos - self.target_pos) > self.tracking_err_tol:
+            if self.reached_target:
+                self.reset()
+            return self.finished
+
+        if not self.reached_target:
+            self.reached_target = True
+            self.t_reached_target=t
+            self.py_logger.info(self.name + " Planner Reached Target.")
+            return self.finished
+
+        if t - self.t_reached_target > self.hold_period:
+            self.finished = True
+            self.py_logger.info(self.name + " Planner Finished.")
+
+        return self.finished
+
+    def reset(self):
+        self.reached_target = False
+        self.t_reached_target = 0
+        self.finished = False
+        self.started = False
+        self.py_logger.info(self.name + " Planner Reset.")
+
+    @staticmethod
+    def getDefaultParams():
+        config = {}
+        config["name"] = "EE Position"
+        config["planner_type"] = "EESimplePlanner"
+        config["frame_id"] = "EE"
+        config["target_pos"] = [0, 0, 0]
+        config["hold_period"] = 3.
+        config["tracking_err_tol"] = 0.02
+
+        return config
+
 
 
 

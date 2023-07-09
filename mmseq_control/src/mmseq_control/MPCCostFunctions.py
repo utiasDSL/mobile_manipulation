@@ -201,6 +201,20 @@ class EEPos3CostFunction(TrackingCostFunction):
         super().__init__(dt, nx, nu, N, nr, f_fcn, cost_params)
 
 
+class EEPos3BaseFrameCostFunction(TrackingCostFunction):
+    def __init__(self, dt, N, robot_mdl, params):
+        self.name = "EEPos3"
+        ss_mdl = robot_mdl.ssSymMdl
+        nx = ss_mdl["nx"]
+        nu = ss_mdl["nu"]
+        nr = 3
+        fk_ee = robot_mdl._getFk(robot_mdl.tool_link_name, base_frame=True)
+        f_fcn = cs.Function("fee", [robot_mdl.x_sym], [fk_ee(robot_mdl.q_sym)[0]])
+        cost_params = {}
+        cost_params["Qk"] = np.eye(nr) * params["Qk"]
+        cost_params["P"] = np.eye(nr) * params["P"]
+        super().__init__(dt, nx, nu, N, nr, f_fcn, cost_params)
+
 class BasePos2CostFunction(TrackingCostFunction):
     def __init__(self, dt, N, robot_mdl, params):
         self.name = "BasePos2"

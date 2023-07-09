@@ -268,12 +268,13 @@ class ControllerROSNode:
             self.planner_coord_transform(self.robot_interface.q, ee_pos, self.sot.planners)
 
         rospy.Timer(rospy.Duration(0, int(1e8)), self._publish_planner_data)
-
+        states = (self.robot_interface.q ,self.robot_interface.v)
         print("robot coord: {}".format(self.robot_interface.q))
         for planner in self.sot.planners:
-            print("planner target:{}".format(planner.getTrackingPoint(0)))
+            print("planner target:{}".format(planner.getTrackingPoint(0, states)))
 
         input("Press Enter to continue...")
+        rospy.sleep(5.)
         self.sot.activatePlanners()
         t = rospy.Time.now().to_sec()
         t0 = t
@@ -306,7 +307,7 @@ class ControllerROSNode:
                 ee_states = (self.vicon_tool_interface.position, self.vicon_tool_interface.orientation)
             else:
                 ee_states = self.robot.getEE(robot_states[0])
-            states = {"base": robot_states[0][:3], "EE": ee_states}
+            states = {"base": (robot_states[0][:3], robot_states[1][:3]), "EE": ee_states}
 
             self.sot_lock.acquire()
             self.sot.update(t-t0, states)
@@ -351,7 +352,7 @@ class ControllerROSNode:
             elif planner.frame_id == "EE":
                 P = ree
 
-            if planner.__class__.__name__ == "EESimplePlanner":
+            if planner.__class__.__name__ == "EESimplePlanner" or planner.__class__.__name__ == "EESimplePlannerBaseFrame":
                 planner.target_pos = R_wb @ planner.target_pos + P
             elif planner.__class__.__name__ == "EEPosTrajectoryCircle":
                 planner.c = R_wb @ planner.c + P

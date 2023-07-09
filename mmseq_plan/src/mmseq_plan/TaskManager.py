@@ -48,7 +48,8 @@ class SoTStatic(SoTBase):
     def getPlanners(self, num_planners=2):
         # get the top #num_planners in the stack
         end_id = min(self.curr_task_id + num_planners, self.planner_num)
-        return self.planners[self.curr_task_id:end_id]
+        start_id = max(0, end_id - num_planners)
+        return self.planners[start_id:end_id]
 
     def update(self, t, states):
         Pee = states["EE"][0]
@@ -63,7 +64,7 @@ class SoTStatic(SoTBase):
 
         # current task is finished move on to next task, unless it's the last task in the stack
         if finished:
-            if self.curr_task_id != self.planner_num - 2:
+            if self.curr_task_id != self.planner_num - 1:
                 self.curr_task_id = min(self.planner_num-1, self.curr_task_id + 1)
                 self.logger.info("SoT finished %d/%d tasks.", self.curr_task_id, self.planner_num)
             else:

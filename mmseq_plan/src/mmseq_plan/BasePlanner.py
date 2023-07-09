@@ -25,7 +25,8 @@ class BaseSingleWaypoint(Planner):
     def getTrackingPoint(self, t, robot_states=None):
         return self.target_pos, np.zeros(2)
 
-    def checkFinished(self, t, base_curr_pos):
+    def checkFinished(self, t, states):
+        base_curr_pos = states[0][:2]
         err = np.linalg.norm(self.target_pos - base_curr_pos)
         if err < self.tracking_err_tol and not self.finished:
             self.py_logger.info(self.name + " planner finished.")
@@ -103,9 +104,11 @@ class BasePosTrajectoryCircle(TrajectoryPlanner):
 
         return p, v
 
-    def checkFinished(self, t, ee_curr_pos):
+    def checkFinished(self, t, states):
+        base_curr_pos = states[0][:2]
+
         if t - self.start_time > self.T * (self.round - 1):
-            if np.linalg.norm(ee_curr_pos - self.plan[0]) < self.tracking_err_tol:
+            if np.linalg.norm(base_curr_pos - self.plan[0]) < self.tracking_err_tol:
                 self.finished = True
                 self.py_logger.info(self.name + " Planner Finished")
         return self.finished
@@ -122,6 +125,7 @@ class BasePosTrajectoryLine(TrajectoryPlanner):
         self.ref_data_type = "Vec2"
         self.tracking_err_tol = config["tracking_err_tol"]
         self.frame_id = config["frame_id"]
+        self.end_stop = config.get("end_stop", False)
 
         self.finished = False
         self.started = False
@@ -157,8 +161,12 @@ class BasePosTrajectoryLine(TrajectoryPlanner):
 
         return p, v
 
-    def checkFinished(self, t, base_curr_pos):
-        if np.linalg.norm(base_curr_pos - self.plan['p'][-1]) < self.tracking_err_tol:
+    def checkFinished(self, t, states):
+        base_curr_pos = states[0][:2]
+        base_curr_vel = states[1][:2]
+        pos_cond = np.linalg.norm(base_curr_pos - self.plan['p'][-1]) < self.tracking_err_tol
+        vel_cond = np.linalg.norm(base_curr_vel) < 1e-2
+        if (not self.end_stop and pos_cond) or (self.end_stop and pos_cond and vel_cond):
             self.finished = True
             self.py_logger.info(self.name + " Planner Finished")
         return self.finished
@@ -198,7 +206,9 @@ class BasePosTrajectorySqaureWave(TrajectoryPlanner):
 
         return p, v
 
-    def checkFinished(self, t, base_curr_pos):
+    def checkFinished(self, t, states):
+        base_curr_pos = states[0][:2]
+
         if np.linalg.norm(base_curr_pos - self.plan['p'][-1]) < self.tracking_err_tol:
             self.finished = True
             self.py_logger.info(self.name + " Planner Finished")

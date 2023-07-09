@@ -7,7 +7,7 @@ import casadi as cs
 from cvxopt import solvers, matrix
 from mosek import iparam, dparam
 import mmseq_control.MPCConstraints as MPCConstraint
-from mmseq_control.MPCCostFunctions import EEPos3CostFunction, BasePos2CostFunction, ControlEffortCostFunciton, SoftConstraintsRBFCostFunction, ControlEffortCostFuncitonNew, SumOfCostFunctions
+from mmseq_control.MPCCostFunctions import EEPos3CostFunction, BasePos2CostFunction, ControlEffortCostFunciton, SoftConstraintsRBFCostFunction, ControlEffortCostFuncitonNew, SumOfCostFunctions, EEPos3BaseFrameCostFunction
 from mmseq_control.MPCConstraints import HierarchicalTrackingConstraint, HierarchicalTrackingConstraintCostValue, MotionConstraint, StateControlBoxConstraint, StateControlBoxConstraintNew, SignedDistanceCollisionConstraint, EEUpwardConstraint
 from mmseq_control.robot import MobileManipulator3D as MM
 from mmseq_control.robot import CasadiModelInterface as ModelInterface
@@ -30,6 +30,7 @@ class MPC():
         self.QPsize = self.nx * (self.N + 1) + self.nu * self.N
 
         self.EEPos3Cost = EEPos3CostFunction(self.dt, self.N, self.robot, config["cost_params"]["EEPos3"])
+        self.EEPos3BaseFrameCost = EEPos3BaseFrameCostFunction(self.dt, self.N, self.robot, config["cost_params"]["EEPos3"])
         self.BasePos2Cost = BasePos2CostFunction(self.dt, self.N, self.robot, config["cost_params"]["BasePos2"])
         if self.params["penalize_du"]:
             self.CtrlEffCost = ControlEffortCostFuncitonNew(self.dt, self.N, self.robot, config["cost_params"]["Effort"])
@@ -150,9 +151,10 @@ class HTMPCSQP(MPC):
                      for k in range(self.N + 1)]
             r_bars.append([[np.array(r_bar)], [-self.u_prev]])
 
-            if planner.type == "EE" and planner.ref_data_type == "Vec3":
+            if planner.type == "EE" and planner.ref_data_type == "Vec3" and planner.__class__.__name__ == "EESimplePlanner":
                 cost_fcns.append([self.EEPos3Cost, self.CtrlEffCost])
-
+            elif planner.type == "EE" and planner.ref_data_type == "Vec3" and planner.__class__.__name__ == "EESimplePlannerBaseFrame":
+                cost_fcns.append([self.EEPos3BaseFrameCost, self.CtrlEffCost])
             elif planner.type == "base" and planner.ref_data_type == "Vec2":
                 cost_fcns.append([self.BasePos2Cost, self.CtrlEffCost])
                 # cost_fcns.append([self.BasePos2Cost])
