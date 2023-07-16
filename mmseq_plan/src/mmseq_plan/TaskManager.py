@@ -70,7 +70,72 @@ class SoTStatic(SoTBase):
             else:
                 self.logger.info("SoT finished %d/%d tasks.", self.curr_task_id+1, self.planner_num)
 
-class SoTSequentialTasks(SoTStatic):
+class SoTCycle(SoTBase):
+    def __init__(self, config):
+        # in the class, we assume that tasks come in base and ee pairs with a base task preceding an ee task.
+        # This implies that at even indices in self.planners are base tasks and at odd indices are ee task.
+        self.curr_task_id = 1
+        self.shuffle_is_triggered = False
+        super().__init__(config)
+
+    def getPlanners(self, num_planners=2):
+        # get the top #num_planners in the CYCLIC stack
+        indices = np.arange(self.curr_task_id, self.curr_task_id + num_planners)
+        indices %= self.planner_num
+
+        return [self.planners[i] for i in indices]
+
+    def update(self, t, states):
+        Pee = states["EE"][0]
+        Pb = states["base"][:2]
+        # check if current task is finished
+        planner = self.planners[self.curr_task_id]
+        finished = False
+        if planner.type == "EE":
+            finished = planner.checkFinished(t, Pee)
+        elif planner.type == "base":
+            finished = planner.checkFinished(t, Pb)
+
+        # current task is finished move on to next task, unless it's the last task in the stack
+        if finished:
+            self.planners[self.curr_task_id].reset()
+            self.curr_task_id += 2
+            self.curr_task_id %= self.planner_num
+            self.logger.info("SoT current task is %d/%d", self.curr_task_id, self.planner_num)
+
+        if self.shuffle_is_triggered:
+            self.shuffle()
+
+
+    def shuffle(self):
+        curr_ee_task = self.curr_task_id + (1 - self.curr_task_id % 2)
+        curr_ee_task_idx = (curr_ee_task - 1) // 2
+
+        seq_curr = np.arange(self.planner_num).reshape((self.planner_num//2, 2))
+        if np.random.random() > 0.0:
+            if curr_ee_task != self.planner_num - 1:
+                seq_to_shuffle = np.vstack((seq_curr[:curr_ee_task_idx], seq_curr[curr_ee_task_idx+1:]))
+            else:
+                seq_to_shuffle = seq_curr[:curr_ee_task_idx]
+
+            np.random.shuffle(seq_to_shuffle)
+            if curr_ee_task != self.planner_num - 1:
+                seq_new = np.vstack((seq_to_shuffle[:curr_ee_task_idx], seq_curr[curr_ee_task_idx], seq_to_shuffle[curr_ee_task_idx:]))
+            else:
+                seq_new = np.vstack((seq_to_shuffle, seq_curr[curr_ee_task_idx]))
+
+            seq_new = seq_new.flatten()
+        else:
+            np.random.shuffle(seq_curr)
+            seq_new = seq_curr.flatten()
+
+        self.planners = [self.planners[i] for i in seq_new]
+        self.shuffle_is_triggered = False
+
+        planner_name_new = [self.planners[2*i + 1].name for i in range(self.planner_num//2)]
+        self.logger.info("Curr Task: {} New Task Seq: {}".format(self.curr_task_id, planner_name_new))
+
+class SoTSequentialTasks(SoTCycle):
     def __init__(self, config):
         self.target_num = len(config["initial_waypoints_index"])
         self.ee_target_pos_xy = config["ee_target_pos_xy"]
@@ -184,77 +249,12 @@ class SoTSequentialTasks(SoTStatic):
             ee_config["frame_id"] = "base"
             ee_config["name"] = "EE Pos "+ str(i+1)
             ee_config["target_pos"] = ee_target_pos[i]
-            ee_config["hold_period"] = 3.
+            ee_config["hold_period"] = 1.
 
             task_config_list.append(base_config)
             task_config_list.append(ee_config)
 
         return task_config_list
-
-class SoTCycle(SoTBase):
-    def __init__(self, config):
-        # in the class, we assume that tasks come in base and ee pairs with a base task preceding an ee task.
-        # This implies that at even indices in self.planners are base tasks and at odd indices are ee task.
-        self.curr_task_id = 1
-        self.shuffle_is_triggered = False
-        super().__init__(config)
-
-    def getPlanners(self, num_planners=2):
-        # get the top #num_planners in the CYCLIC stack
-        indices = np.arange(self.curr_task_id, self.curr_task_id + num_planners)
-        indices %= self.planner_num
-
-        return [self.planners[i] for i in indices]
-
-    def update(self, t, states):
-        Pee = states["EE"][0]
-        Pb = states["base"][:2]
-        # check if current task is finished
-        planner = self.planners[self.curr_task_id]
-        finished = False
-        if planner.type == "EE":
-            finished = planner.checkFinished(t, Pee)
-        elif planner.type == "base":
-            finished = planner.checkFinished(t, Pb)
-
-        # current task is finished move on to next task, unless it's the last task in the stack
-        if finished:
-            self.planners[self.curr_task_id].reset()
-            self.curr_task_id += 2
-            self.curr_task_id %= self.planner_num
-            self.logger.info("SoT current task is %d/%d", self.curr_task_id, self.planner_num)
-
-        if self.shuffle_is_triggered:
-            self.shuffle()
-
-
-    def shuffle(self):
-        curr_ee_task = self.curr_task_id + (1 - self.curr_task_id % 2)
-        curr_ee_task_idx = (curr_ee_task - 1) // 2
-
-        seq_curr = np.arange(self.planner_num).reshape((self.planner_num//2, 2))
-        if np.random.random() > 0.0:
-            if curr_ee_task != self.planner_num - 1:
-                seq_to_shuffle = np.vstack((seq_curr[:curr_ee_task_idx], seq_curr[curr_ee_task_idx+1:]))
-            else:
-                seq_to_shuffle = seq_curr[:curr_ee_task_idx]
-
-            np.random.shuffle(seq_to_shuffle)
-            if curr_ee_task != self.planner_num - 1:
-                seq_new = np.vstack((seq_to_shuffle[:curr_ee_task_idx], seq_curr[curr_ee_task_idx], seq_to_shuffle[curr_ee_task_idx:]))
-            else:
-                seq_new = np.vstack((seq_to_shuffle, seq_curr[curr_ee_task_idx]))
-
-            seq_new = seq_new.flatten()
-        else:
-            np.random.shuffle(seq_curr)
-            seq_new = seq_curr.flatten()
-
-        self.planners = [self.planners[i] for i in seq_new]
-        self.shuffle_is_triggered = False
-
-        planner_name_new = [self.planners[2*i + 1].name for i in range(self.planner_num//2)]
-        self.logger.info("Curr Task: {} New Task Seq: {}".format(self.curr_task_id, planner_name_new))
 
 class SoTTimed(SoTBase):
     def __init__(self, config):
