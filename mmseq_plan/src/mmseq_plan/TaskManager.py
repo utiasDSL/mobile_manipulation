@@ -13,6 +13,7 @@ from mmseq_utils import parsing
 class SoTBase(ABC):
     def __init__(self, config):
         self.config = config
+        self.started = False
 
         self.planners = []
         for task_entry in config["tasks"]:
@@ -152,6 +153,7 @@ class SoTSequentialTasks(SoTCycle):
         config["tasks"] = task_list
 
         super().__init__(config)
+        self.curr_task_id = 0
 
     def update_planner(self, human_pos, robot_states):
         base_pos = robot_states["base"][0][:2]
@@ -168,7 +170,11 @@ class SoTSequentialTasks(SoTCycle):
         for i in range(self.target_num):
             prev_base_task_index = i*2
             ee_task_index = prev_base_task_index + 1
-            next_base_task_index = prev_base_task_index + 2
+            if self.started:
+                next_base_task_index = (prev_base_task_index + 2)%self.planner_num
+            else:
+                next_base_task_index = prev_base_task_index + 2
+
             if new_waypoints_index[i] != self.curr_waypoints_index[i]:
                 # Future/Current task changed
                 if ee_task_index >= self.curr_task_id:
@@ -212,9 +218,9 @@ class SoTSequentialTasks(SoTCycle):
         return new_waypoints_index
 
     def _get_new_ee_target_pos_z(self, human_pos):
-        ee_pos_z = human_pos[:, 2] - 0.5
+        ee_pos_z = human_pos[:, 2] - 0.8
         ee_pos_z = np.where(ee_pos_z < 0.8, 0.8, ee_pos_z)
-        ee_pos_z = np.where(ee_pos_z > 1.8, 1.8, ee_pos_z)
+        ee_pos_z = np.where(ee_pos_z > 1.5, 1.5, ee_pos_z)
 
         return ee_pos_z
 
@@ -255,6 +261,70 @@ class SoTSequentialTasks(SoTCycle):
             task_config_list.append(ee_config)
 
         return task_config_list
+
+    def update(self, t, states):
+        Pee = states["EE"][0]
+        Pb = states["base"][:2]
+        if not self.config.get("use_joy", False) or "joy" not in states.keys():
+
+            # check if current task is finished
+            planner = self.planners[self.curr_task_id]
+            if planner.type == "EE":
+                finished = planner.checkFinished(t, Pee)
+            elif planner.type == "base":
+                finished = planner.checkFinished(t, Pb)
+            else:
+                finished = False
+
+            if finished:
+                task_id_increment = 1
+            else:
+                task_id_increment = 0
+
+        else:
+
+            # joy is 1 when an EE task is finished
+            planner = self.planners[self.curr_task_id]
+
+            if states["joy"] == 1:
+                finished = True
+                if planner.type == "EE":
+                    task_id_increment = 1
+                elif planner.type == "base":
+                    task_id_increment = 2
+                else:
+                    finished = False
+                    task_id_increment = 0
+
+            else:
+                if planner.type == "base":
+                    finished = planner.checkFinished(t, Pb)
+                    if finished:
+                        task_id_increment = 1
+                    else:
+                        task_id_increment = 0
+                else:
+                    finished = False
+                    task_id_increment = 0
+
+            print(task_id_increment)
+
+        # current task is finished move on to next task, unless it's the last task in the stack
+        if finished:
+            for i in range(task_id_increment):
+                self.planners[self.curr_task_id+i].reset()
+            self.curr_task_id += task_id_increment
+            self.curr_task_id %= self.planner_num
+            for i in range(2):
+                next_task_id = (self.curr_task_id + i) % self.planner_num
+                if self.planners[next_task_id].type=="base":
+                    self.planners[next_task_id].initial_pos = Pb[0][:2]
+                    self.planners[next_task_id].regeneratePlan()
+                    self.planners[next_task_id].start_time = 0
+
+            self.logger.info("SoT current task is %d/%d", self.curr_task_id, self.planner_num)
+
+        return finished, task_id_increment
 
 class SoTTimed(SoTBase):
     def __init__(self, config):

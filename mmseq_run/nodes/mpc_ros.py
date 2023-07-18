@@ -20,7 +20,7 @@ from mmseq_control.robot import MobileManipulator3D
 import mmseq_plan.TaskManager as TaskManager
 from mmseq_utils import parsing
 from mmseq_utils.logging import DataLogger
-from mobile_manipulation_central.ros_interface import MobileManipulatorROSInterface, ViconObjectInterface, ViconMarkerSwarmInterface
+from mobile_manipulation_central.ros_interface import MobileManipulatorROSInterface, ViconObjectInterface, ViconMarkerSwarmInterface, JoystickButtonInterface
 
 class ControllerROSNode:
 
@@ -55,7 +55,7 @@ class ControllerROSNode:
             config["logging"]["log_dir"] = os.path.join(config["logging"]["log_dir"], args.logging_sub_folder)
 
         self.ctrl_config = config["controller"]
-        self.planner_config = config["planner"]
+        self.planner_config = config["planner"].copy()
 
         # controller
         control_class = getattr(HTMPC, self.ctrl_config["type"], None)
@@ -93,6 +93,13 @@ class ControllerROSNode:
         self.vicon_tool_interface = ViconObjectInterface(self.ctrl_config["robot"]["tool_vicon_name"])
         if self.planner_config["sot_type"] == "SoTSequentialTasks":
             self.vicon_marker_swarm_interface = ViconMarkerSwarmInterface(self.planner_config["vicon_mark_swarm_estimation_topic_name"])
+
+        if self.planner_config.get("use_joy", False):
+            self.use_joy = True
+            self.joystick_interface = JoystickButtonInterface(1)
+        else:
+            self.use_joy = False
+
         self.controller_visualization_pub = rospy.Publisher("controller_visualization", Marker, queue_size=10)
         self.plan_visualization_pub = rospy.Publisher("plan_visualization", Marker, queue_size=10)
         self.tracking_point_pub = rospy.Publisher("controller_tracking_pt", MultiDOFJointTrajectory, queue_size=5)
@@ -277,6 +284,14 @@ class ControllerROSNode:
 
                 print("Planner did not receive vicon marker swarm estimation. Using config file to initialize SoT.")
 
+        print("-----Checking Joy stick messages----- ")
+        if self.use_joy:
+            if self.joystick_interface.ready():
+                print("Received joystick msg. Using joystick data.")
+            else:
+                self.use_joy = False
+                print("Did not receive joystick msg.")
+
 
         if use_vicon_tool_data:
             self.planner_coord_transform(self.robot_interface.q, self.vicon_tool_interface.position, self.sot.planners)
@@ -295,7 +310,7 @@ class ControllerROSNode:
         self.sot.activatePlanners()
         t = rospy.Time.now().to_sec()
         t0 = t
-
+        self.sot.started = True
         while not self.ctrl_c:
             t = rospy.Time.now().to_sec()
 
@@ -325,6 +340,11 @@ class ControllerROSNode:
             else:
                 ee_states = self.robot.getEE(robot_states[0])
             states = {"base": (robot_states[0][:3], robot_states[1][:3]), "EE": ee_states}
+            if self.use_joy:
+                self.joystick_interface.button_lock.acquire()
+                button = self.joystick_interface.button
+                self.joystick_interface.button_lock.release()
+                states["joy"] = button
 
             self.sot_lock.acquire()
             if self.sot.__class__.__name__ == "SoTSequentialTasks" and use_vicon_marker_swarm_data:
@@ -335,8 +355,11 @@ class ControllerROSNode:
                 #     self.sot.update_planner(human_pos, states)
                 self.sot.update_planner(self.vicon_marker_swarm_interface.position, states)
 
-            self.sot.update(t-t0, states)
+            updated, _ = self.sot.update(t-t0, states)
             self.sot_lock.release()
+
+            if self.use_joy and updated:
+                self.joystick_interface.reset_button()
 
             # log
             self.logger.append("ts", t)
@@ -346,9 +369,12 @@ class ControllerROSNode:
             r_bw_wd = []
             for planner in planners:
                 if planner.type == "EE":
-                    r_ew_wd, _ = planner.getTrackingPoint(t-t0, robot_states)
+                    # r_ew_wd, _ = planner.getTrackingPoint(t-t0, robot_states)
+                    r_ew_wd = self.controller.ree_bar[0]
                 elif planner.type == "base":
-                    r_bw_wd, _ = planner.getTrackingPoint(t-t0, robot_states)
+                    # r_bw_wd, _ = planner.getTrackingPoint(t-t0, robot_states)
+                    r_bw_wd = self.controller.rbase_bar[0]
+
             if len(r_ew_wd) > 0:
                 self.logger.append("r_ew_w_ds", r_ew_wd)
             if len(r_bw_wd) > 0:

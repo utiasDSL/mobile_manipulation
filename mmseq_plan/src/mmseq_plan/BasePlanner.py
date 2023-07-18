@@ -116,6 +116,7 @@ class BasePosTrajectoryCircle(TrajectoryPlanner):
     def reset(self):
         self.finished = False
         self.started = False
+        self.py_logger.info(self.name + " planner reset.")
 
 class BasePosTrajectoryLine(TrajectoryPlanner):
     def __init__(self, config):
@@ -173,12 +174,13 @@ class BasePosTrajectoryLine(TrajectoryPlanner):
         vel_cond = np.linalg.norm(base_curr_vel) < 1e-2
         if (not self.end_stop and pos_cond) or (self.end_stop and pos_cond and vel_cond):
             self.finished = True
-            self.py_logger.info(self.name + " Planner Finished")
+            self.py_logger.info(self.name + " Planner Finished Position error {}".format(np.linalg.norm(base_curr_pos - self.plan['p'][-1])))
         return self.finished
 
     def reset(self):
         self.finished = False
         self.start_time = 0
+        self.py_logger.info(self.name + " planner reset.")
 
     @staticmethod
     def getDefaultParams():
