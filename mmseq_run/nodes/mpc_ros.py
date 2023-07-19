@@ -21,6 +21,7 @@ import mmseq_plan.TaskManager as TaskManager
 from mmseq_utils import parsing
 from mmseq_utils.logging import DataLogger
 from mobile_manipulation_central.ros_interface import MobileManipulatorROSInterface, ViconObjectInterface, ViconMarkerSwarmInterface, JoystickButtonInterface
+from mobile_manipulation_central import PointToPointTrajectory, bound_array
 
 class ControllerROSNode:
 
@@ -94,9 +95,11 @@ class ControllerROSNode:
         if self.planner_config["sot_type"] == "SoTSequentialTasks":
             self.vicon_marker_swarm_interface = ViconMarkerSwarmInterface(self.planner_config["vicon_mark_swarm_estimation_topic_name"])
 
+        self.start_end_button_interface = JoystickButtonInterface(3)    # square
+
         if self.planner_config.get("use_joy", False):
             self.use_joy = True
-            self.joystick_interface = JoystickButtonInterface(1)
+            self.joystick_interface = JoystickButtonInterface(1)    # circle
         else:
             self.use_joy = False
 
@@ -259,6 +262,7 @@ class ControllerROSNode:
             if rospy.is_shutdown():
                 return
         print("Controller received joint states. Proceed ... ")
+        self.home = self.robot_interface.q
 
         print("-----Checking Vicon Tool messages----- ")
         use_vicon_tool_data = True
@@ -305,12 +309,21 @@ class ControllerROSNode:
         for planner in self.sot.planners:
             print("planner target:{}".format(planner.getTrackingPoint(0, states)))
 
-        input("Press Enter to continue...")
+        if self.use_joy:
+            print("----- Press Square(Ps4) to start -----")
+            while not self.start_end_button_interface.button == 1:
+                rate.sleep()
+
+            self.start_end_button_interface.reset_button()
+        else:
+            input("----- Press Enter to start -----")
+
         # rospy.sleep(5.)
         self.sot.activatePlanners()
         t = rospy.Time.now().to_sec()
         t0 = t
         self.sot.started = True
+
         while not self.ctrl_c:
             t = rospy.Time.now().to_sec()
 
@@ -382,11 +395,48 @@ class ControllerROSNode:
             self.logger.append("cmd_vels", u)
             self.logger.append("cmd_accs", acc)
 
+            if self.use_joy and self.start_end_button_interface.button == 1:
+                break
+
             rate.sleep()
 
-        # robot_interface.brake()
-        # timestamp = datetime.datetime.now()
-        # logger.save(timestamp, "ctrl")
+        self.cmd_vel_timer.shutdown()
+        self.mpc_plan = None
+
+        self.go_home()
+
+    def go_home(self):
+        rate = rospy.Rate(125)
+
+        trajectory = PointToPointTrajectory.quintic(
+            self.robot_interface.q, self.home, max_vel=0.2, max_acc=1, min_duration=1
+        )
+
+        # use P control + feedforward velocity to track the trajectory
+        while not rospy.is_shutdown():
+            t = rospy.Time.now().to_sec()
+            dist = np.linalg.norm(self.home - self.robot_interface.q)
+
+            # we want to both let the trajectory complete and ensure we've
+            # converged properly
+            if trajectory.done(t) and dist < 1e-2:
+                break
+
+            qd, vd, _ = trajectory.sample(t)
+            cmd_vel = (qd - self.robot_interface.q) + vd
+
+            # this shouldn't be needed unless the trajectory is poorly tracked, but
+            # we do it just in case for safety
+            cmd_vel = bound_array(cmd_vel, lb=-0.2, ub=0.2)
+
+
+            self.robot_interface.publish_cmd_vel(cmd_vel, bodyframe=False)
+
+            rate.sleep()
+
+        self.robot_interface.brake()
+
+        print(f"Converged to within {dist} of home position.")
 
     def log_mpc_info(self, logger, controller):
         logger.append("mpc_solver_statuss", controller.solver_status)
