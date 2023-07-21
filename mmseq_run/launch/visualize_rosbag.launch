@@ -1,0 +1,18 @@
+<?xml version="1.0"?>
+<!-- Launches the ROS-based simulation, which uses the real mpc_ros nodes talking to a PyBullet sim environment. -->
+
+<launch>
+  <param name="/use_sim_time" value="true" type="bool"/>
+  <arg name="bag" default="/home/tracy/Documents/PhD/data/demo/test_dynamic_final/test_dynamic_9_2023-07-20-16-00-20.bag" />
+  <!-- TF -->
+  <include file="$(find mobile_manipulation_central)/launch/thing_description.launch">
+    <arg name="visual_params" value="$(find ur_description)/config/ur10/visual_parameters.yaml" />
+  </include>
+  <node pkg="robot_state_publisher" type="robot_state_publisher" name="ur10_state_publisher" ns="ur10"/>
+  <node name="ridgeback_state_publisher" pkg="mobile_manipulation_central" type="ridgeback_state_publisher_node.py" output="screen"/>
+
+  <include file="$(find mmseq_run)/launch/rviz.launch"/>
+
+  <node pkg="rosbag" type="play" name="player" output="screen" args="--clock $(arg bag) --topics /ur10/joint_states /ridgeback/joint_states /controller_visualization /swarm_state
+  /current_plan_visualization /plan_visualization"/>
+</launch>
