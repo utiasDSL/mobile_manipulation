@@ -9,6 +9,7 @@ import numpy as np
 import mmseq_plan.EEPlanner as eep
 import mmseq_plan.BasePlanner as basep
 from mmseq_utils import parsing
+from mmseq_utils.math import wrap_pi_scalar
 
 class SoTBase(ABC):
     def __init__(self, config):
@@ -71,11 +72,14 @@ class SoTStatic(SoTBase):
             else:
                 self.logger.info("SoT finished %d/%d tasks.", self.curr_task_id+1, self.planner_num)
 
+        return finished, 1
+
 class SoTCycle(SoTBase):
     def __init__(self, config):
         # in the class, we assume that tasks come in base and ee pairs with a base task preceding an ee task.
         # This implies that at even indices in self.planners are base tasks and at odd indices are ee task.
         self.curr_task_id = 1
+        self.task_increment = 2
         self.shuffle_is_triggered = False
         super().__init__(config)
 
@@ -100,13 +104,14 @@ class SoTCycle(SoTBase):
         # current task is finished move on to next task, unless it's the last task in the stack
         if finished:
             self.planners[self.curr_task_id].reset()
-            self.curr_task_id += 2
+            self.curr_task_id += self.task_increment
             self.curr_task_id %= self.planner_num
             self.logger.info("SoT current task is %d/%d", self.curr_task_id, self.planner_num)
 
         if self.shuffle_is_triggered:
             self.shuffle()
 
+        return finished, self.task_increment
 
     def shuffle(self):
         curr_ee_task = self.curr_task_id + (1 - self.curr_task_id % 2)
@@ -218,9 +223,10 @@ class SoTSequentialTasks(SoTCycle):
         return new_waypoints_index
 
     def _get_new_ee_target_pos_z(self, human_pos):
-        ee_pos_z = human_pos[:, 2] - 0.8
-        ee_pos_z = np.where(ee_pos_z < 0.8, 0.8, ee_pos_z)
-        ee_pos_z = np.where(ee_pos_z > 1.5, 1.5, ee_pos_z)
+        # ee_pos_z = human_pos[:, 2] - 0.8
+        # ee_pos_z = np.where(ee_pos_z < 0.8, 0.8, ee_pos_z)
+        # ee_pos_z = np.where(ee_pos_z > 1.5, 1.5, ee_pos_z)
+        ee_pos_z = np.ones((human_pos.shape[0])) * 0.8
 
         return ee_pos_z
 
@@ -326,6 +332,72 @@ class SoTSequentialTasks(SoTCycle):
 
         return finished, task_id_increment
 
+class SoTSequentialTasksBaseline(SoTCycle):
+
+    def __init__(self, config):
+        super().__init__(config)
+        self.curr_task_id = 0
+        self.task_increment = 1
+
+    def update(self, t, states):
+        Pee = states["EE"][0]
+        Pb = states["base"][:2]
+        if not self.config.get("use_joy", False) or "joy" not in states.keys():
+
+            # check if current task is finished
+            planner = self.planners[self.curr_task_id]
+            if planner.type == "EE":
+                finished = planner.checkFinished(t, Pee)
+            elif planner.type == "base":
+                finished = planner.checkFinished(t, Pb)
+            else:
+                finished = False
+
+            if finished:
+                task_id_increment = 1
+            else:
+                task_id_increment = 0
+
+        else:
+
+            # joy is 1 when an EE task is finished
+            planner = self.planners[self.curr_task_id]
+
+            if planner.type == "base":
+                finished = planner.checkFinished(t, Pb)
+            else:
+                if states["joy"] == 1:
+                    finished = True
+                else:
+                    finished = False
+
+            if finished:
+                task_id_increment = 1
+            else:
+                task_id_increment = 0
+
+
+            print(task_id_increment)
+
+        # current task is finished move on to next task, unless it's the last task in the stack
+        if finished:
+            for i in range(task_id_increment):
+                self.planners[self.curr_task_id+i].reset()
+            self.curr_task_id += task_id_increment
+            self.curr_task_id %= self.planner_num
+            next_task_id = (self.curr_task_id + 1) % self.planner_num
+            if self.planners[next_task_id].type =="base":
+                Pb[0][2] = wrap_pi_scalar(Pb[0][2])
+                self.planners[next_task_id].initial_pose = Pb[0]
+                self.planners[next_task_id].regeneratePlan()
+                self.planners[next_task_id].start_time = 0
+
+            self.logger.info("SoT current task is %d/%d", self.curr_task_id, self.planner_num)
+
+        return finished, task_id_increment
+
+
+
 class SoTTimed(SoTBase):
     def __init__(self, config):
         self.curr_base_task_id = 1
@@ -343,6 +415,8 @@ class SoTTimed(SoTBase):
             self.curr_base_task_id = min(self.curr_base_task_id, self.planner_num - 1)
 
             self.logger.info("SoT on base task %d.", self.curr_base_task_id)
+
+        return True, 1
 
 class SoTBottomTaskFixed(SoTBase):
     def __init__(self, config):
@@ -369,6 +443,8 @@ class SoTBottomTaskFixed(SoTBase):
             self.curr_task_id += 1
 
             self.logger.info("SoT on base task %d.", self.curr_task_id)
+
+        return finished, 1
 
 if __name__ == "__main__":
     config_path = "$PROJECTMM3D_HOME/experiments/config/sim/simulation.yaml"

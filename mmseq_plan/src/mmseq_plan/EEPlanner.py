@@ -91,7 +91,6 @@ class EESimplePlannerBaseFrame(Planner):
         target_pos[:2] -= q[:2]
         Rwb = rotz(q[2])
         target_pos= Rwb.T @ target_pos
-        print(target_pos)
 
         return target_pos, np.zeros(3)
     

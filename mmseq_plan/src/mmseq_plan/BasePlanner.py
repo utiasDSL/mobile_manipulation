@@ -4,6 +4,7 @@
 import numpy as np
 from mmseq_plan.PlanBaseClass import Planner, TrajectoryPlanner
 from mmseq_utils.parsing import parse_number
+from mmseq_utils.math import wrap_pi_scalar
 from mmseq_utils.trajectory_generation import sqaure_wave
 
 class BaseSingleWaypoint(Planner):
@@ -191,6 +192,126 @@ class BasePosTrajectoryLine(TrajectoryPlanner):
         config["initial_pos"] = [0, 0]
         config["target_pos"] = [0, 0]
         config["cruise_speed"] = 0.5
+        config["tracking_err_tol"] = 0.02
+
+        return config
+
+class BasePoseTrajectoryLine(TrajectoryPlanner):
+    def __init__(self, config):
+        self.name = config["name"]
+        self.type = "base"
+        self.ref_type = "trajectory"
+        self.ref_data_type = "Vec3"
+        self.tracking_err_tol = config["tracking_err_tol"]
+        self.frame_id = config["frame_id"]
+        self.end_stop = config.get("end_stop", False)
+
+        self.finished = False
+        self.started = False
+        self.start_time = 0
+
+        self.initial_pose = np.array(config["initial_pose"])
+        self.target_pose = np.array(config["target_pose"])
+        self.cruise_speed = config["cruise_speed"]
+        self.yaw_speed = config["yaw_speed"]
+
+        self.dt = 0.01
+        self.plan = self._generatePlan()
+
+        super().__init__()
+
+    def regeneratePlan(self):
+        self.plan = self._generatePlan()
+        self.start_time = 0
+
+    def _generatePlan(self):
+        initial_pos = self.initial_pose[:2]
+        target_pos = self.target_pose[:2]
+        initial_heading = wrap_pi_scalar(self.initial_pose[2])
+        target_heading = wrap_pi_scalar(self.target_pose[2])
+
+        T_pos = np.linalg.norm(initial_pos - target_pos) / self.cruise_speed
+
+        ts = np.linspace(0, T_pos, int(T_pos/self.dt)).reshape((-1, 1))
+        n = (target_pos - initial_pos) / np.linalg.norm(initial_pos - target_pos)
+        plan_pos = n * ts * self.cruise_speed + initial_pos
+
+        plan_vel = np.tile(n * self.cruise_speed, (int(T_pos/self.dt), 1))
+
+        heading_diff = target_heading - initial_heading
+        print("target_heading: {}, initial_heading: {}".format(target_heading, initial_heading))
+        # if heading_diff > np.pi:
+        #     heading_diff -= 2 * np.pi
+        # elif heading_diff < -np.pi:
+        #     heading_diff += 2 * np.pi
+
+        omega = np.sign(heading_diff) * self.yaw_speed
+        if omega != 0:
+            T_heading = heading_diff / omega
+        else:
+            T_heading = T_pos
+        ts_heading = np.linspace(0, T_heading, int(T_heading/self.dt)).reshape((-1, 1))
+        plan_heading = omega * ts_heading + initial_heading
+        plan_omega = np.ones_like(plan_heading) * omega
+
+        d = plan_pos.shape[0] - plan_heading.shape[0]
+        if d > 0:
+            padding = np.ones((d, 1)) * plan_heading[-1]
+            plan_heading = np.vstack((plan_heading, padding))
+            plan_omega = np.vstack((plan_omega, np.zeros((d, 1))))
+
+            t = ts
+
+        else:
+            d = -d
+            padding = np.ones((d, 2)) * plan_pos[-1]
+            plan_pos = np.vstack((plan_pos, padding))
+            plan_vel = np.vstack((plan_vel, np.zeros((d, 2))))
+
+            t = ts_heading
+
+        p = np.hstack((plan_pos, plan_heading))
+        v = np.hstack((plan_vel, plan_omega))
+
+
+        return {'t': t, 'p': p, 'v': v}
+
+    def getTrackingPoint(self, t, robot_states=None):
+
+        if self.started and self.start_time == 0:
+            self.start_time = t
+
+        te = t - self.start_time
+
+        p, v = self._interpolate(te, self.plan)
+
+        return p, v
+
+    def checkFinished(self, t, states):
+        base_curr_pose = states[0]
+        base_curr_vel = states[1]
+        pos_cond = np.linalg.norm(base_curr_pose - self.plan['p'][-1]) < self.tracking_err_tol
+        vel_cond = np.linalg.norm(base_curr_vel) < 1e-2
+        if (not self.end_stop and pos_cond) or (self.end_stop and pos_cond and vel_cond):
+            self.finished = True
+            self.py_logger.info(self.name + " Planner Finished Pose error {}".format(np.linalg.norm(base_curr_pose - self.plan['p'][-1])))
+        return self.finished
+
+    def reset(self):
+        self.finished = False
+        self.start_time = 0
+        self.py_logger.info(self.name + " planner reset.")
+
+    @staticmethod
+    def getDefaultParams():
+        config = {}
+        config["name"] = "Base Pose"
+        config["planner_type"] = "BasePoseTrajectoryLine"
+        config["frame_id"] = "base"
+        config["initial_pose"] = [0, 0, 0]
+        config["target_pose"] = [0, 0, 0]
+        config["cruise_speed"] = 0.5
+        config["yaw_speed"] = 0.5
         config["tracking_err_tol"] = 0.02
 
         return config
