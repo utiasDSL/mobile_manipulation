@@ -4,15 +4,12 @@ import logging
 
 import numpy as np
 import casadi as cs
-from cvxopt import solvers, matrix
-from mosek import iparam, dparam
 import mmseq_control.MPCConstraints as MPCConstraint
 from mmseq_control.MPCCostFunctions import EEPos3CostFunction, BasePos2CostFunction, ControlEffortCostFunciton, SoftConstraintsRBFCostFunction, ControlEffortCostFuncitonNew, SumOfCostFunctions, EEPos3BaseFrameCostFunction
 from mmseq_control.MPCConstraints import HierarchicalTrackingConstraint, HierarchicalTrackingConstraintCostValue, MotionConstraint, StateControlBoxConstraint, StateControlBoxConstraintNew, SignedDistanceCollisionConstraint, EEUpwardConstraint
 from mmseq_control.robot import MobileManipulator3D as MM
 from mmseq_control.robot import CasadiModelInterface as ModelInterface
 from mmseq_utils.math import wrap_pi_array
-
 
 class MPC():
     def __init__(self, config):
@@ -55,6 +52,7 @@ class MPC():
         self.collision_link_names = ["self"] if self.params["self_collision_avoidance_enabled"] else []
         self.collision_link_names += self.model_interface.scene.collision_link_names["static_obstacles"] \
             if self.params["static_obstacles_collision_avoidance_enabled"] else []
+        self.collision_link_names += ["sdf"] if self.params["sdf_collision_avoidance_enabled"] else []
 
         self.collisionCsts = {}
         for name in self.collision_link_names:
@@ -87,7 +85,7 @@ class MPC():
         self.rbase_bar = []
 
     @abstractmethod
-    def control(self, t, robot_states, planners):
+    def control(self, t, robot_states, planners, map=None):
         """
 
         :param t: current control time
@@ -128,12 +126,14 @@ class HTMPCSQP(MPC):
         self.MotionCst = MotionConstraint(self.dt, self.N, self.robot, "DI Motion Model")
         self.hierarchy_cst_type = getattr(MPCConstraint, self.params["hierarchy_constraint_type"])
 
-    def control(self, t, robot_states, planners):
+    def control(self, t, robot_states, planners, map=None):
         self.py_logger.debug("control time {}".format(t))
         self.curr_control_time = t
         q, v = robot_states
         q[2:9] = wrap_pi_array(q[2:9])
         xo = np.hstack((q, v))
+        if map is not None:
+            self.model_interface.sdf_map.update_map(map)
 
         # 0.1 Get linearization point
         self.u_bar[:-1] = self.u_bar[1:]

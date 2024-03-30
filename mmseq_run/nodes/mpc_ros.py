@@ -22,7 +22,7 @@ import mmseq_plan.TaskManager as TaskManager
 from mmseq_utils import parsing
 from mmseq_utils.logging import DataLogger
 from mmseq_utils.math import wrap_pi_scalar, wrap_to_2_pi_scalar
-from mobile_manipulation_central.ros_interface import MobileManipulatorROSInterface, ViconObjectInterface, ViconMarkerSwarmInterface, JoystickButtonInterface
+from mobile_manipulation_central.ros_interface import MobileManipulatorROSInterface, ViconObjectInterface, ViconMarkerSwarmInterface, JoystickButtonInterface, MapInterface
 from mobile_manipulation_central import PointToPointTrajectory, bound_array
 
 class ControllerROSNode:
@@ -106,6 +106,8 @@ class ControllerROSNode:
             self.joystick_interface = JoystickButtonInterface(1)    # circle
         else:
             self.use_joy = False
+        
+        self.map_interface = MapInterface(topic_name="/pocd_slam_node/occupied_ef_nodes")
 
         self.controller_visualization_pub = rospy.Publisher("controller_visualization", Marker, queue_size=10)
         self.plan_visualization_pub = rospy.Publisher("plan_visualization", Marker, queue_size=10)
@@ -292,6 +294,17 @@ class ControllerROSNode:
         print("Controller received joint states. Proceed ... ")
         self.home = self.robot_interface.q
 
+        if self.ctrl_config["sdf_collision_avoidance_enabled"]:
+            print("-----Checking Map Interface----- ")
+            while not self.map_interface.ready():
+                self.robot_interface.brake()
+                rate.sleep()
+                if rospy.is_shutdown():
+                    return
+            
+            _, tsdf_latest = self.map_interface.get_map()
+            print("Received Map. Procee ...")
+
         print("-----Checking Vicon Tool messages----- ")
         use_vicon_tool_data = True
         if not self.vicon_tool_interface.ready():
@@ -357,6 +370,10 @@ class ControllerROSNode:
         sot_num_plans = 2
         while not self.ctrl_c:
             t = rospy.Time.now().to_sec()
+            if self.ctrl_config["sdf_collision_avoidance_enabled"]:
+                status, tsdf = self.map_interface.get_map()
+                if status:
+                    tsdf_latest = tsdf
 
             # open-loop command
             robot_states = (self.robot_interface.q, self.robot_interface.v)
@@ -365,7 +382,7 @@ class ControllerROSNode:
             self.sot_lock.release()
 
             tc1 = time.perf_counter()
-            u, acc, u_bar = self.controller.control(t-t0, robot_states, planners)
+            u, acc, u_bar = self.controller.control(t-t0, robot_states, planners, tsdf_latest)
             tc2 = time.perf_counter()
             self.controller_log.log(5, "Controller Run Time: {}".format(tc2 - tc1))
 

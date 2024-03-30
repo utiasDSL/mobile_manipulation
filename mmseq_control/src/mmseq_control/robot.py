@@ -12,10 +12,12 @@ from scipy.linalg import expm
 import hppfcl as fcl
 from spatialmath.base import r2q, rotz
 
-from liegroups import SO3
+# from liegroups import SO3
+from mmseq_control.map import SDF2D
 from mmseq_utils import parsing
 from mmseq_simulator import simulation
 from mobile_manipulation_central.kinematics import RobotKinematics
+from cbf_mpc.barrier_function2 import CBF, CBFJacobian
 
 import yappi
 
@@ -170,8 +172,11 @@ class PinocchioInterface:
 class CasadiModelInterface:
     def __init__(self, config):
         self.robot = MobileManipulator3D(config)
-        self.scene = Scene(config)
+        self.scene = Scene(config)  
         self.pinocchio_interface = PinocchioInterface(config)
+        #TODO: set robot init pose
+        self.sdf_map = SDF2D()          
+        self.sdf_map_SymMdl = CBF('sdf', self.sdf_map)
 
         self.collision_pairs = {"self": [],
                                 "static_obstacles": {},
@@ -184,6 +189,7 @@ class CasadiModelInterface:
                                                     # obstacle groups are also a dictionary, keyed by obstacle name
         self._setupSelfCollisionSymMdl()
         self._setupStaticObstaclesCollisionSymMdl()
+        self._setupSDFCollisionSymMdl()
 
 
     def _addCollisionPairFromTwoGroups(self, group1, group2):
@@ -231,7 +237,9 @@ class CasadiModelInterface:
                                                                             self.robot.collision_link_names["wrist"] +
                                                                             self.robot.collision_link_names["forearm"] +
                                                                             self.robot.collision_link_names["upper_arm"])
-
+        
+        self.collision_pairs["sdf"] = self._addCollisionPairFromTwoGroups(["map"],
+                                                                          self.robot.collision_link_names["base"])
 
     def _setupSelfCollisionSymMdl(self):
         sd_syms = []
@@ -248,7 +256,7 @@ class CasadiModelInterface:
             sd_fcn = cs.Function("sd_" + pair[0] + "_" + pair[1], [self.robot.q_sym], [sd_sym])
             self.signedDistanceSymMdls[tuple(pair)] = sd_fcn
 
-        self.signedDistanceSymMdlsPerGroup["self"] = cs.Function("sd", [self.robot.q_sym], [cs.vertcat(*sd_syms)])
+        self.signedDistanceSymMdlsPerGroup["self"] = cs.Function("sd_self", [self.robot.q_sym], [cs.vertcat(*sd_syms)])
 
     def _setupStaticObstaclesCollisionSymMdl(self):
         for obstacle, pairs in self.collision_pairs["static_obstacles"].items():
@@ -265,7 +273,24 @@ class CasadiModelInterface:
                 sd_fcn = cs.Function("sd_" + pair[0] + "_" + pair[1], [self.robot.q_sym], [sd_sym])
                 self.signedDistanceSymMdls[tuple(pair)] = sd_fcn
 
-            self.signedDistanceSymMdlsPerGroup["static_obstacles"][obstacle] = cs.Function("sd", [self.robot.q_sym], [cs.vertcat(*sd_syms)])
+            self.signedDistanceSymMdlsPerGroup["static_obstacles"][obstacle] = cs.Function("sd_"+obstacle, [self.robot.q_sym], [cs.vertcat(*sd_syms)])
+
+    def _setupSDFCollisionSymMdl(self):
+        sd_syms = []
+
+        for pair in self.collision_pairs["sdf"]:
+            o = self.pinocchio_interface.getGeometryObject(pair[1:])
+            if o is None:
+                print("either {} or {} isn't a collision geometry".format(*pair))
+                continue
+
+            pt_sym = self.robot.collisionLinkKinSymMdls[pair[1]](self.robot.q_sym)
+            sd_sym = self.sdf_map_SymMdl(pt_sym[0][:2]) - o.geometry.radius
+            sd_syms.append(sd_sym)
+            sd_fcn = cs.Function("sd_" + pair[0] + "_" + pair[1], [self.robot.q_sym], [sd_sym])
+            self.signedDistanceSymMdls[tuple(pair)] = sd_fcn
+        
+        self.signedDistanceSymMdlsPerGroup["sdf"] = cs.Function("sd_sdf", [self.robot.q_sym], [cs.vertcat(*sd_syms)])
 
     def getSignedDistanceSymMdls(self, name):
         """ get signed distance function by collision link name
@@ -275,6 +300,8 @@ class CasadiModelInterface:
         """
         if name == "self":
             return self.signedDistanceSymMdlsPerGroup["self"]
+        elif name =="sdf":
+            return self.signedDistanceSymMdlsPerGroup["sdf"]
         else:
             for group, name_list in self.scene.collision_link_names.items():
                 if name in name_list:

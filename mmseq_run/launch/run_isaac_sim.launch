@@ -1,0 +1,25 @@
+<?xml version="1.0"?>
+<!-- Launches the ROS-based simulation, which uses the real mpc_ros nodes talking to a PyBullet sim environment. -->
+
+<launch>
+  <arg name="config"/>
+  <arg name="ctrl_config" default="default" doc="alternative controller config overwriting the one in config"/>
+  <arg name="planner_config" default="default" doc="alternative controller config overwriting the one in config"/>
+  <arg name="use_mpc" default="false" doc="use mpc as controller"/>
+  <arg name="logging_sub_folder"  default="default" doc="save data to a sub folder if set"/>
+  <param name="/use_sim_time" value="True" type="bool"/>
+
+  <!-- Simulation -->
+  <!-- <include file="$(find mmseq_run)/launch/simulation.launch" pass_all_args="true"/> -->
+
+  <!-- Controller -->
+  <node pkg="mmseq_run" type="controller_ros.py" name="controller_idk" output="screen" required="true" args="--config $(arg config) --ctrl_config $(arg ctrl_config) --planner_config $(arg planner_config) --logging_sub_folder $(arg logging_sub_folder)" unless="$(arg use_mpc)"/>
+  <node pkg="mmseq_run" type="mpc_ros.py" name="controller_mpc" output="screen" required="true" args="--config $(arg config) --ctrl_config $(arg ctrl_config)  --planner_config $(arg planner_config) --logging_sub_folder $(arg logging_sub_folder)" if="$(arg use_mpc)"/>
+
+  <!-- Robot Model -->
+  <include file="$(find mobile_manipulation_central)/launch/thing_description.launch">
+    <arg name="visual_params" value="$(find ur_description)/config/ur10/visual_parameters.yaml" />
+  </include>
+  <node pkg="robot_state_publisher" type="robot_state_publisher" name="ur10_state_publisher" ns="ur10"/>
+  <node name="ridgeback_state_publisher" pkg="mobile_manipulation_central" type="ridgeback_state_publisher_node.py" output="screen"/>
+</launch>

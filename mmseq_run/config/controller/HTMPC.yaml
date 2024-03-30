@@ -14,6 +14,7 @@ controller:
   penalize_du: True
   self_collision_avoidance_enabled: True
   static_obstacles_collision_avoidance_enabled: False
+  sdf_collision_avoidance_enabled: True
   ee_upward_constraint_enabled: False
   cst_tol_schedule_enabled: False
   hierarchy_const_tol: 0.01
