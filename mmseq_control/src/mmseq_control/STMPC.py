@@ -4,8 +4,6 @@ import logging
 
 import numpy as np
 import casadi as cs
-from cvxopt import solvers, matrix
-from mosek import iparam, dparam
 from mmseq_control.MPCConstraints import MotionConstraint
 from mmseq_control.MPCCostFunctions import  BasePose3CostFunction, ArmJointCostFunction
 from mmseq_control.robot import MobileManipulator3D as MM

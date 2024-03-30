@@ -2,8 +2,9 @@
 # -*- coding: utf-8 -*-
 import numpy as np
 from numpy import linalg
-from liegroups import SE3, SO3
+# from liegroups import SE3, SO3
 from spatialmath.base import rotz
+from spatialmath import SE3
 
 from mmseq_plan.PlanBaseClass import Planner
 from mmseq_utils.transformation import *
@@ -309,8 +310,11 @@ class EESixDofWaypoint(Planner):
     def checkFinished(self, t, state_ee):
         # state_ee a Homogeneous Transformation matrix
         Terr = np.matmul(linalg.inv(state_ee), self.target_pose)
-        Terr = SE3(SO3(Terr[:3,:3]), Terr[:3, 3])
-        twist = Terr.log()
+        # Terr = SE3(SO3(Terr[:3,:3]), Terr[:3, 3])
+        Terr = SE3(Terr)
+        # twist = Terr.log()
+        twist = Terr.twist()
+
         if not self.finished and np.linalg.norm(twist) > 0.2:
             self.reset()
         if not self.reached_target and np.linalg.norm(twist) < 0.1:

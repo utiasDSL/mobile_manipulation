@@ -10,7 +10,7 @@ import casadi_kin_dyn.py3casadi_kin_dyn as cas_kin_dyn
 import rospkg
 from scipy.linalg import expm
 import hppfcl as fcl
-from spatialmath.base import r2q, rotz
+from spatialmath.base import r2q, rotz, q2r
 
 # from liegroups import SO3
 from mmseq_control.map import SDF2D
@@ -19,7 +19,7 @@ from mmseq_simulator import simulation
 from mobile_manipulation_central.kinematics import RobotKinematics
 from cbf_mpc.barrier_function2 import CBF, CBFJacobian
 
-import yappi
+# import yappi
 
 def signed_distance_sphere_sphere(c1, c2, r1, r2):
     """ signed distance between two spheres
@@ -586,7 +586,8 @@ def verify_link_transforms(robot_sim, sysMdls, link_names):
         else:
             continue
         pos_sim, orn_sim = robot_sim.link_pose(link_idx)
-        rot_sim = SO3.from_quaternion(orn_sim, 'xyzw').as_matrix()
+        # rot_sim = SO3.from_quaternion(orn_sim, 'xyzw').as_matrix()
+        rot_sim = q2r(np.array(orn_sim), order="xyzs")
         J_sim = robot_sim.jacobian(q)
 
         fk_fcn = sysMdls[name]

@@ -7,12 +7,11 @@ import logging
 import time
 import sys
 import numpy as np
-from pyb_utils.ghost import GhostSphere, GhostCylinder
 import rospy
 
 from mmseq_simulator import simulation
 from mmseq_utils import parsing
-from mmseq_utils.logging import DataLogger, DataPlotter
+from mmseq_utils.logging import DataLogger
 from mobile_manipulation_central.simulation_ros_interface import SimulatedMobileManipulatorROSInterface, SimulatedViconObjectInterface
 
 def main():
