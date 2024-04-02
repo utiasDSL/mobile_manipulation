@@ -40,7 +40,6 @@ class SDF2D:
             self.valid = True
 
             self.mutex.release()
-
         
     def create_map(self, tsdf):
         pts = np.around(np.array([np.array([p.x,p.y]) for p in tsdf]), 2).reshape((len(tsdf),2))
@@ -48,16 +47,12 @@ class SDF2D:
         vs = [p.z*self.mul for p in tsdf]
         self.map = LinearNDInterpolator(pts, vs) # choose LinearNDInterpolator(pts, vs) or CloughTocher2DInterpolator(pts, vs)
 
-    def vis(self, tsdf):
-        pts = np.around(np.array([np.array([p.x,p.y]) for p in tsdf]), 2).reshape((len(tsdf),2))
-        xs = pts[:,0]
-        ys = pts[:,1]
+    def vis(self, x_lim, y_lim, block=True):
+        Nx = int(1.0/0.1 * (x_lim[1] - x_lim[0]))+1
+        Ny = int(1.0/0.1 * (y_lim[1] - y_lim[0]))+1
 
-        Nx = int(1.0/0.1 * max(xs-min(xs)))+1
-        Ny = int(1.0/0.1 * max(ys-min(ys)))+1
-
-        x_1d = np.linspace(min(xs), max(xs), Nx)
-        y_1d = np.linspace(min(ys), max(ys), Ny)
+        x_1d = np.linspace(x_lim[0], x_lim[1], Nx)
+        y_1d = np.linspace(y_lim[0], y_lim[1], Ny)
 
         X,Y=np.meshgrid(x_1d, y_1d)
         Z=np.zeros(X.shape)
@@ -67,10 +62,17 @@ class SDF2D:
                 Z[j][i] = self.query_val(x_1d[i], y_1d[j])
         #print(Z)
 
-           
-        fig, ax = plt.subplots(subplot_kw={"projection": "3d"})
-        surf = ax.plot_surface(X,Y,Z)
-        plt.show()
+        # fig, ax = plt.subplots(subplot_kw={"projection": "3d"})
+        fig, ax = plt.subplots()
+        levels = np.linspace(-0.5, 1.5, int(2./0.25)+1)
+
+        cs = ax.contour(X,Y,Z, levels)
+        ax.clabel(cs, levels)
+        ax.grid()
+        ax.set_title("Signed Distance Field $sd(x)$")   # 0.6 is base collision radius
+        ax.set_xlabel("x(m)")
+        ax.set_ylabel("y(m)")
+        plt.show(block=block)
 
 
     def query_val(self, x, y):

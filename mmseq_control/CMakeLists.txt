@@ -6,7 +6,6 @@ find_package(catkin REQUIRED)
 catkin_python_setup()
 catkin_package()
 catkin_install_python(PROGRAMS
-            scripts/mpc_constraint_tester.py
             scripts/map_tester.py
             scripts/sdf_tester.py
             DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
