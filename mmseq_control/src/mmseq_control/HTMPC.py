@@ -141,7 +141,7 @@ class HTMPCSQP(MPC):
         q[2:9] = wrap_pi_array(q[2:9])
         xo = np.hstack((q, v))
         if map is not None:
-            self.model_interface.sdf_map.update_map(map)
+            self.model_interface.sdf_map.update_map(*map)
 
         # 0.1 Get linearization point
         self.u_bar[:-1] = self.u_bar[1:]

@@ -107,7 +107,7 @@ class ControllerROSNode:
         else:
             self.use_joy = False
         
-        self.map_interface = MapInterface(topic_name="/pocd_slam_node/occupied_ef_nodes")
+        self.map_interface = MapInterface(topic_name="/pocd_slam_node/occupied_ef_dist_nodes")
 
         self.controller_visualization_pub = rospy.Publisher("controller_visualization", Marker, queue_size=10)
         self.plan_visualization_pub = rospy.Publisher("plan_visualization", Marker, queue_size=10)

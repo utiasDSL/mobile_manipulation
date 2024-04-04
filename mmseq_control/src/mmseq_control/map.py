@@ -32,19 +32,21 @@ class SDF2D:
         else:
             return len(var)
 
-    def update_map(self, tsdf):
+    def update_map(self, tsdf, tsdf_vals):
         if (len(tsdf) > 10):
             self.mutex.acquire(blocking=True)
 
-            self.create_map(tsdf)
+            self.create_map(tsdf, tsdf_vals)
             self.valid = True
 
             self.mutex.release()
         
-    def create_map(self, tsdf):
+    def create_map(self, tsdf, tsdf_vals):
         pts = np.around(np.array([np.array([p.x,p.y]) for p in tsdf]), 2).reshape((len(tsdf),2))
         #vs = [p.z*self.mul-self.offset for p in tsdf]
-        vs = [p.z*self.mul for p in tsdf]
+        # vs = [p.z*self.mul for p in tsdf]
+        vs = [c.r * self.mul for c in tsdf_vals]
+
         self.map = LinearNDInterpolator(pts, vs) # choose LinearNDInterpolator(pts, vs) or CloughTocher2DInterpolator(pts, vs)
 
     def vis(self, x_lim, y_lim, block=True):

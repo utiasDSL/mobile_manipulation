@@ -13,15 +13,16 @@ from cbf_mpc.barrier_function2 import CBF, CBFJacobian
 
 def testSDFMapConstraint(config):
     with rosbag.Bag("/home/tracy/PhD/data/map/cube_map.bag", 'r') as bag:
-            for topic, msg, t in bag.read_messages(topics=["/pocd_slam_node/occupied_ef_nodes"]):
+            for topic, msg, t in bag.read_messages(topics=["/pocd_slam_node/occupied_ef_dist_nodes"]):
                 # Assuming at least one marker is present
                 if msg.markers:
                     tsdf = msg.markers[0].points
+                    tsdf_vals = msg.markers[0].colors
 
     from mmseq_control.robot import  CasadiModelInterface
     from mmseq_control.MPCCostFunctions import SoftConstraintsRBFCostFunction
     casadi_model_interface = CasadiModelInterface(config["controller"])
-    casadi_model_interface.sdf_map.update_map(tsdf)
+    casadi_model_interface.sdf_map.update_map(tsdf, tsdf_vals)
 
     # query points inside the tsdf points
     pts = np.around(np.array([np.array([p.x,p.y]) for p in tsdf]), 2).reshape((len(tsdf),2))
@@ -65,8 +66,8 @@ def testSDFMapConstraint(config):
 
     # Plot RBF
 
-    mu = config["controller"]["collision_soft"]["mu"]
-    zeta = config["controller"]["collision_soft"]["zeta"]
+    mu = config["controller"]["collision_soft"]['sdf']["mu"]
+    zeta = config["controller"]["collision_soft"]['sdf']["zeta"]
     const_soft = SoftConstraintsRBFCostFunction(mu, zeta, const, "SelfCollisionSoftConstraint",expand=False)
     # J_soft = [const_soft.evaluate(x_bar[i,:], u_bar)/X.size for i in range(N+1)]
     J_soft = const_soft.evaluate_vec(x_bar, u_bar)

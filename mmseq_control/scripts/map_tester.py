@@ -1,11 +1,12 @@
 import rospy
+import numpy as np
 
 from mobile_manipulation_central.ros_interface import MapInterface
 from mmseq_control.map import SDF2D
 
 def main():
 
-    map_ros_interface = MapInterface(topic_name="/pocd_slam_node/occupied_ef_nodes")
+    map_ros_interface = MapInterface(topic_name="/pocd_slam_node/occupied_ef_dist_nodes")
     sdf = SDF2D()
     rate = rospy.Rate(100)
 
@@ -15,11 +16,19 @@ def main():
     while not rospy.is_shutdown():
         is_map_updated, map = map_ros_interface.get_map()
         if is_map_updated:
-            sdf.update_map(map)
+            sdf.update_map(*map)
             print(f"{rospy.get_time()} map updated")
+            tsdf, _ = map
+            pts = np.around(np.array([np.array([p.x,p.y]) for p in tsdf]), 2).reshape((len(tsdf),2))
+            xs = pts[:,0]
+            ys = pts[:,1]
+            x_lim = [min(xs), max(xs)]
+            y_lim = [min(ys), max(ys)]
 
             if sdf.valid:
-                sdf.vis(map)
+                sdf.vis(x_lim=x_lim,
+                        y_lim=y_lim,
+                        block=True)
 
         rate.sleep()
 
