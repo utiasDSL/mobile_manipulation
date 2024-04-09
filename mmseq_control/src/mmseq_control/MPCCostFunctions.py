@@ -22,7 +22,7 @@ class RBF:
     B_grad_fcn = cs.Function("dBdh_fcn", [s_sym, h_sym, mu_sym, zeta_sym], [B_grad_eqn])
 
 class CostFunctions(ABC):
-    def __init__(self, dt, nx, nu, N):
+    def __init__(self, dt, nx, nu, N, name="TBD"):
         """ MPC cost functions base class
 
         :param dt: discretization time step
@@ -36,6 +36,7 @@ class CostFunctions(ABC):
         self.nx = nx
         self.nu = nu
         self.N = N
+        self.name = name
 
         self.QPsize = self.nx * (self.N + 1) + self.nu * self.N
         self.x_bar_sym = cs.MX.sym('x_bar', self.nx, self.N + 1)
@@ -72,7 +73,7 @@ class CostFunctions(ABC):
         pass
 
 class LinearLeastSquare(CostFunctions):
-    def __init__(self, dt, nx, nu, N, nr, params):
+    def __init__(self, dt, nx, nu, N, nr, params, name):
         """ Linear least square cost function
             J = ||A z_bar + b||^2_W
             A is a constant matrix, b is a constant vector and treated as a parameter
@@ -84,7 +85,7 @@ class LinearLeastSquare(CostFunctions):
         :param nr: output dimension
         :param params: python dictionary {A:[nr x nz] 2d numpy array, W:[nr x nr] 2d numpy array}
         """
-        super().__init__(dt, nx, nu, N)
+        super().__init__(dt, nx, nu, N, name)
         self.nr = nr
         self.A = params["A"]
         self.W = params["W"]
@@ -115,7 +116,7 @@ class LinearLeastSquare(CostFunctions):
 
 
 class TrackingCostFunction(CostFunctions):
-    def __init__(self, dt, nx, nu, N, nr, f_fcn, params):
+    def __init__(self, dt, nx, nu, N, nr, f_fcn, params, name):
         """ Nonlinear least square cost function
             J = \sum_{k=0}^N ||f_fcn(x(t_k)) - r(t_k)||^2_Qk + ||f_fcn(x(t_N)) - r(t_N)||^2_P
 
@@ -127,7 +128,7 @@ class TrackingCostFunction(CostFunctions):
         :param f_fcn: output/observation function, casadi.Function
         :param params: cost function params
         """
-        super().__init__(dt, nx, nu, N)
+        super().__init__(dt, nx, nu, N, name)
         self.nr = nr
         self.f_fcn = f_fcn.expand()
         self.r_bar_sym = cs.MX.sym("r_bar", self.nr, self.N+1)
@@ -188,7 +189,6 @@ class TrackingCostFunction(CostFunctions):
 
 class EEPos3CostFunction(TrackingCostFunction):
     def __init__(self, dt, N, robot_mdl, params):
-        self.name = "EEPos3"
         ss_mdl = robot_mdl.ssSymMdl
         nx = ss_mdl["nx"]
         nu = ss_mdl["nu"]
@@ -198,12 +198,11 @@ class EEPos3CostFunction(TrackingCostFunction):
         cost_params = {}
         cost_params["Qk"] = np.eye(nr) * params["Qk"]
         cost_params["P"] = np.eye(nr) * params["P"]
-        super().__init__(dt, nx, nu, N, nr, f_fcn, cost_params)
+        super().__init__(dt, nx, nu, N, nr, f_fcn, cost_params, "EEPos3")
 
 
 class EEPos3BaseFrameCostFunction(TrackingCostFunction):
     def __init__(self, dt, N, robot_mdl, params):
-        self.name = "EEPos3"
         ss_mdl = robot_mdl.ssSymMdl
         nx = ss_mdl["nx"]
         nu = ss_mdl["nu"]
@@ -213,11 +212,10 @@ class EEPos3BaseFrameCostFunction(TrackingCostFunction):
         cost_params = {}
         cost_params["Qk"] = np.eye(nr) * params["Qk"]
         cost_params["P"] = np.eye(nr) * params["P"]
-        super().__init__(dt, nx, nu, N, nr, f_fcn, cost_params)
+        super().__init__(dt, nx, nu, N, nr, f_fcn, cost_params, "EEPos3BaseFrame")
 
 class ArmJointCostFunction(TrackingCostFunction):
     def __init__(self, dt, N, robot_mdl, params):
-        self.name = "ArmJoint"
 
         ss_mdl = robot_mdl.ssSymMdl
         nx = ss_mdl["nx"]
@@ -228,13 +226,12 @@ class ArmJointCostFunction(TrackingCostFunction):
         cost_params["Qk"] = np.eye(nr) * params["Qk"]
         cost_params["P"] = np.eye(nr) * params["P"]
 
-        super().__init__(dt, nx, nu, N, nr, f_fcn, cost_params)
+        super().__init__(dt, nx, nu, N, nr, f_fcn, cost_params, "ArmJoint")
 
 
 
 class BasePos2CostFunction(TrackingCostFunction):
     def __init__(self, dt, N, robot_mdl, params):
-        self.name = "BasePos2"
         ss_mdl = robot_mdl.ssSymMdl
         nx = ss_mdl["nx"]
         nu = ss_mdl["nu"]
@@ -245,11 +242,10 @@ class BasePos2CostFunction(TrackingCostFunction):
         cost_params["Qk"] = np.eye(nr) * params["Qk"]
         cost_params["P"] = np.eye(nr) * params["P"]
 
-        super().__init__(dt, nx, nu, N, nr, f_fcn, cost_params)
+        super().__init__(dt, nx, nu, N, nr, f_fcn, cost_params, "BasePos2")
 
 class BasePose3CostFunction(TrackingCostFunction):
     def __init__(self, dt, N, robot_mdl, params):
-        self.name = "BasePos2"
         ss_mdl = robot_mdl.ssSymMdl
         nx = ss_mdl["nx"]
         nu = ss_mdl["nu"]
@@ -260,7 +256,7 @@ class BasePose3CostFunction(TrackingCostFunction):
         cost_params["Qk"] = np.eye(nr) * params["Qk"]
         cost_params["P"] = np.eye(nr) * params["P"]
 
-        super().__init__(dt, nx, nu, N, nr, f_fcn, cost_params)
+        super().__init__(dt, nx, nu, N, nr, f_fcn, cost_params, "BasePos2")
 
 class ControlEffortCostFuncitonNew(CostFunctions):
     def __init__(self, dt, N, robot_mdl, params):
@@ -282,7 +278,7 @@ class ControlEffortCostFuncitonNew(CostFunctions):
         ll_params = {}
         ll_params["W"] = block_diag(Qx, Qu)
         ll_params["A"] = np.eye(nr)
-        self.xu_cost = LinearLeastSquare(dt, nx, nu, N, nr, ll_params)
+        self.xu_cost = LinearLeastSquare(dt, nx, nu, N, nr, ll_params, "ControlEffortNewxu")
 
         # du penalization
         Qdu = [params["Qdub"]] * (nu - robot_mdl.numjoint) + [params["Qdua"]] * robot_mdl.numjoint
@@ -294,9 +290,9 @@ class ControlEffortCostFuncitonNew(CostFunctions):
         ll_params_du = {}
         ll_params_du["W"] = Qdu
         ll_params_du["A"] = np.hstack((np.zeros((N*nu, (N+1)*nx)), Lambda))
-        self.du_cost = LinearLeastSquare(dt, nx, nu, N, nu*N, ll_params_du)
+        self.du_cost = LinearLeastSquare(dt, nx, nu, N, nu*N, ll_params_du, "ControlEffortNewdu")
 
-        super().__init__(dt, nx, nu, N)
+        super().__init__(dt, nx, nu, N, "ControlEffortNew")
 
     def evaluate(self, x_bar, u_bar, *params):
         Jxu = self.xu_cost.evaluate(x_bar, u_bar, np.zeros(self.QPsize))
@@ -313,7 +309,6 @@ class ControlEffortCostFuncitonNew(CostFunctions):
 
 class ControlEffortCostFunciton(LinearLeastSquare):
     def __init__(self, dt, N, robot_mdl, params):
-        self.name = "ControlEffort"
 
         ss_mdl = robot_mdl.ssSymMdl
         nx = ss_mdl["nx"]
@@ -331,7 +326,7 @@ class ControlEffortCostFunciton(LinearLeastSquare):
         ll_params = {}
         ll_params["W"] = block_diag(Qx, Qu)
         ll_params["A"] = np.eye(nr)
-        super().__init__(dt, nx, nu, N, nr, ll_params)
+        super().__init__(dt, nx, nu, N, nr, ll_params,"ControlEffort")
 
     def evaluate(self, x_bar, u_bar, *params):
         return super().evaluate(x_bar, u_bar, *[np.zeros(self.QPsize)])
@@ -341,9 +336,8 @@ class ControlEffortCostFunciton(LinearLeastSquare):
 
 class SoftConstraintsRBFCostFunction(CostFunctions):
     def __init__(self, mu, zeta, cst_obj, name="SoftConstraint", expand=True):
-        super().__init__(cst_obj.dt, cst_obj.nx, cst_obj.nu, cst_obj.N)
+        super().__init__(cst_obj.dt, cst_obj.nx, cst_obj.nu, cst_obj.N, name)
 
-        self.name = name
         self.mu = mu
         self.zeta = zeta
 
@@ -354,8 +348,6 @@ class SoftConstraintsRBFCostFunction(CostFunctions):
         self.dhdz_eqn = -cst_obj.grad_fcn(self.z_bar_sym, *self.params_sym)
         self.nh = self.h_eqn.shape[0]
         self.s_sym = cs.MX.sym("s_"+self.name, self.nh)
-
-
 
         J_eqn_list = [RBF.B_fcn(self.s_sym[k], self.h_eqn[k], self.mu, self.zeta) for k in range(self.nh)]
         self.J_eqn = sum(J_eqn_list)
@@ -405,12 +397,15 @@ class SoftConstraintsRBFCostFunction(CostFunctions):
 class SumOfCostFunctions(CostFunctions):
 
     def __init__(self, cost_fcn_obj):
-        self.name = "Sum"
+        name = "Sum" + "_".join([c.name for c in cost_fcn_obj])
         self.cost_fcn_obj = cost_fcn_obj
+        super().__init__(cost_fcn_obj[0].dt, cost_fcn_obj[0].nx, cost_fcn_obj[0].nu, cost_fcn_obj[0].N, name)
+
         J_fcns = [c.J_fcn for c in cost_fcn_obj]
-        self.J_fcn = self._sum_cs_fcns(J_fcns)
-        self.hess_fcn = self._sum_cs_fcns([c.get_hess_fcn() for c in cost_fcn_obj], n_comm_in=1)
-        self.grad_fcn = self._sum_cs_fcns([c.grad_fcn for c in cost_fcn_obj], n_comm_in=1)
+        self.J_fcn = self._sum_cs_fcns(J_fcns, name="J")
+        self.hess_fcn = self._sum_cs_fcns([c.get_hess_fcn() for c in cost_fcn_obj], n_comm_in=1, name="ddJddz")
+        self.grad_fcn = self._sum_cs_fcns([c.grad_fcn for c in cost_fcn_obj], n_comm_in=1, name="dJdz")
+
 
     def evaluate(self, x_bar, u_bar, *params):
         params = [p.T for p in params]
@@ -425,7 +420,7 @@ class SumOfCostFunctions(CostFunctions):
 
         return H, g
 
-    def _sum_cs_fcns(self, fcns, n_comm_in=2):
+    def _sum_cs_fcns(self, fcns, n_comm_in=2, name="sum"):
         common_input_sysms = fcns[0].mx_in()[:n_comm_in]
         param_syms = []
         output_syms = []
@@ -436,7 +431,7 @@ class SumOfCostFunctions(CostFunctions):
             output_syms.append(f_out)
             param_syms += f_params
 
-        sum_fcn = cs.Function('sum', common_input_sysms + param_syms, [sum(output_syms)])
+        sum_fcn = cs.Function(name, common_input_sysms + param_syms, [sum(output_syms)])
 
         return sum_fcn
 
