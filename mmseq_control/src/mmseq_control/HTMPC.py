@@ -135,13 +135,17 @@ class HTMPCSQP(MPC):
         self.hierarchy_cst_type = getattr(MPCConstraint, self.params["hierarchy_constraint_type"])
 
     def control(self, t, robot_states, planners, map=None):
-        self.py_logger.debug("control time {}".format(t))
+        self.py_logger.log(20, "control time {}".format(t))
         self.curr_control_time = t
         q, v = robot_states
         q[2:9] = wrap_pi_array(q[2:9])
         xo = np.hstack((q, v))
+        
+        t0 = time.perf_counter()
         if map is not None:
             self.model_interface.sdf_map.update_map(*map)
+        t1 = time.perf_counter()
+        self.py_logger.log(15, "Update Map Time: {}".format(t1 - t0))
 
         # 0.1 Get linearization point
         self.u_bar[:-1] = self.u_bar[1:]
@@ -153,7 +157,7 @@ class HTMPCSQP(MPC):
         r_bars = []
         cost_fcns = []
         hier_csts = []
-
+        t0 = time.perf_counter()
         for id, planner in enumerate(planners):
             r_bar = [planner.getTrackingPoint(t + k * self.dt, (self.x_bar[k, :self.DoF], self.x_bar[k, self.DoF:]))[0]
                      for k in range(self.N + 1)]
@@ -177,9 +181,13 @@ class HTMPCSQP(MPC):
                 self.ree_bar = r_bar
             elif planner.type == "base":
                 self.rbase_bar = r_bar
+        t1 = time.perf_counter()
+        self.py_logger.log(15, "HTMPC Prep Time: {}".format(t1 - t0))
 
+        t0 = time.perf_counter()
         xbar_opt, ubar_opt = self.solveHTMPC(xo, self.x_bar.copy(), self.u_bar.copy(), cost_fcns, hier_csts, r_bars)
-
+        t1 = time.perf_counter()
+        self.py_logger.log(15, "HTMPC Solve Time: {}".format(t1 - t0))
         self.x_bar = xbar_opt.copy()
         self.u_bar = ubar_opt.copy()
         self.u_prev = self.u_bar[0].copy()
@@ -265,12 +273,11 @@ class HTMPCSQP(MPC):
 
 
 
-                # t0 = time.perf_counter()
+                t0 = time.perf_counter()
                 xbar_lopt, ubar_lopt, status = self.solveSTMPCCasadi(xo, xbar_l.copy(), ubar_l.copy(), st_cost_fcn,
                                                                      st_cost_fcn_params, csts, csts_params, i, task_id)
-
-                # t1 = time.perf_counter()
-                # print("STMPC Time: {}".format(t1 - t0))
+                t1 = time.perf_counter()
+                self.py_logger.log(15, "STMPC Time: {}".format(t1 - t0))
                 if task_id < task_num - 1:
                     e_bars_l = cost_fcn[0].e_bar_fcn(xbar_lopt.T, ubar_lopt.T, r_bars[task_id][0][0].T)
                     e_bars.append(e_bars_l.toarray().flatten())
@@ -308,20 +315,24 @@ class HTMPCSQP(MPC):
 
         for i in range(self.params["ST_MaxIntvl"]):
             tp0 = time.perf_counter()
-            # t0 = time.perf_counter()
+            t0 = time.perf_counter()
             # Cost Function
             H = cs.DM.zeros((self.QPsize, self.QPsize))
             H += cs.DM.eye(self.QPsize) * 1e-6
             g = cs.DM.zeros(self.QPsize)
             for id, f in enumerate(cost_fcn):
+                tf0 = time.perf_counter()
+
                 Hi, gi = f.quad(xbar_i, ubar_i, *cost_fcn_params[id])
                 H += Hi
                 g += gi
-            # t1 = time.perf_counter()
-            # print("Cost Function Prep Time:{}".format(t1 - t0))
+                tf1 = time.perf_counter()
+                print("Cost Function {} Prep Time:{}".format(f.name, tf1 - tf0))
+            t1 = time.perf_counter()
+            print("Cost Function Prep Time:{}".format(t1 - t0))
 
             # Equality Constraints
-            # t0 = time.perf_counter()
+            t0 = time.perf_counter()
 
             A = cs.DM.zeros((0, self.QPsize))
             b = cs.DM.zeros(0)
@@ -330,11 +341,11 @@ class HTMPCSQP(MPC):
                 Ai, bi = cst.linearize(xbar_i, ubar_i, *csts_params["eq"][id])
                 A = cs.vertcat(A, Ai)
                 b = cs.vertcat(b, bi)
-            # t1 = time.perf_counter()
-            # print("Eq Constraint Prep Time:{}".format(t1 - t0))
+            t1 = time.perf_counter()
+            print("Eq Constraint Prep Time:{}".format(t1 - t0))
 
             # Inequality Constraints (without state bound)
-            # t0 = time.perf_counter()
+            t0 = time.perf_counter()
             C = cs.DM.zeros((0, self.QPsize))
             d = cs.DM.zeros(0)
             if self.params['soft_cst']:
@@ -347,7 +358,8 @@ class HTMPCSQP(MPC):
                     Ci, di = cst.linearize(xbar_i, ubar_i, *csts_params["ineq"][id + 1])
                     C = cs.vertcat(C, Ci)
                     d = cs.vertcat(d, di)
-
+            t1 = time.perf_counter()
+            print("InEq Constraint Prep Time:{}".format(t1 - t0))
             # C_scaled, d_scaled = self.scaleConstraints(C.toarray(), d.toarray().flatten())
 
             # State Bound
@@ -368,7 +380,7 @@ class HTMPCSQP(MPC):
             S = cs.conic('S', 'gurobi', qp, opts)
 
             tp1 = time.perf_counter()
-            self.py_logger.log(5, "QP prep time:{}".format(tp1 - tp0))
+            self.py_logger.log(15, "QP prep time:{}".format(tp1 - tp0))
 
             t0 = time.perf_counter()
             try:
@@ -392,7 +404,7 @@ class HTMPCSQP(MPC):
                     results['x'] = np.zeros(self.QPsize)
 
             t1 = time.perf_counter()
-            self.py_logger.log(5, "QP time:{}".format(t1 - t0))
+            self.py_logger.log(15, "QP time:{}".format(t1 - t0))
 
             dzopt = np.array(results['x']).squeeze()
 
@@ -407,13 +419,14 @@ class HTMPCSQP(MPC):
                 xbar_i, ubar_i = xbar_opt_i.copy(), ubar_opt_i.copy()
             else:
                 linesearch_step_opt = 0.
+            t1 = time.perf_counter()
+            self.py_logger.log(15, "Line Search time:{}".format(t1 - t0))
 
             self.cost_iter[ht_iter, task_id, i + 1] = self._eval_cost_functions(cost_fcn, xbar_i, ubar_i,
                                                                                 cost_fcn_params)
             self.step_size[ht_iter, task_id, i] = linesearch_step_opt
             self.solver_status[ht_iter, task_id, i] = results['status_val']
-            t1 = time.perf_counter()
-            self.py_logger.log(5, "Line Search time:{}".format(t1 - t0))
+
 
         return xbar_i, ubar_i, results['status']
 
@@ -446,14 +459,14 @@ class HTMPCSQP(MPC):
         ineq_vio = G @ dz + h
         ineq_vio_indx = np.where(ineq_vio > tol)
         if len(ineq_vio_indx[0] > 0):
-            self.py_logger.debug("Linearized Inequality Constraints # %d infeasible!", ineq_vio_indx[0])
+            self.py_logger.log(10, "Linearized Inequality Constraints # %d infeasible!", ineq_vio_indx[0])
             feas = False
 
         eq_vio = np.abs(A @ dz + b)
         eq_vio_indx = np.where(eq_vio > tol)
 
         if len(eq_vio_indx[0] > 0):
-            self.py_logger.debug("Linearized Equality Constraints #{} infeasible!".format(eq_vio_indx[0]))
+            self.py_logger.log(10, "Linearized Equality Constraints #{} infeasible!".format(eq_vio_indx[0]))
             feas = False
 
         return feas
@@ -481,7 +494,7 @@ class HTMPCSQP(MPC):
                 if not feas_i:
                     feas = False
                     # print(xbar_new[:, 9])
-                    self.py_logger.debug(
+                    self.py_logger.log(10,
                         "Controller: line search step {} not feasible. Violating constraint {}".format(t, cst.name))
                     break
 
@@ -489,13 +502,20 @@ class HTMPCSQP(MPC):
                 J_xp = 0
                 J_xp_lin = 0
                 for fid, f in enumerate(cost_fcn):
+                    t0 = time.perf_counter()
                     J_xp += f.evaluate(xbar_new, ubar_new, *cost_fcn_params[fid])
+                    t1 = time.perf_counter()
                     _, g = f.quad(xbar, ubar, *cost_fcn_params[fid])
+                    t2 = time.perf_counter()
                     J_xp_lin += f.evaluate(xbar, ubar, *cost_fcn_params[fid]) + alpha * t * g.T @ dzopt
+                    t3 = time.perf_counter()
+
+                    self.py_logger.log(15, f"Line Search Func {f.name} J{t1-t0}, Jquad{t2-t1}, Jlin{t3-t2}")
+
                 if J_xp < J_xp_lin:
                     return t, J_xp
                 else:
-                    self.py_logger.debug("Controller: line search step acceptance condition not met {}.".format(J_xp_lin - J_xp))
+                    self.py_logger.log(10, "Controller: line search step acceptance condition not met {}.".format(J_xp_lin - J_xp))
 
             t = t * beta
 
@@ -509,7 +529,7 @@ class HTMPCSQP(MPC):
         for id, f in enumerate(cost_fcn):
             Ji = f.evaluate(xbar, ubar, *cost_fcn_params[id])
             J += Ji
-            self.py_logger.log(4, f.name+" value:{}".format(Ji))
+            self.py_logger.log(10, f.name+" value:{}".format(Ji))
         return J
 
 

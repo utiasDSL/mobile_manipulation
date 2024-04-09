@@ -384,7 +384,7 @@ class ControllerROSNode:
             tc1 = time.perf_counter()
             u, acc, u_bar = self.controller.control(t-t0, robot_states, planners, tsdf_latest)
             tc2 = time.perf_counter()
-            self.controller_log.log(5, "Controller Run Time: {}".format(tc2 - tc1))
+            self.controller_log.log(20, "Controller Run Time: {}".format(tc2 - tc1))
 
             self.lock.acquire()
             self.mpc_plan = u_bar
