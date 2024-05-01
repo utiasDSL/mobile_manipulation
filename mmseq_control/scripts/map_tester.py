@@ -1,8 +1,9 @@
 import rospy
 import numpy as np
-
+import time
 from mobile_manipulation_central.ros_interface import MapInterface
 from mmseq_control.map import SDF2D, SDF3D
+import matplotlib.pyplot as plt
 
 def test_3d():
 
@@ -25,13 +26,33 @@ def test_3d():
             ys = pts[:,1]
             x_lim = [min(xs), max(xs)]
             y_lim = [min(ys), max(ys)]
+            print(f"x:{x_lim}, y:{y_lim}")
             if sdf.valid:
                 sdf.vis(x_lim=x_lim,
                         y_lim=y_lim,
+                        z_lim=[0.25, 0.25],
+                        block=False)
+                sdf.vis(x_lim=x_lim,
+                        y_lim=y_lim,
                         z_lim=[0.5, 0.5],
+                        block=False)
+                # X,Y = np.meshgrid(sdf.xs, sdf.ys, indexing='ij')
+                # plt.plot(X.flatten(), Y.flatten(), 'r.')
+                
+                sdf.vis(x_lim=x_lim,
+                        y_lim=y_lim,
+                        z_lim=[0.75, 0.75],
                         block=True)
+                
             else:
                 print("map invalid")
+            t0 = time.perf_counter()
+            sdf.query_val(xs, ys, np.ones_like(xs)*0.25)
+            t1 = time.perf_counter()
+            sdf.query_grad(xs, ys, np.ones_like(xs)*0.25)
+            t2= time.perf_counter()
+            print(sdf.query_val([2],[1],[0.75]))
+            print(f"Query Val {t1-t0}, Grad {t2-t1}")
 
         rate.sleep()
 

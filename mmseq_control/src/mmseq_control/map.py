@@ -1,12 +1,13 @@
 import numpy as np
 import threading
 import rospy
+import time
+import itertools
 from casadi import MX, DM
 from visualization_msgs.msg import MarkerArray
-from scipy.interpolate import LinearNDInterpolator, CloughTocher2DInterpolator
+from scipy.interpolate import LinearNDInterpolator, CloughTocher2DInterpolator,RegularGridInterpolator
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D # <--- This is important for 3d plotting 
-
 
 class SDF2D:
     def __init__(self, init_pose=np.eye(4)):
@@ -41,6 +42,9 @@ class SDF2D:
             self.valid = True
 
             self.mutex.release()
+
+    def set_robot_pose(self, pose):
+        pass
         
     def create_map(self, tsdf, tsdf_vals):
         pts = np.around(np.array([np.array([p.x,p.y]) for p in tsdf]), 2).reshape((len(tsdf),2))
@@ -133,14 +137,20 @@ class SDF2D:
 class SDF3D:
     def __init__(self, init_pose=np.eye(4)):
         self.mutex = threading.Lock()
+        self.pose_mutex = threading.Lock()
+
         self.valid = False
         self.map = None
         self.dim = 3
         self.init_robot_pose = init_pose
         self.inv_init_robot_pose = np.linalg.inv(init_pose)
+        self.curr_robot_pose = init_pose
 
         self.mul = 10.0
         self.default_val = 1.8
+
+        self.voxel_size = 0.1
+        self.map_size_xy = 4 # size of effective map in meters
 
         print('[map] init robot pose',self.init_robot_pose)
 
@@ -157,18 +167,133 @@ class SDF3D:
 
     def update_map(self, tsdf, tsdf_vals):
         if (len(tsdf) > 10):
-            self.mutex.acquire(blocking=True)
-
-            self.create_map(tsdf, tsdf_vals)
+            self.create_map2(tsdf, tsdf_vals)
             self.valid = True
-            self.mutex.release()
+    
+    def set_robot_pose(self, pose):
+        self.pose_mutex.acquire(blocking=True)
+        self.curr_robot_pose = pose
+        self.pose_mutex.release()
+        
+    def create_map0(self, tsdf, tsdf_vals):
+        pts = np.around(np.array([np.array([p.x,p.y,p.z]) for p in tsdf]), 2).reshape((len(tsdf),3))
+        vs = [c.r * self.mul for c in tsdf_vals]
+        #print("max",max(vs))
+        #print("min",min(vs))
+        self.mutex.acquire(blocking=True)
+        self.map = LinearNDInterpolator(pts, vs)
+        self.mutex.release()
         
     def create_map(self, tsdf, tsdf_vals):
         pts = np.around(np.array([np.array([p.x,p.y,p.z]) for p in tsdf]), 2).reshape((len(tsdf),3))
         vs = [c.r * self.mul for c in tsdf_vals]
-        # print("max",max(vs))
-        # print("min",min(vs))
-        self.map = LinearNDInterpolator(pts, vs) # choose LinearNDInterpolator(pts, vs) or CloughTocher2DInterpolator(pts, vs)
+        #print("max",max(vs))
+        #print("min",min(vs))
+        self.map_ir = LinearNDInterpolator(pts, vs) # choose LinearNDInterpolator(pts, vs) or CloughTocher2DInterpolator(pts, vs) ort RegularGridInterpolator?
+        time_first_query_start = time.time()
+        self.map_ir(0,0,0)
+        time_first_query_end = time.time()
+
+        max_x = max(pts[:,0])
+        min_x = min(pts[:,0])
+        max_y = max(pts[:,1])
+        min_y = min(pts[:,1])
+        max_z = max(pts[:,2])
+        min_z = min(pts[:,2])
+
+        xs = np.linspace(min_x, max_x, int(np.ceil((max_x-min_x)/self.voxel_size)))
+        ys = np.linspace(min_y, max_y, int(np.ceil((max_y-min_y)/self.voxel_size)))
+        zs = np.linspace(min_z, max_z, int(np.ceil((max_z-min_z)/self.voxel_size)))
+        xg, yg, zg = np.meshgrid(xs, ys, zs, indexing='ij')
+        time_data_start = time.time()
+        data = np.nan_to_num(self.map_ir(xg, yg, zg), True, self.default_val)
+        time_data_end = time.time()
+        print("Time for first query",time_first_query_end-time_first_query_start)
+        print("Time for data creation",time_data_end-time_data_start)
+
+        self.mutex.acquire(blocking=True)
+        #self.map = RegularGridInterpolator((xs, ys, zs), data, bounds_error=False, fill_value=self.default_val)
+        self.map = self.map_ir
+        self.map((0,0,0))
+        self.mutex.release()
+
+    def create_map2(self, tsdf, tsdf_vals):
+        pts = np.around(np.array([np.array([p.x,p.y,p.z]) for p in tsdf]), 2).reshape((len(tsdf),3))
+        vs = [c.r * self.mul for c in tsdf_vals]
+
+        self.map_ir = LinearNDInterpolator(pts, vs) # choose LinearNDInterpolator(pts, vs) or CloughTocher2DInterpolator(pts, vs) ort RegularGridInterpolator?
+        self.map_ir(0,0,0)
+
+        # Limit the map to a certain size around the robot
+        max_x = np.around(min(max(pts[:,0]), self.curr_robot_pose[0,3]+self.map_size_xy), 2)
+        min_x = np.around(max(min(pts[:,0]), self.curr_robot_pose[0,3]-self.map_size_xy), 2)
+        max_y = np.around(min(max(pts[:,1]), self.curr_robot_pose[1,3]+self.map_size_xy), 2)
+        min_y = np.around(max(min(pts[:,1]), self.curr_robot_pose[1,3]-self.map_size_xy), 2)
+        max_z = max(pts[:,2])
+        min_z = min(pts[:,2])
+
+        xs = np.linspace(min_x, max_x, int(np.ceil((max_x-min_x)/self.voxel_size)))
+        ys = np.linspace(min_y, max_y, int(np.ceil((max_y-min_y)/self.voxel_size)))
+        zs = np.linspace(min_z, max_z, int(np.ceil((max_z-min_z)/self.voxel_size)))
+
+        xg, yg, zg = np.meshgrid(xs, ys, zs, indexing='ij')
+        data = np.nan_to_num(self.map_ir(xg, yg, zg), True, self.default_val)
+
+        self.mutex.acquire(blocking=True)
+        #self.map = self.map_ir
+        self.map = RegularGridInterpolator((xs, ys, zs), data, bounds_error=False, fill_value=self.default_val)
+        self.map((0,0,0))
+        self.mutex.release()
+            
+    # This assumes we only build the map around the filled up regions around the robot
+    # In this region TSDF is assumed to form a regular grid
+    def create_map3(self, tsdf, tsdf_vals):
+        pts = np.around(np.array([np.array([p.x,p.y,p.z]) for p in tsdf]), 2).reshape((len(tsdf),3))
+        vs = [c.r * self.mul for c in tsdf_vals]
+        
+        xs = np.unique(pts[:,0])
+        ys = np.unique(pts[:,1])
+        zs = np.unique(pts[:,2])
+
+        val_dict = {}
+
+        for idx in range(len(vs)):
+            val_dict[(pts[idx,0],pts[idx,1],pts[idx,2])] = vs[idx]
+
+        # must make sure the xy size is smaller than the filled up regions around the robot from mapping c++ code
+        max_x = np.around(min(max(pts[:,0]), self.curr_robot_pose[0,3]+self.map_size_xy), 2)
+        min_x = np.around(max(min(pts[:,0]), self.curr_robot_pose[0,3]-self.map_size_xy), 2)
+        max_y = np.around(min(max(pts[:,1]), self.curr_robot_pose[1,3]+self.map_size_xy), 2)
+        min_y = np.around(max(min(pts[:,1]), self.curr_robot_pose[1,3]-self.map_size_xy), 2)
+
+        #remove the xyz pts outside the boundary
+        xs = sorted(xs[(xs>=min_x) & (xs<=max_x)])
+        ys = sorted(ys[(ys>=min_y) & (ys<=max_y)])
+
+        data = np.ones((len(xs),len(ys),len(zs))) * self.default_val
+
+        # Convert xs, ys, and zs to sets
+        xs_set = set(xs)
+        ys_set = set(ys)
+        zs_set = set(zs)
+
+        # Perform set intersection with the keys of val_dict
+        keys = set(val_dict.keys()) & set(itertools.product(xs_set, ys_set, zs_set))
+        #keys = set(itertools.product(xs_set, ys_set, zs_set))
+
+        # Iterate over the keys and set the corresponding elements in the data array
+        for (x, y, z) in keys:
+            i = np.digitize(x, xs) - 1
+            j = np.digitize(y, ys) - 1
+            k = np.digitize(z, zs) - 1
+            data[i, j, k] = val_dict[(x, y, z)]
+
+        self.mutex.acquire(blocking=True)
+        self.map = RegularGridInterpolator((xs, ys, zs), data, method="linear", bounds_error=False, fill_value=None) # extrapolate the values outside the map
+        self.map((0,0,0))
+        self.xs = xs
+        self.ys = ys
+        self.mutex.release()
 
     def vis(self, x_lim, y_lim, z_lim, block=True):
         Nx = int(1.0/0.1 * (x_lim[1] - x_lim[0]))+1
@@ -205,7 +330,7 @@ class SDF3D:
 
 
         fig, ax = plt.subplots()
-        levels = np.linspace(-1.0, 1.5, int(2.5/0.25)+1)
+        levels = np.linspace(-1.0, 2.5, int(3.5/0.25)+1)
 
         cs = ax.contour(X,Y,Z, levels)
         ax.clabel(cs, levels)   
@@ -232,13 +357,10 @@ class SDF3D:
             new_x = transformed_pos[0,:]
             new_y = transformed_pos[1,:]
             new_z = transformed_pos[2,:]
-            #print('before',x,y)
-            #print('after',new_x,new_y)
-            val = self.map(new_x,new_y,new_z)
-            #print("before",val)
-            val = np.nan_to_num(val, True, self.default_val)
-            #val[val == 0] = self.default_val
-            #print("after",val)
+
+            val = self.map((new_x,new_y,new_z))
+            # val = np.nan_to_num(val, True, self.default_val)
+
         return val
     
     def query_grad(self, x, y, z):

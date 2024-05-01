@@ -4,6 +4,7 @@ import logging
 
 import numpy as np
 import casadi as cs
+from spatialmath.base import rotz
 import mmseq_control.MPCConstraints as MPCConstraint
 from mmseq_control.MPCCostFunctions import EEPos3CostFunction, BasePos2CostFunction, ControlEffortCostFunciton, SoftConstraintsRBFCostFunction, ControlEffortCostFuncitonNew, SumOfCostFunctions, EEPos3BaseFrameCostFunction
 from mmseq_control.MPCConstraints import HierarchicalTrackingConstraint, HierarchicalTrackingConstraintCostValue, MotionConstraint, StateControlBoxConstraint, StateControlBoxConstraintNew, SignedDistanceCollisionConstraint, EEUpwardConstraint
@@ -140,11 +141,15 @@ class HTMPCSQP(MPC):
         q, v = robot_states
         q[2:9] = wrap_pi_array(q[2:9])
         xo = np.hstack((q, v))
-        print(q)
         
         t0 = time.perf_counter()
         if map is not None:
+            Tbw = np.eye(4)
+            Tbw[:2, 3] = q[:2]
+            Tbw[:3, :3] = rotz(q[2])
+            self.model_interface.sdf_map.set_robot_pose(Tbw)
             self.model_interface.sdf_map.update_map(*map)
+
         t1 = time.perf_counter()
         self.py_logger.log(15, "Update Map Time: {}".format(t1 - t0))
 
@@ -670,6 +675,10 @@ class HTMPCSQPNEW(MPC):
         
         t0 = time.perf_counter()
         if map is not None:
+            Tbw = np.eye(4)
+            Tbw[:2, 3] = q[:2]
+            Tbw[:3, :3] = rotz(q[2])
+            self.model_interface.sdf_map.set_robot_pose(Tbw)
             self.model_interface.sdf_map.update_map(*map)
         t1 = time.perf_counter()
         self.py_logger.log(15, "Update Map Time: {}".format(t1 - t0))
@@ -809,8 +818,6 @@ class HTMPCSQPNEW(MPC):
         :param task_id: current st task id
         :return: xbar_opt, ubar_opt
         """
-        print(cost_fcn.J_fcn)
-        print(cost_fcn.name)
 
         xbar_i = xbar.copy()
         ubar_i = ubar.copy()
