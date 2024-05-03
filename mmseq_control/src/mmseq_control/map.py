@@ -4,6 +4,7 @@ import rospy
 import time
 import itertools
 from casadi import MX, DM
+import casadi as cs
 from visualization_msgs.msg import MarkerArray
 from scipy.interpolate import LinearNDInterpolator, CloughTocher2DInterpolator,RegularGridInterpolator
 import matplotlib.pyplot as plt
@@ -397,3 +398,108 @@ class SDF3D:
         grad_z = (val_pdz - val_mdz) / (2*delta)
         self.mutex.release()
         return np.hstack((grad_x, grad_y, grad_z))
+
+class SDF2DNew:
+    def __init__(self, init_pose=np.eye(4)):
+
+        self.dim = 2
+
+        self.default_val = 1.8
+        self.map_coverage = np.array([4,4]) # x,y in m
+        self.voxel_size = 0.1
+        self.map_size = np.ceil(self.map_coverage / self.voxel_size).astype(int)
+        self.mul=10
+        self.init_robot_pose = init_pose
+        self.inv_init_robot_pose = np.linalg.inv(init_pose)
+        self.curr_robot_pose = init_pose
+        print('[map] init robot pose',self.init_robot_pose)
+
+        self.xg_sym = MX.sym("xg", self.map_size[0])
+        self.yg_sym = MX.sym("yg", self.map_size[1])
+        self.v_sym = MX.sym("v", self.map_size[0] * self.map_size[1])
+        self.x_sym = MX.sym("x", self.dim)
+        interp = cs.interpolant("interpol_linear_x", "linear", self.map_size)
+        self.sdf_eqn = interp(self.x_sym, cs.vertcat(self.xg_sym, self.yg_sym), self.v_sym)
+        self.sdf_fcn = cs.Function('map', [self.x_sym, self.xg_sym, self.yg_sym, self.v_sym], [self.sdf_eqn],
+                                          ["x_query", "x_grid", "y_grid", "value"], ["sd(x)"])
+
+        self.hess_eqn, self.grad_eqn = cs.hessian(self.sdf_eqn, self.x_sym)
+        self.grad_fcn = cs.Function('map_grad', [self.x_sym, self.xg_sym, self.yg_sym, self.v_sym], [self.grad_eqn])
+
+        self.xg, self.yg = self._get_grid()
+        self.v = np.ones(self.map_size[0]* self.map_size[1]) * self.default_val
+
+    def update_map(self, tsdf, tsdf_vals):
+        if (len(tsdf) > 10):
+
+            self.create_map(tsdf, tsdf_vals)
+            self.valid = True
+
+    def create_map(self, tsdf, tsdf_vals):
+        pts = np.around(np.array([np.array([p.x,p.y]) for p in tsdf]), 2).reshape((len(tsdf),2))
+        vs = [c.r * self.mul for c in tsdf_vals]
+
+        xg, yg = self._get_grid()
+
+        X, Y = np.meshgrid(xg, yg, indexing='ij')
+        map_ir = LinearNDInterpolator(pts, vs)
+        map_ir((0,0))
+
+        v = np.nan_to_num(map_ir(X, Y), True, self.default_val)
+        v = v.ravel(order='F')
+
+        self.xg, self.yg, self.v = xg, yg, v
+    
+    def get_params(self):
+        return [self.xg, self.yg, self.v]
+
+    def vis(self, x_lim, y_lim, block=True):
+        Nx = int(1.0/0.1 * (x_lim[1] - x_lim[0]))+1
+        Ny = int(1.0/0.1 * (y_lim[1] - y_lim[0]))+1
+
+        x_1d = np.linspace(x_lim[0], x_lim[1], Nx)
+        y_1d = np.linspace(y_lim[0], y_lim[1], Ny)
+
+        X,Y=np.meshgrid(x_1d, y_1d)
+        Z=np.zeros(X.shape)
+        # This makes the unobserved area free space
+        for i in range(len(x_1d)):
+            for j in range(len(y_1d)):
+                Z[j][i] = self.query_val(x_1d[i], y_1d[j])
+        #print(Z)
+
+        # fig, ax = plt.subplots(subplot_kw={"projection": "3d"})
+        fig, ax = plt.subplots()
+        levels = np.linspace(-0.5, 1.5, int(2./0.25)+1)
+
+        cs = ax.contour(X,Y,Z, levels)
+        ax.clabel(cs, levels)
+        ax.grid()
+        ax.set_title("Signed Distance Field $sd(x)$")   # 0.6 is base collision radius
+        ax.set_xlabel("x(m)")
+        ax.set_ylabel("y(m)")
+        plt.show(block=block)
+
+
+    def query_val(self, x, y):
+        val = self.sdf_fcn(np.vstack((x,y)), self.xg, self.yg, self.v)
+        return val
+    
+    def query_grad(self, x, y):
+        return self.grad_fcn(np.vstack((x,y)), self.xg, self.yg, self.v).toarray()
+
+    def set_robot_pose(self, pose):
+        self.curr_robot_pose = pose
+    
+    def _get_grid(self):
+        # Limit the map to a certain size around the robot
+
+        max_x = np.around(self.curr_robot_pose[0,3]+self.map_coverage[0]/2, 2)
+        min_x = np.around(self.curr_robot_pose[0,3]-self.map_coverage[0]/2, 2)
+        max_y = np.around(self.curr_robot_pose[1,3]+self.map_coverage[1]/2, 2)
+        min_y = np.around(self.curr_robot_pose[1,3]-self.map_coverage[1]/2, 2)
+
+        xg = np.linspace(min_x, max_x, self.map_size[0])
+        yg = np.linspace(min_y, max_y, self.map_size[1])
+
+        return xg, yg
