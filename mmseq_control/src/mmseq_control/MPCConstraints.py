@@ -224,10 +224,10 @@ class StateControlBoxConstraintNew(NonlinearConstraint):
 class SignedDistanceCollisionConstraint(NonlinearConstraint):
     def __init__(self, robot_mdl, signed_distance_fcn, dt, N, d_safe, name="obstacle", tol=1e-2):
         """ Signed Distance Collision Constraint
-                   - (sd(x_k) - d_safe) < 0
+                   - (sd(x_k, param1, param2, ...) - d_safe) < 0
 
         :param robot_mdl: class mmseq_control.robot.MobileManipulator3D
-        :param signed_distance_fcn: signed distance model between (multiple) body pair(s), casadi function
+        :param signed_distance_fcn: signed distance model, casadi function
         :param dt: discretization time step
         :param N: prediction window size
         :param d_safe: safe clearance, scalar, same for all body pairs
@@ -237,15 +237,18 @@ class SignedDistanceCollisionConstraint(NonlinearConstraint):
         nx = robot_mdl.ssSymMdl["nx"]
         nu = robot_mdl.ssSymMdl["nu"]
         nq = robot_mdl.q_sym.size()[0]
+        params_sym = signed_distance_fcn.mx_in()[1:]
+        params_name = signed_distance_fcn.name_in()[1:]
 
         Constraint.__init__(self, dt, nx, nu, N, name+"_collision")
 
-        g_sym_list = [- signed_distance_fcn(self.x_bar_sym[:nq, k]) + d_safe for k in range(N+1)]
+        g_sym_list = [- signed_distance_fcn(self.x_bar_sym[:nq, k], *params_sym) + d_safe for k in range(N+1)]
         g_sym = cs.vertcat(*g_sym_list)
         ng = g_sym.size()[0]
 
-        g_fcn = cs.Function("g_"+self.name, [self.x_bar_sym, self.u_bar_sym], [g_sym], ["x_bar", "u_bar"], ["g_collision"])
-        super().__init__(dt, nx, nu, nq, N, g_fcn, [], self.name)
+        g_fcn = cs.Function("g_"+self.name, [self.x_bar_sym, self.u_bar_sym] + params_sym, [g_sym], 
+                            ["x_bar", "u_bar"] + params_name, ["g_collision"])
+        super().__init__(dt, nx, nu, nq, N, g_fcn, params_sym, self.name)
 
 class EEUpwardConstraint(NonlinearConstraint):
     def __init__(self, robot_mdl, psi_max, dt, N, name="EEUpward", tol=1e-2):

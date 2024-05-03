@@ -255,7 +255,11 @@ class HTMPCSQP(MPC):
 
                     for name, soft_cst in self.collisionSoftCsts.items():
                         st_cost_fcn += [soft_cst]
-                        st_cost_fcn_params += [[]]
+                        if name == "sdf":
+                            st_cost_fcn_params += [self.model_interface.sdf_map.get_params()]
+                        else:
+                            st_cost_fcn_params += [[]]
+
 
                     if self.params["ee_upward_constraint_enabled"]:
                         st_cost_fcn += [self.eeUpwardSoftCst]
@@ -709,7 +713,10 @@ class HTMPCSQPNEW(MPC):
                      for k in range(self.N + 1)]
             # Tracking Cost, Control Effort 
             st_cost_params = [np.array(r_bar), np.zeros(self.QPsize)]
+            # xusoft
             st_cost_params += [self.u_prev] if self.params["penalize_du"] else []
+            # collision
+            st_cost_params += self.model_interface.sdf_map.get_params()
             ht_cost_params.append(st_cost_params)
 
             if id < num_plans - 1:
@@ -935,13 +942,13 @@ class HTMPCSQPNEW(MPC):
         return xbar_i, ubar_i, results['status']
 
     def get_soft_cst_params(self, xbar, ubar):
-        params = [self.xuSoftCst.h_fcn(xbar.T, ubar.T) < self.xuSoftCst.zeta]
+        # params = [self.xuSoftCst.h_fcn(xbar.T, ubar.T) < self.xuSoftCst.zeta]
 
-        for name, soft_cst in self.collisionSoftCsts.items():
-            params += [soft_cst.h_fcn(xbar.T, ubar.T) < soft_cst.zeta]
+        # for name, soft_cst in self.collisionSoftCsts.items():
+        #     params += [soft_cst.h_fcn(xbar.T, ubar.T) < soft_cst.zeta]
 
-        if self.params["ee_upward_constraint_enabled"]:
-            params += [self.eeUpwardSoftCst.h_fcn(xbar.T, ubar.T) < self.eeUpwardSoftCst.zeta]
+        # if self.params["ee_upward_constraint_enabled"]:
+        #     params += [self.eeUpwardSoftCst.h_fcn(xbar.T, ubar.T) < self.eeUpwardSoftCst.zeta]
         
         return []
     
