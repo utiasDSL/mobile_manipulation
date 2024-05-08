@@ -180,7 +180,7 @@ class CasadiModelInterface:
             sdf_class = getattr(map, "SDF2D", None)
             print(f"sdf_type {config['sdf_type']} can not be found. Using SDF2D instead.")
 
-        self.sdf_map = sdf_class()  
+        self.sdf_map = sdf_class(config)  
         if config["sdf_type"][-3:] == "New":
             self.sdf_map_SymMdl = self.sdf_map.sdf_fcn
         else:

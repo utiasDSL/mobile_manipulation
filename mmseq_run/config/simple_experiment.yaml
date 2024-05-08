@@ -47,6 +47,8 @@ include:
     path: "config/sim/simulation.yaml"
   - package: "mmseq_run"
     path: "config/scene/empty.yaml"
+  - package: "mmseq_run"
+    path: "config/map/sdf.yaml"
 
 logging:
   log_dir: "/home/tracy/Documents/PhD/data/debug"

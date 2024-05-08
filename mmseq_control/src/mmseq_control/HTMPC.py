@@ -144,10 +144,6 @@ class HTMPCSQP(MPC):
         
         t0 = time.perf_counter()
         if map is not None:
-            Tbw = np.eye(4)
-            Tbw[:2, 3] = q[:2]
-            Tbw[:3, :3] = rotz(q[2])
-            self.model_interface.sdf_map.set_robot_pose(Tbw)
             self.model_interface.sdf_map.update_map(*map)
 
         t1 = time.perf_counter()
@@ -679,10 +675,6 @@ class HTMPCSQPNEW(MPC):
         
         t0 = time.perf_counter()
         if map is not None:
-            Tbw = np.eye(4)
-            Tbw[:2, 3] = q[:2]
-            Tbw[:3, :3] = rotz(q[2])
-            self.model_interface.sdf_map.set_robot_pose(Tbw)
             self.model_interface.sdf_map.update_map(*map)
         t1 = time.perf_counter()
         self.py_logger.log(15, "Update Map Time: {}".format(t1 - t0))

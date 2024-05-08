@@ -22,7 +22,7 @@ import mmseq_plan.TaskManager as TaskManager
 from mmseq_utils import parsing
 from mmseq_utils.logging import DataLogger
 from mmseq_utils.math import wrap_pi_scalar, wrap_to_2_pi_scalar
-from mobile_manipulation_central.ros_interface import MobileManipulatorROSInterface, ViconObjectInterface, ViconMarkerSwarmInterface, JoystickButtonInterface, MapInterface
+from mobile_manipulation_central.ros_interface import MobileManipulatorROSInterface, ViconObjectInterface, ViconMarkerSwarmInterface, JoystickButtonInterface, MapInterface, MapInterfaceNew
 from mobile_manipulation_central import PointToPointTrajectory, bound_array
 
 class ControllerROSNode:
@@ -107,7 +107,7 @@ class ControllerROSNode:
         else:
             self.use_joy = False
         
-        self.map_interface = MapInterface(topic_name="/pocd_slam_node/occupied_ef_dist_nodes")
+        self.map_interface = MapInterfaceNew(config=self.ctrl_config)
 
         self.controller_visualization_pub = rospy.Publisher("controller_visualization", Marker, queue_size=10)
         self.plan_visualization_pub = rospy.Publisher("plan_visualization", Marker, queue_size=10)
@@ -302,8 +302,10 @@ class ControllerROSNode:
                 if rospy.is_shutdown():
                     return
             
-            _, tsdf_latest = self.map_interface.get_map()
-            print("Received Map. Procee ...")
+            _, map_latest = self.map_interface.get_map()
+            print("Received Map. Proceed ...")
+        else:
+            map_latest = None
 
         print("-----Checking Vicon Tool messages----- ")
         use_vicon_tool_data = True
@@ -371,9 +373,11 @@ class ControllerROSNode:
         while not self.ctrl_c:
             t = rospy.Time.now().to_sec()
             if self.ctrl_config["sdf_collision_avoidance_enabled"]:
-                status, tsdf = self.map_interface.get_map()
+                status, map = self.map_interface.get_map()
                 if status:
-                    tsdf_latest = tsdf
+                    map_latest = map
+                else:
+                    map_latest = None
 
             # open-loop command
             robot_states = (self.robot_interface.q, self.robot_interface.v)
@@ -382,7 +386,7 @@ class ControllerROSNode:
             self.sot_lock.release()
 
             tc1 = time.perf_counter()
-            u, acc, u_bar = self.controller.control(t-t0, robot_states, planners, tsdf_latest)
+            u, acc, u_bar = self.controller.control(t-t0, robot_states, planners, map_latest)
             tc2 = time.perf_counter()
             self.controller_log.log(20, "Controller Run Time: {}".format(tc2 - tc1))
 
