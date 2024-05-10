@@ -480,22 +480,15 @@ class SDF2DNew:
         return xg, yg
 
 class SDF3DNew:
-    def __init__(self, init_pose=np.eye(4)):
+    def __init__(self, config):
 
         self.dim = 3
-        # self.default_val = config["map"]["default_val"]
-        # self.map_coverage = parsing.parse_array(config["map"]["map_coverage"]) # x,y in m
-        # self.voxel_size = config["map"]["voxel_size"]
+        self.default_val = config["map"]["default_val"]
+        self.map_coverage = parsing.parse_array(config["map"]["map_coverage"]) # x,y in m
+        self.voxel_size = config["map"]["voxel_size"]
 
-        self.default_val = 1.8
-        self.map_coverage = np.array([6,6,0.9]) # x,y,z in m
-        self.voxel_size = 0.1
         self.map_size = np.ceil(self.map_coverage / self.voxel_size).astype(int)
         self.mul=10
-        self.init_robot_pose = init_pose
-        self.inv_init_robot_pose = np.linalg.inv(init_pose)
-        self.curr_robot_pose = init_pose
-        print('[map] init robot pose',self.init_robot_pose)
 
         self.xg_sym = MX.sym("xg", self.map_size[0])
         self.yg_sym = MX.sym("yg", self.map_size[1])
@@ -511,54 +504,11 @@ class SDF3DNew:
         self.hess_eqn, self.grad_eqn = cs.hessian(self.sdf_eqn, self.x_sym)
         self.grad_fcn = cs.Function('map_grad', [self.x_sym, self.xg_sym, self.yg_sym, self.zg_sym, self.v_sym], [self.grad_eqn])
 
-        self.xg, self.yg, self.zg = self._get_grid()
+        self.xg, self.yg, self.zg = self._get_default_grid()
         self.v = np.ones(self.map_size[0]* self.map_size[1]*self.map_size[2]) * self.default_val
 
-    def update_map(self, tsdf, tsdf_vals):
-        if (len(tsdf) > 10):
-
-            self.create_map2(tsdf, tsdf_vals)
-            self.valid = True
-
-    def create_map(self, tsdf, tsdf_vals):
-        pts = np.around(np.array([np.array([p.x,p.y,p.z]) for p in tsdf]), 2).reshape((len(tsdf),3))
-        vs = [c.r * self.mul for c in tsdf_vals]
-
-        map_ir = LinearNDInterpolator(pts, vs) # choose LinearNDInterpolator(pts, vs) or CloughTocher2DInterpolator(pts, vs) ort RegularGridInterpolator?
-        map_ir(0,0,0)
-
-        xg, yg, zg = self._get_grid()
-        X, Y, Z = np.meshgrid(xg, yg, zg, indexing='ij')
-        v = np.nan_to_num(map_ir(X, Y, Z), True, self.default_val)
-        v = v.ravel(order='F')
-
-        # TODO: thread safety?
+    def update_map(self, xg, yg, zg, v):
         self.xg, self.yg, self.zg, self.v = xg, yg, zg, v
-    
-    def create_map2(self, tsdf, tsdf_vals):
-        pts = np.around(np.array([np.array([p.x,p.y,p.z]) for p in tsdf]), 2).reshape((len(tsdf),3))
-        vs = [c.r * self.mul for c in tsdf_vals]
-
-        self.map_ir = LinearNDInterpolator(pts, vs) # choose LinearNDInterpolator(pts, vs) or CloughTocher2DInterpolator(pts, vs) ort RegularGridInterpolator?
-        self.map_ir(0,0,0)
-
-        # Limit the map to a certain size around the robot
-        max_x = np.around(min(max(pts[:,0]), self.curr_robot_pose[0,3]+self.map_size[0]/2), 2)
-        min_x = np.around(max(min(pts[:,0]), self.curr_robot_pose[0,3]-self.map_size[0]/2), 2)
-        max_y = np.around(min(max(pts[:,1]), self.curr_robot_pose[1,3]+self.map_size[1]/2), 2)
-        min_y = np.around(max(min(pts[:,1]), self.curr_robot_pose[1,3]-self.map_size[1]/2), 2)
-        max_z = max(pts[:,2])
-        min_z = min(pts[:,2])
-
-        xg = np.linspace(min_x, max_x, self.map_size[0])
-        yg = np.linspace(min_y, max_y, self.map_size[1])
-        zg = np.linspace(min_z, max_z, self.map_size[2])
-
-        X, Y, Z = np.meshgrid(xg, yg, zg, indexing='ij')
-        v = np.nan_to_num(self.map_ir(X, Y, Z), True, self.default_val)
-        v = v.ravel(order='F')
-        self.xg, self.yg, self.zg, self.v = xg, yg, zg, v
-
     
     def get_params(self):
         return [self.xg, self.yg, self.zg, self.v]
@@ -617,16 +567,13 @@ class SDF3DNew:
     def query_grad(self, x, y, z):
         return self.grad_fcn(np.vstack((x,y,z)), self.xg, self.yg, self.zg, self.v).toarray()
 
-    def set_robot_pose(self, pose):
-        self.curr_robot_pose = pose
-    
-    def _get_grid(self):
+    def _get_default_grid(self):
         # Limit the map to a certain size around the robot
 
-        max_x = np.around(self.curr_robot_pose[0,3]+self.map_coverage[0]/2, 2)
-        min_x = np.around(self.curr_robot_pose[0,3]-self.map_coverage[0]/2, 2)
-        max_y = np.around(self.curr_robot_pose[1,3]+self.map_coverage[1]/2, 2)
-        min_y = np.around(self.curr_robot_pose[1,3]-self.map_coverage[1]/2, 2)
+        max_x = np.around(self.map_coverage[0]/2, 2)
+        min_x = np.around(-self.map_coverage[0]/2, 2)
+        max_y = np.around(self.map_coverage[1]/2, 2)
+        min_y = np.around(-self.map_coverage[1]/2, 2)
         min_z = 0
         max_z = self.map_coverage[2]
 
