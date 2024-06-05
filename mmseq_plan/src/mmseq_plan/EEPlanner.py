@@ -7,6 +7,8 @@ from spatialmath.base import rotz
 from spatialmath import SE3
 
 from mmseq_plan.PlanBaseClass import Planner
+from mmseq_plan.BasePlanner import TrajectoryPlanner
+
 from mmseq_utils.transformation import *
 from mmseq_utils.parsing import parse_number
 
@@ -221,47 +223,81 @@ class EEPosTrajectoryCircle(Planner):
     def reset(self):
         self.finished = False
 
-class EESimplePlannerRandom(Planner):
-    def __init__(self, planner_params):
-        self.target_pose_true = np.array(planner_params["target_pose"])
-        self.regenerate_count = 0
-        self.regenerate(0.75)
+
+class EEPosTrajectoryLine(TrajectoryPlanner):
+    def __init__(self, config):
+        self.name = config["name"]
         self.type = "EE"
-        self.ref_type = "pos"
+        self.ref_type = "trajectory"
+        self.ref_data_type = "Vec3"
+        self.tracking_err_tol = config["tracking_err_tol"]
+        self.frame_id = config["frame_id"]
+        self.end_stop = config.get("end_stop", False)
+
         self.finished = False
+        self.started = False
+        self.start_time = 0
         self.reached_target = False
-        self.stamp = 0
-        self.hold_period = planner_params["hold_period"]
-        
+
+        self.initial_pos = np.array(config["initial_pos"])
+        self.target_pos = np.array(config["target_pos"])
+        self.cruise_speed = config["cruise_speed"]
+
+        self.dt = 0.01
+        self.plan = self._generatePlan()
+
+        super().__init__()
+
+    def regeneratePlan(self):
+        self.plan = self._generatePlan()
+        self.start_time = 0
+
+    def _generatePlan(self):
+        self.T = np.linalg.norm(self.initial_pos - self.target_pos) / self.cruise_speed
+
+        ts = np.linspace(0, self.T, int(self.T/self.dt)).reshape((-1, 1))
+        n = (self.target_pos - self.initial_pos) / np.linalg.norm(self.initial_pos - self.target_pos)
+        plan_pos = n * ts * self.cruise_speed + self.initial_pos
+
+        plan_vel = np.tile(n * self.cruise_speed, (int(self.T/self.dt), 1))
+
+        return {'t': ts, 'p': plan_pos, 'v': plan_vel}
+
     def getTrackingPoint(self, t, robot_states=None):
-        if not self.finished:
-            return self.target_pose, np.zeros(3)
+
+        if self.started and self.start_time == 0:
+            self.start_time = t
+
+        te = t - self.start_time
+
+        p, v = self._interpolate(te, self.plan)
+
+        return p, v
+
+    def checkFinished(self, t, ee_curr_pos):
+        if np.linalg.norm(ee_curr_pos - self.target_pos) < self.tracking_err_tol:
+            return True
         else:
-            return None, None
-    
-    def checkFinished(self, t, current_EE):
-        if self.regenerate_count == 9 and not self.reached_target and np.linalg.norm(current_EE - self.target_pose) < 0.015:
-            self.reached_target = True
-            self.stamp=t
-            self.py_logger.info("Reached")
-            
-        elif self.reached_target and not self.finished:
-            if t - self.stamp > self.hold_period:
-                self.finished = True
-                self.py_logger.info("Finished")
+            return False
+
     def reset(self):
         self.reached_target = False
-        self.stamp = 0
         self.finished = False
-    
-    def regenerate(self, sigma=1):
-        while True:
-            noise = np.random.randn(3) * sigma
-            self.target_pose = self.target_pose_true +noise
-            if self.target_pose[2] > 0:
-                break
-        self.regenerate_count +=1
+        self.start_time = 0
+        self.py_logger.info(self.name + " planner reset.")
 
+    @staticmethod
+    def getDefaultParams():
+        config = {}
+        config["name"] = "Base Position"
+        config["planner_type"] = "BasePosTrajectoryLine"
+        config["frame_id"] = "base"
+        config["initial_pos"] = [0, 0]
+        config["target_pos"] = [0, 0]
+        config["cruise_speed"] = 0.5
+        config["tracking_err_tol"] = 0.02
+
+        return config
 
 class EEPosTrajectory(Planner):
     def __init__(self, planner_params):
@@ -340,7 +376,6 @@ if __name__ == '__main__':
     
     planner = EESimplePlanner(planner_params)
     planner_params = {"target_pose": [0., 1., 1.], 'hold_period':1}
-    planner = EESimplePlannerRandom(planner_params)
     
     T = make_trans_from_vec(np.array([0,0,1]) * np.pi/2, [1,0,0])
     
