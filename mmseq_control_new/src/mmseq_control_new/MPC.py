@@ -118,19 +118,8 @@ class MPC():
             vals.append(cost_function.evaluate(x_bar[k], u_bar[k], cost_p_map.cat.full().flatten()))
         return np.sum(vals)
 
-class STMPC(MPC):
 
-    def __init__(self, config):
-        super().__init__(config)
-        self._construct()
-        self.cost_iter = 0
-        self.cost_final = 0
-        self.step_size = 0
-        self.sqp_iter = 0
-        self.solver_status = 0
-        self.qp_iter = 0
-
-    def _construct(self):
+    def _construct(self, costs, constraints, num_terminal_cost, name="MM"):
         # Construct AcadosModel
         model = AcadosModel()
         model.x = cs.MX.sym('x', self.nx)
@@ -139,22 +128,18 @@ class STMPC(MPC):
 
         model.f_impl_expr = model.xdot - self.ssSymMdl["fmdl"](model.x, model.u)
         model.f_expl_expr = self.ssSymMdl["fmdl"](model.x, model.u)
-        model.name = "MM"
+        model.name = name
 
         # get params from constraints
-        num_terminal_cost = 2
-        costs = [self.BasePos2Cost, self.EEPos3Cost, self.CtrlEffCost]
-        costs += [cost for cost in self.collisionSoftCsts.values()]
-        constraints = []
-        self.p_dict = {}
+        p_dict = {}
         for cost in costs:
-            self.p_dict.update(cost.get_p_dict())
+            p_dict.update(cost.get_p_dict())
         for cst in constraints:
-            self.p_dict.update(cst.get_p_dict())
-        self.p_struct = casadi_sym_struct(self.p_dict)
-        print(self.p_struct)
-        self.p_map = self.p_struct(0)
-        model.p = self.p_struct.cat
+            p_dict.update(cst.get_p_dict())
+        p_struct = casadi_sym_struct(p_dict)
+        print(p_struct)
+        p_map = p_struct(0)
+        model.p = p_struct.cat
 
         # Construct AcadosOCP
         ocp = AcadosOcp()
@@ -188,13 +173,6 @@ class STMPC(MPC):
                 cost_hess_expr_e = cs.substitute(cost_hess_expr_e, model.u, [])
                 model.cost_expr_ext_cost_custom_hess_e = cost_hess_expr_e
 
-        # self.terminal_cost = cs.Function("Terminal", [model.x, model.p], [cost_expr_e])
-        # fk_ee = self.robot.kinSymMdls[self.robot.tool_link_name]
-        # Pee,_ = fk_ee(model.x[:9])
-        # ocp.model.cost_y_expr_e = Pee
-        # ocp.cost.W_e = np.eye(3) * self.params["cost_params"]["EEPos3"]["P"]
-        # ocp.cost.yref_e = np.zeros(3)
-
         # control input constraints
         ocp.constraints.lbu = np.array(self.ssSymMdl["lb_u"])
         ocp.constraints.ubu = np.array(self.ssSymMdl["ub_u"])
@@ -223,12 +201,16 @@ class STMPC(MPC):
             ocp.constraints.uh = np.zeros(h_expr_num)
             ocp.constraints.lh = -INF*np.ones(h_expr_num)
 
+            model.con_h_expr_e = cs.substitute(h_expr, model.u, [])
+            ocp.constraints.uh_e = np.zeros(h_expr_num)
+            ocp.constraints.lh_e = -INF*np.ones(h_expr_num)
+            
         # TODO: slack variables?
 
         # initial condition
         ocp.constraints.x0 = self.x_bar[0]
 
-        ocp.parameter_values = self.p_map.cat.full().flatten()
+        ocp.parameter_values = p_map.cat.full().flatten()
 
         # set options
         ocp.solver_options.qp_solver = 'FULL_CONDENSING_HPIPM' # FULL_CONDENSING_QPOASES
@@ -241,12 +223,29 @@ class STMPC(MPC):
         ocp.solver_options.globalization = 'MERIT_BACKTRACKING' # turns on globalization
         ocp.solver_options.qp_solver_iter_max = 100
         ocp.solver_options.nlp_solver_tol_stat = 1e-3
+        ocp.solver_options.qp_solver_warm_start = True
+
         # Construct AcadosOCPSolver
         ocp_solver = AcadosOcpSolver(ocp, json_file = 'acados_ocp_stmpc.json')
 
-        self.model = model
-        self.ocp = ocp
-        self.ocp_solver = ocp_solver
+        return ocp, ocp_solver, p_struct
+
+
+class STMPC(MPC):
+
+    def __init__(self, config):
+        super().__init__(config)
+        num_terminal_cost = 2
+        costs = [self.BasePos2Cost, self.EEPos3Cost, self.CtrlEffCost]
+        costs += [cost for cost in self.collisionSoftCsts.values()]
+        constraints = []
+        self.ocp, self.ocp_solver, self.p_struct = self._construct(costs, constraints, num_terminal_cost)
+        self.cost_iter = 0
+        self.cost_final = 0
+        self.step_size = 0
+        self.sqp_iter = 0
+        self.solver_status = 0
+        self.qp_iter = 0
 
     def control(self, t, robot_states, planners, map=None):
 
