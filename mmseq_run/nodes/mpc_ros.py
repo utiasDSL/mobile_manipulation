@@ -507,10 +507,9 @@ class ControllerROSNode:
         print(f"Converged to within {dist} of home position.")
 
     def log_mpc_info(self, logger, controller):
-        logger.append("mpc_solver_statuss", controller.solver_status)
-        logger.append("mpc_cost_iters", controller.cost_iter)
-        logger.append("mpc_cost_finals", controller.cost_final)
-        logger.append("mpc_step_sizes", controller.step_size)
+        log = self.controller.log
+        for (key, val) in controller.log.items():
+            logger.append("_".join(["mpc", key])+"s", val)
 
     def planner_coord_transform(self, q, ree, planners):
         R_wb = rotz(q[2])
@@ -525,6 +524,8 @@ class ControllerROSNode:
                 planner.target_pos = R_wb @ planner.target_pos + P
             elif planner.__class__.__name__ == "EEPosTrajectoryCircle":
                 planner.c = R_wb @ planner.c + P
+                planner.plan['p'] = planner.plan['p'] @ R_wb.T + P
+            elif planner.__class__.__name__ == "EEPosTrajectoryLine":
                 planner.plan['p'] = planner.plan['p'] @ R_wb.T + P
 
             elif planner.__class__.__name__ == "BaseSingleWaypoint":

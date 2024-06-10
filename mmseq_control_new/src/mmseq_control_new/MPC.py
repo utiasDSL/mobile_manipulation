@@ -67,7 +67,7 @@ class MPC():
         self.v_cmd = np.zeros(self.nx - self.DoF)
 
         self.py_logger = logging.getLogger("Controller")
-
+        self.log = self._get_log()
 
     @abstractmethod
     def control(self, t, robot_states, planners, map=None):
@@ -230,6 +230,8 @@ class MPC():
 
         return ocp, ocp_solver, p_struct
 
+    def _get_log(self):
+        return {}
 
 class STMPC(MPC):
 
@@ -240,12 +242,6 @@ class STMPC(MPC):
         costs += [cost for cost in self.collisionSoftCsts.values()]
         constraints = []
         self.ocp, self.ocp_solver, self.p_struct = self._construct(costs, constraints, num_terminal_cost)
-        self.cost_iter = 0
-        self.cost_final = 0
-        self.step_size = 0
-        self.sqp_iter = 0
-        self.solver_status = 0
-        self.qp_iter = 0
 
     def control(self, t, robot_states, planners, map=None):
 
@@ -288,14 +284,24 @@ class STMPC(MPC):
             elif planner.type == "base":
                 self.rbase_bar = r_bar
 
-    
+        t1 = time.perf_counter()
         if map is not None:
             self.model_interface.sdf_map.update_map(*map)
+        t2 = time.perf_counter()
+        self.log["time_map_update"] = t2 - t1
 
+        tp1 = time.perf_counter()
         curr_p_map_bar = []
+        self.log["time_ocp_set_params_map"] = 0
+        self.log["time_ocp_set_params_set_x"] = 0
+        self.log["time_ocp_set_params_tracking"] = 0
+        self.log["time_ocp_set_params_setp"] = 0
+
         for i in range(self.N+1):
             curr_p_map = self.p_struct(0)
+            # curr_p_map["eps_Regularization"] = self.params["cost_params"]["Regularization"]["eps"]
 
+            t1 = time.perf_counter()
             if self.params["sdf_collision_avoidance_enabled"]:
                 params = self.model_interface.sdf_map.get_params()
                 curr_p_map["x_grid_sdf"] = params[0]
@@ -305,11 +311,15 @@ class STMPC(MPC):
                     curr_p_map["value_sdf"] = params[3]
                 else:
                     curr_p_map["value_sdf"] = params[2]
-        
+            t2 = time.perf_counter()
+            self.log["time_ocp_set_params_map"] += t2 - t1
             # set initial guess
+            t1 = time.perf_counter()
             self.ocp_solver.set(i, 'x', self.x_bar[i])
-
+            t2 = time.perf_counter()
+            self.log["time_ocp_set_params_set_x"] += t2 - t1
             # set parameters for tracking cost functions
+            t1 = time.perf_counter()
             p_keys = self.p_struct.keys()
             for (name, r_bar) in r_bar_map.items():
                 p_name_r = "_".join(["r", name])
@@ -326,19 +336,31 @@ class STMPC(MPC):
                         curr_p_map[p_name_W] = self.params["cost_params"][name]["Qk"] * np.eye(r_bar[i].size)
                 else:
                     self.py_logger.warning(f"unknown p name {p_name_r}")
+            t2 = time.perf_counter()
+            self.log["time_ocp_set_params_tracking"] += t2 - t1
 
+            t1 = time.perf_counter()
             self.ocp_solver.set(i, 'p', curr_p_map.cat.full().flatten())
+            t2 = time.perf_counter()
+            self.log["time_ocp_set_params_setp"] += t2 - t1
+
             curr_p_map_bar.append(curr_p_map)
+        tp2 = time.perf_counter()
+        self.log["time_ocp_set_params"] = tp2 - tp1
 
-        print(self.evaluate_cost_function(self.EEPos3Cost, self.x_bar, self.u_bar, curr_p_map_bar))
+        t1 = time.perf_counter()
         self.ocp_solver.solve_for_x0(xo, fail_on_nonzero_status=False)
-        self.ocp_solver.print_statistics() # encapsulates: stat = ocp_solver.get_stats("statistics")
-        self.solver_status = self.ocp_solver.status
-        self.step_size = np.mean(self.ocp_solver.get_stats('alpha'))
-        self.nlp_iter = self.ocp_solver.get_stats('sqp_iter')
-        self.qp_iter = sum(self.ocp_solver.get_stats('qp_iter'))
+        t2 = time.perf_counter()
+        self.log["time_ocp_solve"] = t2 - t1
 
-        if self.solver_status !=0:
+        self.ocp_solver.print_statistics() # encapsulates: stat = ocp_solver.get_stats("statistics")
+        self.log["solver_status"] = self.ocp_solver.status
+        self.log["step_size"] = np.mean(self.ocp_solver.get_stats('alpha'))
+        self.log["sqp_iter"] = self.ocp_solver.get_stats('sqp_iter')
+        self.log["qp_iter"] = sum(self.ocp_solver.get_stats('qp_iter'))
+        self.log["cost_final"] = self.ocp_solver.get_cost()
+
+        if self.ocp_solver.status !=0:
             for i in range(self.N):
                 print(f"stage {i}: x: {self.ocp_solver.get(i, 'x')}")
                 print(f"stage {i}: u: {self.ocp_solver.get(i, 'u')}")
@@ -363,10 +385,20 @@ class STMPC(MPC):
         self.v_cmd = self.x_bar[0][self.robot.DoF:].copy()
 
         self.ee_bar, self.base_bar = self._getEEBaseTrajectories(self.x_bar)
-        print(f"v{self.v_cmd}")
-        print(f"u: {self.u_bar[0]}")
         return self.v_cmd, self.u_prev, self.u_bar.copy()
 
+    def _get_log(self):
+        log = {"cost_final": 0,
+               "step_size": 0,
+               "sqp_iter": 0,
+               "qp_iter": 0,
+               "solver_status": 0,
+               "time_map_update": 0,
+               "time_ocp_set_params": 0,
+               "time_ocp_solve": 0,
+               }
+        
+        return log
 
 
 if __name__ == "__main__":
