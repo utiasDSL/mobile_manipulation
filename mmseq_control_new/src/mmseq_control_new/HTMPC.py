@@ -18,7 +18,7 @@ class HTMPC(MPC):
         self.EEPos3LexConstraint = HierarchicalTrackingConstraint(self.EEPos3Cost, "_".join([self.EEPos3Cost.name, "Lex"]))
         self.BasePos2LexConstraint = HierarchicalTrackingConstraint(self.BasePos2Cost, "_".join([self.BasePos2Cost.name, "Lex"]))
         common_cost_fcns = [cost for cost in self.collisionSoftCsts.values()]
-        ocp1, ocp_solver1, p_struct1 = self._construct([self.EEPos3Cost, self.RegularizationCost] + common_cost_fcns, [], 1, "EEPos3")
+        ocp1, ocp_solver1, p_struct1 = self._construct([self.EEPos3Cost, self.RegularizationCost, self.CtrlEffCost] + common_cost_fcns, [], 1, "EEPos3")
         ocp2, ocp_solver2, p_struct2 = self._construct([self.BasePos2Cost, self.CtrlEffCost] + common_cost_fcns, [self.EEPos3LexConstraint], 1, "BasePos2")
         
         self.stmpcs = [ocp1, ocp2]
@@ -106,6 +106,8 @@ class HTMPC(MPC):
 
                 # set initial guess
                 stmpc_solver.set(k, 'x', self.x_bar[k])
+                if k != self.N:
+                    stmpc_solver.set(k, 'u', self.u_bar[k])
 
                 # set parameters for tracking cost functions
                 p_keys = p_struct.keys()
@@ -179,7 +181,7 @@ class HTMPC(MPC):
                 # Relaxed Lex Constraints |e_k| \leq |e^*_k| + eps
                 e_p_bar_map[tracking_cost_fcn_name].append(np.abs(tracking_cost_fcn.get_e(self.x_bar[k],
                                                             [],
-                                                            r_bar_map[tracking_cost_fcn_name][k])) + 0.0025)
+                                                            r_bar_map[tracking_cost_fcn_name][k])) + self.params["hierarchy_const_tol"])
                 print(f"task:{tracking_cost_fcn_name}, time{k}: e_p {e_p_bar_map[tracking_cost_fcn_name][-1]}")
             
             e_p_bar_map[tracking_cost_fcn_name] = np.array(e_p_bar_map[tracking_cost_fcn_name])

@@ -18,7 +18,7 @@ controller:
   sdf_collision_avoidance_enabled: False
   ee_upward_constraint_enabled: False
   cst_tol_schedule_enabled: False
-  hierarchy_const_tol: 0.01
+  hierarchy_const_tol: 0.001
 
   ee_upward_deviation_angle_max: 0.20    #rad, 0.26 rad ~ 15 degree
   collision_safety_margin:
@@ -42,22 +42,22 @@ controller:
   # weights for each cost function
   cost_params:
     EEPos3:
-      Qk: 1.0
+      Qk: 10.0
       P: 1
     BasePos2:
-      Qk: 1.
+      Qk: 10.
       P: 1
     Effort:
       Qqa: 0.
       Qqb: 0.
-      Qva: 0.1
+      Qva: 0.01
       Qvb: 0.1
       Qua: 0.01
       Qub: 0.1
       Qdua: 0.
       Qdub: 0.1
     Regularization:
-      eps: 0.0001
+      eps: 0.00
 
   # line search parameters
   beta: 0.5
