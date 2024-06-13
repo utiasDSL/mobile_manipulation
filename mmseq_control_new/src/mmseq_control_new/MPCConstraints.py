@@ -34,6 +34,7 @@ class Constraint(ABC):
         self.p_sym = None
 
         self.name = name
+        self.slack_enabled = False
         
         super().__init__()
 
@@ -99,9 +100,9 @@ class HierarchicalTrackingConstraint(NonlinearConstraint):
 
         nx = cost_fcn_obj.nx
         nu = cost_fcn_obj.nu
-        ng = cost_fcn_obj.e_eqn.shape[0]
+        ng = cost_fcn_obj.e_eqn.shape[0]*2
         p_dict = cost_fcn_obj.get_p_dict()
-        p_dict["e_p"] = cs.MX.sym("e_p_"+name, ng)
+        p_dict["e_p"] = cs.MX.sym("e_p_"+name, cost_fcn_obj.e_eqn.shape[0])
         super().__init__(nx, nu, ng, None, p_dict, name)
         self.cost_fcn_obj = cost_fcn_obj
 
@@ -148,7 +149,7 @@ class SignedDistanceConstraint(NonlinearConstraint):
         nx = robot_mdl.ssSymMdl["nx"]
         nu = robot_mdl.ssSymMdl["nu"]
         nq = robot_mdl.q_sym.size()[0]
-        ng = signed_distance_fcn.size_out(0)
+        ng = signed_distance_fcn.size_out(0)[0]
         p_sym = signed_distance_fcn.mx_in()[1:]
         p_name = signed_distance_fcn.name_in()[1:]
         p_dict = {name:sym for (name, sym) in zip(p_name, p_sym)}
@@ -162,3 +163,4 @@ class SignedDistanceConstraint(NonlinearConstraint):
         self.g_grad_eqn = cs.jacobian(self.g_eqn, cs.veccat(self.u_sym, self.x_sym))
         self.g_grad_fcn = cs.Function("g_grad", [self.x_sym, self.u_sym, self.p_sym], [self.g_eqn])
 
+        self.slack_enabled = True

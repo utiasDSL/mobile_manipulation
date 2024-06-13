@@ -21,6 +21,11 @@ controller:
   hierarchy_const_tol: 0.001
 
   ee_upward_deviation_angle_max: 0.20    #rad, 0.26 rad ~ 15 degree
+  
+  collision_constraints_softend:
+    self: False
+    sdf: True
+  
   collision_safety_margin:
     self: 0.05
     sdf: 0.15
@@ -82,4 +87,10 @@ controller:
       nlp_solver_tol_stat: 1.0e-05
       nlp_solver_tol_eq: 1.0e-03
       nlp_solver_tol_ineq: 1.0e-04
-      qp_solver_warm_start: 2
+      qp_solver_warm_start: False
+    slack_enabled:
+      x: True
+      x_e: True
+      h_0: True
+      h: False
+      h_e: False

@@ -17,9 +17,15 @@ class HTMPC(MPC):
         super().__init__(config)
         self.EEPos3LexConstraint = HierarchicalTrackingConstraint(self.EEPos3Cost, "_".join([self.EEPos3Cost.name, "Lex"]))
         self.BasePos2LexConstraint = HierarchicalTrackingConstraint(self.BasePos2Cost, "_".join([self.BasePos2Cost.name, "Lex"]))
-        common_cost_fcns = [cost for cost in self.collisionSoftCsts.values()]
-        ocp1, ocp_solver1, p_struct1 = self._construct([self.EEPos3Cost, self.RegularizationCost, self.CtrlEffCost] + common_cost_fcns, [], 1, "EEPos3")
-        ocp2, ocp_solver2, p_struct2 = self._construct([self.BasePos2Cost, self.CtrlEffCost] + common_cost_fcns, [self.EEPos3LexConstraint], 1, "BasePos2")
+        common_csts = []
+        common_cost_fcns = []
+        for name in self.collision_link_names:
+            if self.params["collision_constraints_softend"][name]:
+                common_cost_fcns.append(self.collisionSoftCsts[name])
+            else:
+                common_csts.append(self.collisionCsts[name])
+        ocp1, ocp_solver1, p_struct1 = self._construct([self.EEPos3Cost, self.RegularizationCost, self.CtrlEffCost] + common_cost_fcns, [] + common_csts, 1, "EEPos3")
+        ocp2, ocp_solver2, p_struct2 = self._construct([self.BasePos2Cost, self.CtrlEffCost] + common_cost_fcns, [self.EEPos3LexConstraint] + common_csts, 1, "BasePos2")
         
         self.stmpcs = [ocp1, ocp2]
         self.stmpc_solvers = [ocp_solver1, ocp_solver2]

@@ -183,30 +183,95 @@ class MPC():
         ocp.constraints.ubx = np.array(self.ssSymMdl["ub_x"])
         ocp.constraints.idxbx = np.arange(self.nx)
 
+        if self.params["acados"]["slack_enabled"]["x"]:
+            ocp.constraints.idxsbx = np.arange(self.DoF)
+            ocp.constraints.lsbx = np.zeros(self.DoF)
+            ocp.constraints.usbx = np.zeros(self.DoF)
+            nsx = self.DoF
+        else:
+            nsx = 0
+
         ocp.constraints.lbx_e = np.array(self.ssSymMdl["lb_x"])
         ocp.constraints.ubx_e = np.array(self.ssSymMdl["ub_x"])
         ocp.constraints.idxbx_e = np.arange(self.nx)
 
+        if self.params["acados"]["slack_enabled"]["x_e"]:
+            ocp.constraints.idxsbx_e = np.arange(self.DoF)
+            ocp.constraints.lsbx_e = np.zeros(self.DoF)
+            ocp.constraints.usbx_e = np.zeros(self.DoF)
+            nsx_e = self.DoF
+        else:
+            nsx_e = 0
+
         # nonlinear constraints
         # TODO: what about the initial and terminal shooting nodes.
         h_expr_list = []
-        for cst in constraints:
+        idxsh = []
+        h_idx = 0
+        for i, cst in enumerate(constraints):
             h_expr_list.append(cst.g_fcn(model.x, model.u, cst.p_sym))
-        
+            if cst.slack_enabled and (self.params["acados"]["slack_enabled"]["h"] or self.params["acados"]["slack_enabled"]["h_0"] or self.params["acados"]["slack_enabled"]["h_e"]):
+                idxsh += [h_i for h_i in range(h_idx, h_idx + cst.ng)]
+            h_idx += cst.ng
+
+        nsh = len(idxsh) if self.params["acados"]["slack_enabled"]["h"] else 0
+        nsh_e = len(idxsh) if self.params["acados"]["slack_enabled"]["h_e"] else 0
+        nsh_0 = len(idxsh) if self.params["acados"]["slack_enabled"]["h_0"] else 0
         if len(h_expr_list) > 0:
             h_expr = cs.vertcat(*h_expr_list)
-            print(h_expr)
-            model.con_h_expr = h_expr
             h_expr_num = h_expr.shape[0]
+            print(h_expr)
+
+            model.con_h_expr_0 = h_expr
+            ocp.constraints.uh_0 = np.zeros(h_expr_num)
+            ocp.constraints.lh_0 = -INF*np.ones(h_expr_num)
+
+            model.con_h_expr = h_expr
             ocp.constraints.uh = np.zeros(h_expr_num)
             ocp.constraints.lh = -INF*np.ones(h_expr_num)
 
             model.con_h_expr_e = cs.substitute(h_expr, model.u, [])
             ocp.constraints.uh_e = np.zeros(h_expr_num)
             ocp.constraints.lh_e = -INF*np.ones(h_expr_num)
+        else:
+            h_expr_num = 0
+        
+        if h_expr_num > 0: 
+
+            if nsh_0 > 0:
+                ocp.constraints.idxsh_0 = np.array(idxsh)
+                ocp.constraints.lsh_0 = np.zeros(nsh_0)
+                ocp.constraints.ush_0 = np.zeros(nsh_0)
+            if nsh > 0:
+                ocp.constraints.idxsh = np.array(idxsh)
+                ocp.constraints.lsh = np.zeros(nsh)
+                ocp.constraints.ush = np.zeros(nsh)
+            if nsh_e > 0:
+                ocp.constraints.idxsh_e = np.array(idxsh)
+                ocp.constraints.lsh_e  = np.zeros(nsh_e)
+                ocp.constraints.ush_e  = np.zeros(nsh_e)
+
             
         # TODO: slack variables?
+        ns = nsx + nsh
+        if ns > 0:
+            ocp.cost.Zl = np.eye(ns) * 1
+            ocp.cost.Zu = np.eye(ns) * 1
+            ocp.cost.zl = np.ones(ns) * 0
+            ocp.cost.zu = np.ones(ns) * 0
 
+        ns_e = nsx_e + nsh_e
+        if ns_e > 0:
+            ocp.cost.Zl_e = np.eye(ns_e) * 1
+            ocp.cost.Zu_e = np.eye(ns_e) * 1
+            ocp.cost.zl_e = np.ones(ns_e) * 0
+            ocp.cost.zu_e = np.ones(ns_e) * 0
+        
+        if nsh_0 > 0:
+            ocp.cost.Zl_0 = np.eye(nsh_0) * 10
+            ocp.cost.Zu_0 = np.eye(nsh_0) * 10
+            ocp.cost.zl_0 = np.ones(nsh_0) * 0
+            ocp.cost.zu_0 = np.ones(nsh_0) * 0
         # initial condition
         ocp.constraints.x0 = self.x_bar[0]
 
@@ -221,7 +286,7 @@ class MPC():
                 self.py_logger.warning(f"{key} not found in Acados solver options. Parameter is ignored.")
                 
         # Construct AcadosOCPSolver
-        ocp_solver = AcadosOcpSolver(ocp, json_file = 'acados_ocp_stmpc.json')
+        ocp_solver = AcadosOcpSolver(ocp, json_file = f"acados_ocp_{name}.json")
 
         return ocp, ocp_solver, p_struct
 
@@ -234,8 +299,14 @@ class STMPC(MPC):
         super().__init__(config)
         num_terminal_cost = 2
         costs = [self.BasePos2Cost, self.EEPos3Cost, self.CtrlEffCost]
-        costs += [cost for cost in self.collisionSoftCsts.values()]
+        # costs += [cost for cost in self.collisionSoftCsts.values()]
         constraints = []
+        for name in self.collision_link_names:
+            if self.params["collision_constraints_softend"][name]:
+                costs.append(self.collisionSoftCsts[name])
+            else:
+                constraints.append(self.collisionCsts[name])
+        # constraints = [cst for cst in self.collisionCsts.values()]
         self.ocp, self.ocp_solver, self.p_struct = self._construct(costs, constraints, num_terminal_cost)
 
     def control(self, t, robot_states, planners, map=None):
