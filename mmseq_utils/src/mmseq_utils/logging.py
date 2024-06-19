@@ -691,6 +691,21 @@ class DataPlotter:
 
         return axes
 
+    def plot_collision_detailed(self):
+        nq = int(self.data["nq"])
+        ts = self.data["ts"]
+        qs = self.data["xs"][:, :nq]
+        sds = self.model_interface.evaluteSignedDistancePerPair(qs)
+
+        f, ax = plt.subplots(1, 1)
+        for name, sd in sds.items():
+            ax.plot(ts, sd, label=name)
+           
+        ax.set_title("Signed Distance vs Time")
+        ax.set_xlabel("Time (s)")
+        ax.set_ylabel("Sd(q) (m)")
+        ax.legend()
+    
     def plot_collision(self):
         nq = int(self.data["nq"])
         ts = self.data["ts"]
@@ -700,7 +715,9 @@ class DataPlotter:
         f, ax = plt.subplots(1, 1)
         for name, sd in sds.items():
             ax.plot(ts, sd, label=name)
-        ax.plot(ts, [0.05]*len(ts), 'r--', linewidth=2, label="minimum clearance")
+            margin = self.config["controller"]["collision_safety_margin"].get(name, None)
+            if margin:
+                ax.plot(ts, [margin]*len(ts), '--', linewidth=2, label=f"minimum clearance {name}")
         ax.set_title("Signed Distance vs Time")
         ax.set_xlabel("Time (s)")
         ax.set_ylabel("Sd(q) (m)")
@@ -1270,6 +1287,7 @@ class DataPlotter:
         # self.plot_cmds_normalized()
         self.plot_du()
         self.plot_collision()
+        self.plot_collision_detailed()
 
     def plot_tracking(self):
         # self.plot_ee_position()

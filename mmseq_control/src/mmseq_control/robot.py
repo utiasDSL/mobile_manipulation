@@ -229,7 +229,7 @@ class CasadiModelInterface:
                                                                             self.robot.collision_link_names["wrist"] +
                                                                             self.robot.collision_link_names["tool"])
         # upper arm
-        self.collision_pairs["self"] += self._addCollisionPairFromTwoGroups(self.robot.collision_link_names["upper_arm"],
+        self.collision_pairs["self"] += self._addCollisionPairFromTwoGroups(self.robot.collision_link_names["upper_arm"][:2],
                                                                             self.robot.collision_link_names["wrist"] +
                                                                             self.robot.collision_link_names["tool"])
         # forearm
@@ -356,6 +356,32 @@ class CasadiModelInterface:
             sds = sdn_fcn(qs.T).toarray()
             sd_mins = np.min(sds, axis=0)
             sd[name] = sd_mins
+
+        return sd
+    
+    def evaluteSignedDistancePerPair(self, qs):
+        sd = {}
+        names = ["self", "static_obstacles"]
+
+        N = len(qs)
+        for name in names:
+            if name != "static_obstacles":
+                for pair in self.collision_pairs[name]:
+                    sd_fcn = self.signedDistanceSymMdls[tuple(pair)]
+                    sdn_fcn = sd_fcn.map(N, 'thread', 2)
+                    # sds dimension: num collision pairs x num time step
+                    sds = sdn_fcn(qs.T).toarray()
+                    sd_mins = np.min(sds, axis=0)
+                    sd["&".join(pair)] = sd_mins
+            else:
+                for obstacle, pairs in self.collision_pairs["static_obstacles"].items():
+                    for pair in pairs:
+                        sd_fcn = self.signedDistanceSymMdls[tuple(pair)]
+                        sdn_fcn = sd_fcn.map(N, 'thread', 2)
+                        # sds dimension: num collision pairs x num time step
+                        sds = sdn_fcn(qs.T).toarray()
+                        sd_mins = np.min(sds, axis=0)
+                        sd["&".join(pair)] = sd_mins
 
         return sd
 
@@ -871,9 +897,72 @@ def test_casadi_interface(args):
         print("Obstacle {}, Distance Diff: ".format(obstacle, self_distance_mdl - self_distance_pin))
 
 
+def plot_signed_distance_gradient(c_cylinder, r_sphere, r_cylinder, x_range, y_range, grid_size):
+    """ Plot the signed distance and its gradient.
+
+    :param c_cylinder: array-like, shape (3,), center of the cylinder (x, y, z)
+    :param r_sphere: float, radius of the sphere
+    :param r_cylinder: float, radius of the cylinder
+    :param x_range: tuple, (min_x, max_x)
+    :param y_range: tuple, (min_y, max_y)
+    :param grid_size: int, number of points along each axis
+    """
+    x = np.linspace(x_range[0], x_range[1], grid_size)
+    y = np.linspace(y_range[0], y_range[1], grid_size)
+    X, Y = np.meshgrid(x, y)
+    
+    Z = np.zeros_like(X)
+    grad_x = np.zeros_like(X)
+    grad_y = np.zeros_like(Y)
+    
+    # Define CasADi variables
+    c_sphere_sym = cs.MX.sym('c_sphere', 3)
+    c_cylinder_sym = cs.MX.sym('c_cylinder', 3)
+    r_sphere_sym = cs.MX.sym('r_sphere')
+    r_cylinder_sym = cs.MX.sym('r_cylinder')
+
+    # Define the signed distance function symbolically
+    signed_distance_sym = signed_distance_sphere_cylinder(c_sphere_sym, c_cylinder_sym, r_sphere_sym, r_cylinder_sym)
+
+    # Calculate the gradient symbolically
+    gradient = cs.jacobian(signed_distance_sym, c_sphere_sym)
+    
+    # Create a CasADi function for the signed distance and its gradient
+    signed_distance_fn = cs.Function('signed_distance_fn', [c_sphere_sym, c_cylinder_sym, r_sphere_sym, r_cylinder_sym], [signed_distance_sym])
+    gradient_fn = cs.Function('gradient_fn', [c_sphere_sym, c_cylinder_sym, r_sphere_sym, r_cylinder_sym], [gradient[:2]])
+    
+    for i in range(grid_size):
+        for j in range(grid_size):
+            c_sphere = np.array([X[i, j], Y[i, j], 0])  # Fix z=0 for 2D plot
+            Z[i, j] = signed_distance_fn(c_sphere, c_cylinder, r_sphere, r_cylinder).full().item()
+            grad = gradient_fn(c_sphere, c_cylinder, r_sphere, r_cylinder).full().flatten()
+            grad_x[i, j] = grad[0]
+            grad_y[i, j] = grad[1]
+
+    plt.figure(figsize=(10, 8))
+    plt.contourf(X, Y, Z, levels=50, cmap='viridis')
+    plt.colorbar(label='Signed Distance')
+    plt.quiver(X, Y, grad_x, grad_y, color='white')
+    plt.xlabel('X Coordinate of Sphere Center')
+    plt.ylabel('Y Coordinate of Sphere Center')
+    plt.title('Signed Distance and Gradient between Sphere and Cylinder')
+    plt.show()
+
+
+def test_signed_distance_sphere_cylinder():
+    # Example usage
+    c_cylinder = [0, 0, 0]  # Assume z=0 for cylinder center for simplicity
+    r_sphere = 0.26
+    r_cylinder = 0.325
+    x_range = (-5, 5)
+    y_range = (-5, 5)
+    grid_size = 100
+
+    plot_signed_distance_gradient(c_cylinder, r_sphere, r_cylinder, x_range, y_range, grid_size)
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--config", required=True, help="Path to configuration file.")
+    parser.add_argument("--config", required=False, help="Path to configuration file.")
     parser.add_argument(
         "--video",
         nargs="?",
@@ -886,7 +975,8 @@ if __name__ == "__main__":
     # test_obstacle_mdl(args)
     # test_pinocchio_interface(args)
     args.config = "/home/tracy/Projects/mm_slam/mm_ws/src/mm_sequential_tasks/mmseq_run/config/simple_experiment.yaml"
-    test_casadi_interface(args)
+    # test_casadi_interface(args)
+    test_signed_distance_sphere_cylinder()
     # check_maximum_reach(args)
 
             

@@ -414,7 +414,8 @@ class ControllerROSNode:
             self.mpc_plan_time_stamp = t
             N = self.mpc_plan.shape[0]
             t_mpc = np.arange(N) * self.mpc_dt
-            self.mpc_plan_interp = interp1d(t_mpc, self.mpc_plan, axis=0)
+            self.mpc_plan_interp = interp1d(t_mpc, self.mpc_plan, axis=0, 
+                                            bounds_error=False, fill_value="extrapolate")
             self.lock.release()
 
             # publish data

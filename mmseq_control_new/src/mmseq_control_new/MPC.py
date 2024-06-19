@@ -255,8 +255,8 @@ class MPC():
         # TODO: slack variables?
         ns = nsx + nsh
         if ns > 0:
-            ocp.cost.Zl = np.eye(ns) * 1
-            ocp.cost.Zu = np.eye(ns) * 1
+            ocp.cost.Zl = np.eye(ns) * 10
+            ocp.cost.Zu = np.eye(ns) * 10
             ocp.cost.zl = np.ones(ns) * 0
             ocp.cost.zu = np.ones(ns) * 0
 

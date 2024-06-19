@@ -869,6 +869,8 @@ def tracking(folder_path):
         plotter.plot_singularity(axes[1], pid)
 
         index = np.where(plotter.data["arm_manipulability"] < 0.1)
+        if len(index[0]) == 0:
+            index = np.where(plotter.data["arm_manipulability"] < 0.2)
         shade_region.append([plotter.data["ts"][index][0], plotter.data["ts"][index][-1]])
 
     plotters[0].plot_optimal_error(axes[0])

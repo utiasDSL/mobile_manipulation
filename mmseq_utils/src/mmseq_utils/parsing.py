@@ -7,7 +7,6 @@ import numpy as np
 import yaml
 import os
 import xacro
-import IPython
 
 
 # This is from <https://github.com/Maples7/dict-recursive-update/blob/07204cdab891ac4123b19fe3fa148c3dd1c93992/dict_recursive_update/__init__.py>

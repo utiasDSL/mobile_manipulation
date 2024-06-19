@@ -46,6 +46,9 @@ planner:
 
 controller:
   home: "default"
+  sdf_collision_avoidance_enabled: True
+  type: "STMPC"
+
 include:
   - package: "mmseq_run"
     path: "config/robot/thing.yaml"

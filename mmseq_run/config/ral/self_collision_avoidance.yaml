@@ -7,15 +7,27 @@ planner:
       target_pos: [0., 0., 0.]
       hold_period: 3.
       tracking_err_tol: 0.02
-    - name: "Base Pos 1"
-      planner_type: "BaseSingleWaypoint"
-      frame_id: "base"
-      target_pos: [4.0, 0.]
-      tracking_err_tol: 0.25
+    - frame_id: base
+      name: Base Position
+      planner_type: BasePosTrajectoryLine
+      initial_pos: [0,0]
+      target_pos:
+      - 4.0
+      - 0.0
+      cruise_speed: 1.0
+      tracking_err_tol: 0.2
+    # - name: "Base Pos 1"
+    #   planner_type: "BaseSingleWaypoint"
+    #   frame_id: "base"
+    #   target_pos: [4.0, 0.]
+    #   tracking_err_tol: 0.25
 
 controller:
   home: "default"
-  
+
+simulation:
+  duration: 200
+
 include:
   - package: "mmseq_run"
     path: "config/robot/thing.yaml"
@@ -29,5 +41,5 @@ include:
     path: "config/map/SDF2D.yaml"
 
 logging:
-  log_dir: "/home/tracy/PhD/data/self_collision"
+  log_dir: "/home/tracy/PhD/data/self_collision/benchmark"
   log_level: 4 # 0 - not set, 10 - debug, 20 - info
