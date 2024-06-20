@@ -7,21 +7,18 @@
   <arg name="planner_config" default="default" doc="alternative controller config overwriting the one in config"/>
   <arg name="use_mpc" default="false" doc="use mpc as controller"/>
   <arg name="logging_sub_folder"  default="default" doc="save data to a sub folder if set"/>
-  <arg name="isaac-venv" value="/home/tracy/.local/share/ov/pkg/isaac_sim-2023.1.1/python.sh" />
-
-  <param name="/use_sim_time" value="True" type="bool"/>
 
   <!-- Simulation -->
-  <node pkg="mmseq_run" type="isaac_sim_ros.py" name="simulation_isaac" launch-prefix = "$(arg isaac-venv)" args="--config $(arg config)" output="screen" required="true" />
-
+  <include file="$(find mmseq_run)/launch/isaac_sim.launch">
+    <arg name="config" value="$(arg config)" />
+  </include>
+  
   <!-- Controller -->
   <node pkg="mmseq_run" type="controller_ros.py" name="controller_idk" output="screen" required="true" args="--config $(arg config) --ctrl_config $(arg ctrl_config) --planner_config $(arg planner_config) --logging_sub_folder $(arg logging_sub_folder)" unless="$(arg use_mpc)"/>
   <node pkg="mmseq_run" type="mpc_ros.py" name="controller_mpc" output="screen" required="true" args="--config $(arg config) --ctrl_config $(arg ctrl_config)  --planner_config $(arg planner_config) --logging_sub_folder $(arg logging_sub_folder)" if="$(arg use_mpc)"/>
-
+  
   <!-- Robot Model -->
-  <include file="$(find mobile_manipulation_central)/launch/thing_description.launch">
+  <include file="$(find mmseq_run)/launch/thing_description.launch">
     <!-- <arg name="visual_params" value="$(find ur_description)/config/ur10/visual_parameters.yaml" /> -->
   </include>
-  <node pkg="robot_state_publisher" type="robot_state_publisher" name="ur10_state_publisher" ns="ur10"/>
-  <node name="ridgeback_state_publisher" pkg="mobile_manipulation_central" type="ridgeback_state_publisher_node.py" output="screen"/>
 </launch>

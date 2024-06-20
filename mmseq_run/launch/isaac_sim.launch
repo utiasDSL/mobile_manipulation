@@ -1,0 +1,13 @@
+<?xml version="1.0"?>
+<!-- Launches the ROS-based simulation, which uses the real mpc_ros nodes talking to a PyBullet sim environment. -->
+
+<launch>
+  <arg name="config"/>
+  <arg name="isaac-venv" value="/home/tracy/.local/share/ov/pkg/isaac_sim-2023.1.1/python.sh" />
+
+  <param name="/use_sim_time" value="True" type="bool"/>
+
+  <!-- Simulation -->
+  <node pkg="mmseq_run" type="isaac_sim_ros.py" name="simulation_isaac" launch-prefix = "$(arg isaac-venv)" args="--config $(arg config)" output="screen" required="true" />
+
+</launch>
