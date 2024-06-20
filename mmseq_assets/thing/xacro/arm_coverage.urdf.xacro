@@ -13,7 +13,7 @@
           <sphere radius="${radius}"/>
         </geometry>
         <material name="coverage_ball_color">
-          <color rgba="1.0 0.0 0.0 0.0"/>
+          <color rgba="1.0 0.0 0.0 0.25"/>
         </material>
       </visual>
     </link>
@@ -21,42 +21,42 @@
 
 
   <!-- Coverage sphere for the forearm -->
-  <xacro:coverage_link_sphere name="ur10_arm_forearm_coverage_link" radius="0.075"/>
+  <xacro:coverage_link_sphere name="ur10_arm_forearm_coverage_link" radius="0.08"/>
   <joint name="ur10_arm_forearm_coverage_joint_5" type="fixed">
     <origin rpy="0 1.5708 0" xyz="-0.125 0 0.06"/>
     <parent link="ur10_arm_forearm_link"/>
     <child link="ur10_arm_forearm_coverage_link"/>
   </joint>
 
-  <xacro:coverage_link_sphere name="ur10_arm_forearm_coverage_link_1" radius="0.075"/>
+  <xacro:coverage_link_sphere name="ur10_arm_forearm_coverage_link_1" radius="0.08"/>
   <joint name="ur10_arm_forearm_coverage_joint_1" type="fixed">
     <origin rpy="0 1.5708 0" xyz="-0.2 0 0.06"/>
     <parent link="ur10_arm_forearm_link"/>
     <child link="ur10_arm_forearm_coverage_link_1"/>
   </joint>
 
-  <xacro:coverage_link_sphere name="ur10_arm_forearm_coverage_link_2" radius="0.075"/>
+  <xacro:coverage_link_sphere name="ur10_arm_forearm_coverage_link_2" radius="0.08"/>
   <joint name="ur10_arm_forearm_coverage_sphere_joint_2" type="fixed">
     <origin rpy="0 1.5708 0" xyz="-0.275 0 0.06"/>
     <parent link="ur10_arm_forearm_link"/>
     <child link="ur10_arm_forearm_coverage_link_2"/>
   </joint>
 
-  <xacro:coverage_link_sphere name="ur10_arm_forearm_coverage_link_3" radius="0.075"/>
+  <xacro:coverage_link_sphere name="ur10_arm_forearm_coverage_link_3" radius="0.08"/>
   <joint name="ur10_arm_forearm_coverage_sphere_joint_3" type="fixed">
     <origin rpy="0 1.5708 0" xyz="-0.35 0 0.06"/>
     <parent link="ur10_arm_forearm_link"/>
     <child link="ur10_arm_forearm_coverage_link_3"/>
   </joint>
 
-  <xacro:coverage_link_sphere name="ur10_arm_forearm_coverage_link_4" radius="0.075"/>
+  <xacro:coverage_link_sphere name="ur10_arm_forearm_coverage_link_4" radius="0.08"/>
   <joint name="ur10_arm_forearm_coverage_sphere_joint_4" type="fixed">
     <origin rpy="0 1.5708 0" xyz="-0.425 0 0.06"/>
     <parent link="ur10_arm_forearm_link"/>
     <child link="ur10_arm_forearm_coverage_link_4"/>
   </joint>
 
-  <xacro:coverage_link_sphere name="ur10_arm_forearm_coverage_link_5" radius="0.075"/>
+  <xacro:coverage_link_sphere name="ur10_arm_forearm_coverage_link_5" radius="0.08"/>
   <joint name="ur10_arm_forearm_coverage_sphere_joint_5" type="fixed">
     <origin rpy="0 1.5708 0" xyz="-0.5 0 0.06"/>
     <parent link="ur10_arm_forearm_link"/>
