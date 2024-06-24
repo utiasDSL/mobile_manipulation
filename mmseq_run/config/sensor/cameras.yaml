@@ -9,6 +9,7 @@ simulation:
         path: "config/sensor/femto_bolt_rgb.yaml"
       translation: [0.40171912, 0.02815671, 0.47058649]
       orientation: [0.99903973, -0.00720634,  0.04317019,  0.00200356]
+      ros_topic_name_space: "camera_base"
     - name: "camera_base_tof"
       type: "ToFCamera"
       prim_path: "/thing/base_link/camera_base/camera_base_tof"
@@ -17,6 +18,7 @@ simulation:
         path: "config/sensor/femto_bolt_depth.yaml"
       translation: [0.40171912, 0.02815671, 0.47058649]
       orientation: [0.99903973, -0.00720634,  0.04317019,  0.00200356]
+      ros_topic_name_space: "camera_base"
     - name: "camera_arm_rgb"
       type: "RGBCamera"
       prim_path: "/thing/gripper/camera_arm/camera_arm_rgb"
@@ -25,6 +27,7 @@ simulation:
         path: "config/sensor/femto_bolt_rgb.yaml"
       translation: [0.02375071, -0.16890217,  0.10801089]
       orientation: [ -0.51227125, 0.48877176,  0.47892914,  0.51894817  ]
+      ros_topic_name_space: "camera_hand"
     - name: "camera_arm_tof"
       type: "ToFCamera"
       prim_path: "/thing/gripper/camera_arm/camera_arm_tof"
@@ -33,4 +36,5 @@ simulation:
         path: "config/sensor/femto_bolt_depth.yaml"
       translation: [0.02375071, -0.16890217,  0.10801089]
       orientation: [ -0.51227125, 0.48877176,  0.47892914,  0.51894817  ]
-       
+      ros_topic_name_space: "camera_hand"
+      

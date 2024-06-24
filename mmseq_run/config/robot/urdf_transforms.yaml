@@ -1,0 +1,13 @@
+# no calibration for base-arm or tool
+base_to_arm_transform:
+  rpy: [0, 0, 0]
+  xyz: [0, 0, 0]
+gripped_object_transform:
+  rpy: [0, 0, 0]
+  xyz: [0, 0, 0.29]
+camera_base_transform:
+  rpy: [ -0.0142796, 0.0863938, 0.0033937 ]
+  xyz: [0.40171912, 0.02815671, 0.47058649]
+camera_hand_transform:
+  rpy: [ -0.0580618, -1.507188, -1.5292626 ]
+  xyz: [0.02375071, -0.16890217,  0.10801089]
