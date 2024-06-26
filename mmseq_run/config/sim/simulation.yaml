@@ -1,5 +1,5 @@
 simulation:
-  timestep: 0.01
+  timestep: 0.03
   duration: 25.
   gravity: [0, 0, -9.81]
 
