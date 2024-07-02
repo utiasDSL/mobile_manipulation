@@ -19,7 +19,7 @@ import mmseq_control.HTIDKC as HTIDKC
 from mmseq_control.robot import MobileManipulator3D
 import mmseq_plan.TaskManager as TaskManager
 from mmseq_utils import parsing
-from mmseq_utils.logging import DataLogger, DataPlotter
+from mmseq_utils.logging import DataLogger
 from mobile_manipulation_central.ros_interface import MobileManipulatorROSInterface, ViconObjectInterface
 
 class ControllerROSNode:

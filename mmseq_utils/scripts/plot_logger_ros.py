@@ -5,7 +5,8 @@ import os
 
 import pandas
 
-from mmseq_utils.logging import DataLogger, DataPlotter, multipage, construct_logger
+from mmseq_utils.logging import DataLogger
+from mmseq_utils.plotting import DataPlotter, multipage, construct_logger
 import matplotlib.pyplot as plt
 from pandas import DataFrame, concat
 

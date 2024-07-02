@@ -2,7 +2,8 @@
 # -*- coding: utf-8 -*-
 import argparse
 import os
-from mmseq_utils.logging import DataLogger, DataPlotter
+from mmseq_utils.logging import DataLogger
+from mmseq_utils.plotting import DataPlotter
 import matplotlib.pyplot as plt
 
 def plot_tracking(plotters):

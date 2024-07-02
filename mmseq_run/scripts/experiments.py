@@ -17,7 +17,7 @@ import mmseq_control_new.HTMPC as HTMPCNew
 import mmseq_plan.TaskManager as TaskManager
 from mmseq_simulator import simulation
 from mmseq_utils import parsing
-from mmseq_utils.logging import DataLogger, DataPlotter
+from mmseq_utils.logging import DataLogger
 
 
 def planner_coord_transform(q, ree, planners):

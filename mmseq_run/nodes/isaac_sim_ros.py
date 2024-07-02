@@ -1,4 +1,6 @@
 import sys
+import os
+import datetime
 
 from omni.isaac.kit import SimulationApp
 # URDF import, configuration and simulation sample
@@ -6,6 +8,7 @@ simulation_app = SimulationApp({"headless": False})
 
 import numpy as np
 from mmseq_utils import parsing
+from mmseq_utils.logging import DataLogger
 import rospy
 import yaml
 import argparse
@@ -20,9 +23,16 @@ def main():
     argv = rospy.myargv(argv=sys.argv)
 
     parser.add_argument("--config", required=True, help="Path to configuration file.")
+    parser.add_argument("--logging_sub_folder", type=str,
+                        help="save data in a sub folder of logging director")
+    
     args = parser.parse_args(argv[1:])
     
     config = parsing.load_config(args.config)
+
+    if args.logging_sub_folder != "default":
+        config["logging"]["log_dir"] = os.path.join(config["logging"]["log_dir"], args.logging_sub_folder)
+
     sim_config = config["simulation"]
 
     rospy.init_node("isaac_sim_ros")
@@ -35,6 +45,16 @@ def main():
     # disable gravity to use joint velocity control
     robot.disable_gravity()
 
+    # init logger
+    logger = DataLogger(config)
+    logger.add("sim_timestep", sim.timestep)
+    logger.add("duration", sim.duration)
+
+    logger.add("nq", sim_config["robot"]["dims"]["q"])
+    logger.add("nv", sim_config["robot"]["dims"]["v"])
+    logger.add("nx", sim_config["robot"]["dims"]["x"])
+    logger.add("nu", sim_config["robot"]["dims"]["u"])
+
     # if no cmd_vel comes, brake
     while not robot_ros_interface.ready() and simulation_app.is_running():
         sim.publish_feedback()
@@ -42,8 +62,10 @@ def main():
 
         sim.step(render=True)
         sim.publish_ros_topics()
-
-    while simulation_app.is_running():
+    
+    t0 = world.current_time
+    t = world.current_time
+    while not rospy.is_shutdown() and t - t0 <= sim.duration and simulation_app.is_running():
         t = world.current_time
 
         q = robot.get_joint_positions()
@@ -53,13 +75,28 @@ def main():
         base_cmd_vel_b = robot_ros_interface.base.cmd_vel
         R_wb = euler_to_rot_matrix([0,0,q[2]], extrinsic=False)
         base_cmd_vel = R_wb @ base_cmd_vel_b
-        sim.apply_joint_velocities(np.concatenate((base_cmd_vel, robot_ros_interface.arm.cmd_vel)))
+        cmd_vel_world = np.concatenate((base_cmd_vel, robot_ros_interface.arm.cmd_vel))
+        sim.apply_joint_velocities(cmd_vel_world)
 
         robot_ros_interface.publish_feedback(t=t, q=q, v=v)
+
+        # log
+        (r_ew_w, Q_we), (v_ew_w, ω_ew_w) = robot.tool_state()
+        logger.append("ts", t)
+        logger.append("xs", np.hstack((q,v)))
+        logger.append("cmd_vels", cmd_vel_world)
+        logger.append("r_ew_ws", r_ew_w)
+        logger.append("Q_wes", Q_we)
+        logger.append("v_ew_ws", v_ew_w)
+        logger.append("ω_ew_ws", ω_ew_w)
+
+        logger.append("r_bw_ws", q[:2])
         
         sim.step(render=True)
         sim.publish_ros_topics()
 
+    timestamp = datetime.datetime.now()
+    logger.save(timestamp, "sim")
     simulation_app.close()
 
 if __name__ == "__main__":

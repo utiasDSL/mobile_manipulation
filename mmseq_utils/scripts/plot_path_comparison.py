@@ -4,7 +4,7 @@ import os
 import pandas
 import numpy as np
 
-from mmseq_utils.logging import DataLogger, DataPlotter, multipage, construct_logger
+from mmseq_utils.plotting import construct_logger
 from mmseq_utils import parsing
 import matplotlib.pyplot as plt
 import seaborn as sns

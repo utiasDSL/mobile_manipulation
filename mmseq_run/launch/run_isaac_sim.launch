@@ -13,6 +13,7 @@
   <include file="$(find mmseq_run)/launch/isaac_sim.launch">
     <arg name="config" value="$(arg config)" />
     <arg name="isaac-venv" value="$(arg isaac-venv)" />
+    <arg name="logging_sub_folder" value="$(arg logging_sub_folder)" />
   </include>
   
   <!-- Controller -->

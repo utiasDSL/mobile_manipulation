@@ -5,7 +5,8 @@ import datetime
 import time
 import numpy as np
 from mmseq_simulator import simulation
-from mmseq_utils.logging import DataLogger, DataPlotter
+from mmseq_utils.logging import DataLogger
+from mmseq_utils.plotting import DataPlotter
 from mmseq_utils import parsing
 
 def main():

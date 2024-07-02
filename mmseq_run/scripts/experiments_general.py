@@ -15,7 +15,7 @@ from mmseq_control.IDKC import IKCPrioritized
 from mmseq_simulator import simulation
 from mmseq_plan.TaskManager import SoTCycle, SoTTimed, SoTStatic
 from mmseq_utils import parsing
-from mmseq_utils.logging import DataLogger, DataPlotter
+from mmseq_utils.logging import DataLogger
 
 
 def main():

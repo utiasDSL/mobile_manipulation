@@ -10,7 +10,7 @@ from holoviews import opts
 hv.extension('bokeh')
 opts.defaults(opts.HeatMap(radial=True, width=800, height=800, tools=["hover"]))
 
-from mmseq_utils.logging import DataLogger, DataPlotter, multipage
+from mmseq_utils.plotting import DataPlotter, multipage
 from matplotlib.colors import LinearSegmentedColormap
 from mmseq_utils import math, parsing
 import matplotlib.pyplot as plt
