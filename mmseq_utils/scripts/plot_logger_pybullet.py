@@ -13,8 +13,7 @@ def plot_tracking(plotters):
     plotters["sim"].plot_base_position(base_axes)
 
 def construct_logger(path_to_folder):
-    path_to_npz = os.path.join(path_to_folder, "data.npz")
-    plotter = DataPlotter.from_npz(path_to_npz)
+    plotter = DataPlotter.from_PYSIM_results(path_to_folder)
 
     return plotter
 
