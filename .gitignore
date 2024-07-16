@@ -2,3 +2,4 @@
 *.pdf
 mmseq_control/src/mmseq_control/casadi_c/*
 mmseq_control_new/acados_outputs/*
+*.urdf
