@@ -33,6 +33,10 @@ controller:
     sdf: False
     static_obstacles: False
 
+simulation:
+  static_obstacles:
+    enabled: True
+
 include:
   - package: "mmseq_run"
     path: "config/robot/thing.yaml"
