@@ -1,0 +1,11 @@
+cylinder:
+  - name: "cylinder_1"
+    radius: 0.25
+    length: 1.0
+    xyz: [4, -0.25, 0.5]
+    rpy: [0, 0, 0]
+  - name: "cylinder_2"
+    radius: 0.25
+    length: 1.0
+    xyz: [6, -0.25, 0.5]
+    rpy: [0, 0, 0]

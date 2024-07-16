@@ -9,6 +9,7 @@ controller:
   HT_MaxIntvl: 1
   ST_MaxIntvl: 1
   hierarchy_constraint_type: "HierarchicalTrackingConstraint"    # error, cost_value, cost_value_sum
+  collision_constraint_type: "SignedDistanceConstraint" # SignedDistanceConstraint or SignedDistanceConstraintCBF 
   ctrl_rate: 10 #hz
   cmd_vel_pub_rate: 100 # hz
   soft_cst: True
@@ -25,10 +26,13 @@ controller:
   collision_constraints_softend:
     self: False
     sdf: True
+    static_obstacles: True
   
   collision_safety_margin:
     self: 0.15
     sdf: 0.15
+    static_obstacles: 0.15
+
   # soft constraints parameters
   xu_soft:
     mu: 0.001
@@ -40,6 +44,10 @@ controller:
     sdf:
       mu: 0.0001
       zeta: 0.005
+    static_obstacles:
+      mu: 0.0001
+      zeta: 0.005 
+      
   ee_upward_soft:
     mu: 0.001
     zeta: 0.01

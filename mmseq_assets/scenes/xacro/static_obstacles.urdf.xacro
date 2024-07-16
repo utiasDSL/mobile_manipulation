@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<robot name="StaticObstacles" xmlns:xacro="http://www.ros.org/wiki/xacro">
+    <xacro:arg name="obstacle_params_file" default="$(find mmseq_run)/config/scene/simple_obstacles.yaml"/>
+
+    <!-- Load the base and tool transforms -->
+    <xacro:property name="obstacle_params_file" value="$(arg obstacle_params_file)" />
+    <xacro:property name="obstacle_parameters" value="${xacro.load_yaml(obstacle_params_file)}"/>
+
+    <material name="red">
+        <color rgba="1.0 0.0 0.0 1.0"/>
+    </material>
+
+    <xacro:macro name="obstacle_link" params="name material *geometry">
+        <link name="${name}">
+            <collision>
+            <origin rpy="0 0 0" xyz="0 0 0" />
+            <xacro:insert_block name="geometry" />
+            </collision>
+        <visual>
+            <origin rpy="0 0 0" xyz="0 0 0" />
+            <xacro:insert_block name="geometry" />
+            <material name="${material}"/>
+        </visual>
+        </link>
+    </xacro:macro>
+
+    <link name="obstacle_base_link"/>
+
+    <xacro:macro name="loop_cylinder" params="items:=^">
+            <xacro:if value="${items}">
+                    <!-- pop first item from list -->
+                    <xacro:property name="item" value="${items.pop(0)}"/>
+
+                    <xacro:obstacle_link name="obstacle_${item['name']}_link" material="red">
+                        <geometry>
+                        <cylinder radius="${item['radius']}" length="${item['length']}"/>
+                        </geometry>
+                    </xacro:obstacle_link>
+                    <joint name="obstacle_${item['name']}_joint" type="fixed">
+                        <origin rpy="${item['rpy'][0]} ${item['rpy'][1]} ${item['rpy'][2]}" xyz="${item['xyz'][0]} ${item['xyz'][1]} ${item['xyz'][2]}"/>
+                        <parent link="obstacle_base_link"/>
+                        <child link="obstacle_${item['name']}_link"/>
+                    </joint>
+
+
+                    <!-- recursively call myself -->
+                    <xacro:loop_cylinder/>
+            </xacro:if>
+    </xacro:macro>
+
+    <!-- define the list of items to iterate -->
+    <xacro:loop_cylinder items="${list(obstacle_parameters['cylinder'])}"/>
+
+</robot>

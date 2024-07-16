@@ -13,6 +13,7 @@ from mmseq_control.robot import CasadiModelInterface as ModelInterface
 from mmseq_utils.math import wrap_pi_array
 from mmseq_utils.casadi_struct import casadi_sym_struct
 from mmseq_utils.parsing import parse_ros_path
+import mmseq_control_new.MPCConstraints as MPCConstraints
 from mmseq_control_new.MPCCostFunctions import EEPos3CostFunction, BasePos2CostFunction, ControlEffortCostFunction, EEPos3BaseFrameCostFunction, SoftConstraintsRBFCostFunction, RegularizationCostFunction, CostFunctions
 from mmseq_control_new.MPCConstraints import SignedDistanceConstraint
 import mobile_manipulation_central as mm
@@ -48,17 +49,28 @@ class MPC():
         self.collisionCsts = {}
         for name in self.collision_link_names:
             sd_fcn = self.model_interface.getSignedDistanceSymMdls(name)
-            sd_cst = SignedDistanceConstraint(self.robot, sd_fcn, 
-                                              self.params["collision_safety_margin"][name], name)
+            collision_cst_type = getattr(MPCConstraints, self.params["collision_constraint_type"])
+            if name in self.model_interface.scene.collision_link_names["static_obstacles"]:
+                sd_cst = collision_cst_type(self.robot, sd_fcn,
+                                            self.params["collision_safety_margin"]["static_obstacles"], name)
+            else:
+                sd_cst = collision_cst_type(self.robot, sd_fcn,
+                                            self.params["collision_safety_margin"][name], name)
             self.collisionCsts[name] = sd_cst
             
         self.collisionSoftCsts = {}
         for name,sd_cst in self.collisionCsts.items():
             expand = True if name !="sdf" else False
-            self.collisionSoftCsts[name] = SoftConstraintsRBFCostFunction(self.params["collision_soft"][name]["mu"],
-                                                                          self.params["collision_soft"][name]["zeta"],
-                                                                          sd_cst, name+"CollisionSoftCst",
-                                                                          expand=expand)
+            if name in self.model_interface.scene.collision_link_names["static_obstacles"]:
+                self.collisionSoftCsts[name] = SoftConstraintsRBFCostFunction(self.params["collision_soft"]["static_obstacles"]["mu"],
+                                                                            self.params["collision_soft"]["static_obstacles"]["zeta"],
+                                                                            sd_cst, name+"CollisionSoftCst",
+                                                                            expand=expand)
+            else:
+                self.collisionSoftCsts[name] = SoftConstraintsRBFCostFunction(self.params["collision_soft"][name]["mu"],
+                                                                            self.params["collision_soft"][name]["zeta"],
+                                                                            sd_cst, name+"CollisionSoftCst",
+                                                                            expand=expand)
         self.x_bar = np.zeros((self.N + 1, self.nx))  # current best guess x0,...,xN
         self.x_bar[:, :self.DoF] = self.home
         self.u_bar = np.zeros((self.N, self.nu))  # current best guess u0,...,uN-1
@@ -309,7 +321,12 @@ class STMPC(MPC):
         # costs += [cost for cost in self.collisionSoftCsts.values()]
         constraints = []
         for name in self.collision_link_names:
-            if self.params["collision_constraints_softend"][name]:
+            if name in self.model_interface.scene.collision_link_names["static_obstacles"]:
+                softened = self.params["collision_constraints_softend"]["static_obstacles"]
+            else:
+                softened = self.params["collision_constraints_softend"][name]
+
+            if softened:
                 costs.append(self.collisionSoftCsts[name])
             else:
                 constraints.append(self.collisionCsts[name])
