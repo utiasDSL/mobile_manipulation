@@ -164,3 +164,39 @@ class SignedDistanceConstraint(NonlinearConstraint):
         self.g_grad_fcn = cs.Function("g_grad", [self.x_sym, self.u_sym, self.p_sym], [self.g_eqn])
 
         self.slack_enabled = True
+
+class SignedDistanceConstraintCBF(NonlinearConstraint):
+    def __init__(self, robot_mdl, signed_distance_fcn, d_safe, name="obstacle"):
+        """ Signed Distance Constraint
+                    h(x) = (sd(x_k, param1, param2, ...) - d_safe) > 0
+            Signed Distance CBF Constraint
+                    L_fh(x) + L_gh(x) + gamma * h(x) >= 0
+                    x_d = f(x) + g(x)u
+
+        :param robot_mdl: class mmseq_control.robot.MobileManipulator3D
+        :param signed_distance_fcn: signed distance model, casadi function
+        :param d_safe: safe clearance, scalar, same for all body pairs
+        :param name: name of this constraint
+        """
+        nx = robot_mdl.ssSymMdl["nx"]
+        nu = robot_mdl.ssSymMdl["nu"]
+        nq = robot_mdl.q_sym.size()[0]
+        ng = signed_distance_fcn.size_out(0)[0]
+        p_sym = signed_distance_fcn.mx_in()[1:]
+        p_name = signed_distance_fcn.name_in()[1:]
+        p_dict = {name:sym for (name, sym) in zip(p_name, p_sym)}
+        gamma = 0.25
+
+        super().__init__(nx, nu, ng, None, p_dict, name)
+
+        h_eqn = signed_distance_fcn(self.x_sym[:nq], *[self.p_struct[k] for k in self.p_dict.keys()]) - d_safe
+        h_grad_eqn = cs.jacobian(h_eqn, self.x_sym)
+        
+        self.g_eqn = -(h_grad_eqn @ robot_mdl.ssSymMdl["fmdl"](self.x_sym, self.u_sym) + gamma*h_eqn)
+
+        self.g_fcn = cs.Function("g_"+self.name, [self.x_sym, self.u_sym, self.p_sym], [self.g_eqn])
+
+        self.g_grad_eqn = cs.jacobian(self.g_eqn, cs.veccat(self.u_sym, self.x_sym))
+        self.g_grad_fcn = cs.Function("g_grad", [self.x_sym, self.u_sym, self.p_sym], [self.g_grad_eqn])
+
+        self.slack_enabled = True
