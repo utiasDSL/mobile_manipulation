@@ -1,9 +1,9 @@
 controller:
   # local map params
   map:
-    default_val: 1.8
+    default_val: 6.0
     map_coverage: [4, 4]
-    voxel_size: 0.1
+    voxel_size: 0.5
   
   # Signed Distance Field Type, SDF3D vs SDF2D
   sdf_type: "SDF2DNew"
