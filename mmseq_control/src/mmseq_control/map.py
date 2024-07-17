@@ -426,7 +426,12 @@ class SDF2DNew:
                                           ["x_query", "x_grid", "y_grid", "value"], ["sd(x)"])
 
         self.hess_eqn, self.grad_eqn = cs.hessian(self.sdf_eqn, self.x_sym)
+        grad_eqn_normalized_list = [self.grad_eqn, self.grad_eqn/cs.norm_2(self.grad_eqn)]
+        self.grad_eqn_normalized = cs.conditional(cs.norm_2(self.grad_eqn)>0.01,
+                                                  grad_eqn_normalized_list, 0 , False)
         self.grad_fcn = cs.Function('map_grad', [self.x_sym, self.xg_sym, self.yg_sym, self.v_sym], [self.grad_eqn])
+        self.grad_fcn_normalzied = cs.Function('map_grad_normalized', [self.x_sym, self.xg_sym, self.yg_sym, self.v_sym], [self.grad_eqn_normalized])
+
 
         self.xg, self.yg = self._get_default_grid()
         self.v = np.ones(self.map_size[0]* self.map_size[1]) * self.default_val
@@ -446,19 +451,23 @@ class SDF2DNew:
 
         X,Y=np.meshgrid(x_1d, y_1d)
         Z=np.zeros(X.shape)
+        dZdX = np.zeros((2, X.shape[0], X.shape[1]))
         # This makes the unobserved area free space
         for i in range(len(x_1d)):
             for j in range(len(y_1d)):
                 Z[j][i] = self.query_val(x_1d[i], y_1d[j])
+                dZdX[:, j, i] = self.query_grad(x_1d[i], y_1d[j]).flatten()
         #print(Z)
 
         # fig, ax = plt.subplots(subplot_kw={"projection": "3d"})
         fig, ax = plt.subplots()
-        levels = np.linspace(-0.5, 1.5, int(2./0.25)+1)
+        levels = np.linspace(-0.5, self.default_val, int((self.default_val + 0.5)/0.25)+1)
 
         cs = ax.contour(X,Y,Z, levels)
         ax.clabel(cs, levels)
         ax.grid()
+        ax.quiver(X, Y, dZdX[0],dZdX[1], scale_units="xy", scale=1, color='gray')
+
         ax.set_title("Signed Distance Field $sd(x)$")   # 0.6 is base collision radius
         ax.set_xlabel("x(m)")
         ax.set_ylabel("y(m)")
