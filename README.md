@@ -59,6 +59,12 @@ python3 -m pip install -r requirements.txt
 roscd mmseq_run/scripts
 python3 experiments.py --config $(rospack find mmseq_run)/config/self_collision_avoidance.yaml --GUI
 ```
+The simulation will put the simulation data and the config file in a folder specified in the config file. To visualize tracking performance,
+```
+roscd mmseq_utils/scripts
+python3 plot_logger_pybullet.py --folder [path_to_data_folder] --tracking
+```
+
 
 ## Run controller and Simulation asynchronously in two ROS nodes
 To use Pybullet Sim
