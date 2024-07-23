@@ -4,6 +4,10 @@ controller:
     default_val: 1.8
     map_coverage: [3, 3, 0.9]
     voxel_size: 0.1
+    
+    filter_enabled: false
+    filter_type: "gaussian"   # gaussian or tv
+  
   
   # Signed Distance Field Type, SDF3D vs SDF2D
   sdf_type: "SDF3DNew"
