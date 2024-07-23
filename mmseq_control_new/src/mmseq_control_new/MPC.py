@@ -416,6 +416,12 @@ class STMPC(MPC):
                     curr_p_map["value_sdf"] = params[2]
             t2 = time.perf_counter()
             self.log["time_ocp_set_params_map"] += t2 - t1
+
+            if self.params["collision_constraint_type"] == "SignedDistanceConstraintCBF":
+                for name in self.collision_link_names:
+                    p_name = "_".join(["gamma", name])
+                    curr_p_map[p_name] = self.params["collision_cbf_gamma"]
+
             # set initial guess
             t1 = time.perf_counter()
             self.ocp_solver.set(i, 'x', self.x_bar[i])

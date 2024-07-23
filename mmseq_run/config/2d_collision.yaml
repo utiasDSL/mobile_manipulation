@@ -25,6 +25,7 @@ controller:
   sdf_collision_avoidance_enabled: False
   self_collision_avoidance_enabled: False
   static_obstacles_collision_avoidance_enabled: True
+  collision_cbf_gamma: 0.5
 
   collision_constraint_type: "SignedDistanceConstraintCBF" # SignedDistanceConstraint or SignedDistanceConstraintCBF 
   type: "STMPC"

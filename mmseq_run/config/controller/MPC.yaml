@@ -47,7 +47,9 @@ controller:
     static_obstacles:
       mu: 0.0001
       zeta: 0.005 
-      
+  
+  collision_cbf_gamma: 0.9
+  
   ee_upward_soft:
     mu: 0.001
     zeta: 0.01

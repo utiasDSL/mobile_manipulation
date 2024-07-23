@@ -188,17 +188,17 @@ class SignedDistanceConstraintCBF(NonlinearConstraint):
         p_sym = signed_distance_fcn.mx_in()[1:]
         p_name = signed_distance_fcn.name_in()[1:]
         p_dict = {name:sym for (name, sym) in zip(p_name, p_sym)}
-        gamma = 0.9
+        p_dict["gamma"] = cs.MX.sym('gamma')
 
         super().__init__(nx, nu, ng, None, p_dict, name)
 
-        h_eqn = signed_distance_fcn(self.x_sym[:nq], *[self.p_struct[k] for k in self.p_dict.keys()]) - d_safe
+        h_eqn = signed_distance_fcn(self.x_sym[:nq], *[self.p_struct[k] for k in p_name]) - d_safe
         h_grad_eqn = cs.jacobian(h_eqn, self.x_sym)
         # h_grad_eqn_normalized_list = [h_grad_eqn, h_grad_eqn/cs.norm_2(h_grad_eqn)]
         # h_grad_eqn_normalized = cs.conditional(cs.norm_2(h_grad_eqn)>0.01,
         #                                           h_grad_eqn_normalized_list, 0 , False)
         
-        self.g_eqn = -(h_grad_eqn @ robot_mdl.ssSymMdl["fmdl"](self.x_sym, self.u_sym) + gamma*h_eqn)
+        self.g_eqn = -(h_grad_eqn @ robot_mdl.ssSymMdl["fmdl"](self.x_sym, self.u_sym) + self.p_dict["gamma"]*h_eqn)
 
         self.g_fcn = cs.Function("g_"+self.name, [self.x_sym, self.u_sym, self.p_sym], [self.g_eqn])
 
