@@ -546,6 +546,7 @@ class SDF3DNew:
         y_idx = shown[1]
         X,Y=np.meshgrid(data_1d[x_idx], data_1d[y_idx])
         Z=np.zeros(X.shape)
+        dZdX = np.zeros((3, X.shape[0], X.shape[1]))
         # This makes the unobserved area free space
         for i in range(Nx):
             for j in range(Ny):
@@ -554,6 +555,7 @@ class SDF3DNew:
                     temp = [i,j,k]
                     Z[temp[y_idx]][temp[x_idx]] = val
                     # print(f" {(data_1d[0][i], data_1d[1][j], data_1d[2][k])} = {val}")
+                    dZdX[:, temp[y_idx], temp[x_idx]] = self.query_grad(data_1d[0][i], data_1d[1][j], data_1d[2][k]).flatten()
 
 
         fig, ax = plt.subplots()
@@ -561,6 +563,7 @@ class SDF3DNew:
 
         cs = ax.contour(X,Y,Z, levels)
         ax.clabel(cs, levels)   
+        ax.quiver(X, Y, dZdX[x_idx],dZdX[y_idx], scale_units="xy", scale=1, color='gray')
         ax.grid()
         ax.set_title(f"Signed Distance Field sd({dims[x_idx]}, {dims[y_idx]}, {data_1d[not_shown][0]})")   # 0.6 is base collision radius
         ax.set_xlabel(labels[x_idx])
