@@ -26,7 +26,7 @@ controller:
   home: "default"
   self_collision_avoidance_enabled: True
   sdf_collision_avoidance_enabled: False
-  type: "HTMPC"
+  type: "STMPC"
 
 
 simulation:
@@ -45,5 +45,5 @@ include:
     path: "config/map/SDF2D.yaml"
 
 logging:
-  log_dir: "/home/tracy/PhD/data/self_collision"
+  log_dir: "/home/ubuntu/"
   log_level: 4 # 0 - not set, 10 - debug, 20 - info
