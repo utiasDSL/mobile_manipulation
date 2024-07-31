@@ -15,7 +15,7 @@ from mmseq_utils.casadi_struct import casadi_sym_struct
 from mmseq_utils.parsing import parse_ros_path
 import mmseq_control_new.MPCConstraints as MPCConstraints
 from mmseq_control_new.MPCCostFunctions import EEPos3CostFunction, BasePos2CostFunction, ControlEffortCostFunction, EEPos3BaseFrameCostFunction, SoftConstraintsRBFCostFunction, RegularizationCostFunction, CostFunctions
-from mmseq_control_new.MPCConstraints import SignedDistanceConstraint
+from mmseq_control_new.MPCConstraints import SignedDistanceConstraint, StateBoxConstraints, ControlBoxConstraints
 import mobile_manipulation_central as mm
 INF = 1e5
 
@@ -41,6 +41,7 @@ class MPC():
         self.BasePos2Cost = BasePos2CostFunction(self.robot, config["cost_params"]["BasePos2"])
         self.CtrlEffCost = ControlEffortCostFunction(self.robot, config["cost_params"]["Effort"])
         self.RegularizationCost = RegularizationCostFunction(self.nx, self.nu)
+        
         self.collision_link_names = ["self"] if self.params["self_collision_avoidance_enabled"] else []
         self.collision_link_names += self.model_interface.scene.collision_link_names["static_obstacles"] \
             if self.params["static_obstacles_collision_avoidance_enabled"] else []
@@ -71,6 +72,10 @@ class MPC():
                                                                             self.params["collision_soft"][name]["zeta"],
                                                                             sd_cst, name+"CollisionSoftCst",
                                                                             expand=expand)
+        
+        self.stateCst = StateBoxConstraints(self.robot)
+        self.controlCst = ControlBoxConstraints(self.robot)
+
         self.x_bar = np.zeros((self.N + 1, self.nx))  # current best guess x0,...,xN
         self.x_bar[:, :self.DoF] = self.home
         self.u_bar = np.zeros((self.N, self.nu))  # current best guess u0,...,uN-1
@@ -497,6 +502,10 @@ class STMPC(MPC):
         for name in self.collision_link_names: 
             self.log["_".join([name, "constraint"])] = self.evaluate_constraints(self.collisionCsts[name], 
                                                                    self.x_bar, self.u_bar, curr_p_map_bar)
+        
+        self.log["state_constraint"] = self.evaluate_constraints(self.stateCst, self.x_bar, self.u_bar, curr_p_map_bar)
+        self.log["control_constraint"] = self.evaluate_constraints(self.controlCst, self.x_bar, self.u_bar, curr_p_map_bar)
+
         return self.v_cmd, self.u_prev, self.u_bar.copy(), self.x_bar[:, 9:].copy()
 
     def _get_log(self):
@@ -512,6 +521,8 @@ class STMPC(MPC):
                "time_ocp_set_params_set_x" : 0,
                "time_ocp_set_params_tracking" : 0,
                "time_ocp_set_params_setp" : 0,
+               "state_constraint": 0,
+               "control_constraint": 0
                }
         for name in self.collision_link_names:
             log["_".join([name, "constraint"])]= 0
