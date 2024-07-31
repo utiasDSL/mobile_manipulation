@@ -148,11 +148,15 @@ class MPC():
         cost_p_map = cost_p_struct(0)
 
         vals = []
-        for k in range(self.N):
+        for k in range(self.N+1):
             nlp_p_map = nlp_p_map_bar[k]
             for key in cost_p_map.keys():
                 cost_p_map[key] = nlp_p_map[key]
-            v = constraints.check(x_bar[k], u_bar[k], cost_p_map.cat.full().flatten())
+            if k < self.N:
+                v = constraints.check(x_bar[k], u_bar[k], cost_p_map.cat.full().flatten())
+            else:
+                v = constraints.check(x_bar[k], u_bar[k-1], cost_p_map.cat.full().flatten())
+
             vals.append(v)
         return vals
 
@@ -430,6 +434,9 @@ class STMPC(MPC):
             # set initial guess
             t1 = time.perf_counter()
             self.ocp_solver.set(i, 'x', self.x_bar[i])
+            if i < self.N:
+                self.ocp_solver.set(i, 'u', self.u_bar[i])
+
             t2 = time.perf_counter()
             self.log["time_ocp_set_params_set_x"] += t2 - t1
             # set parameters for tracking cost functions
@@ -485,6 +492,10 @@ class STMPC(MPC):
             for i in range(self.N):
                 print(f"stage {i}: pi: {self.ocp_solver.get(i, 'pi')}")
 
+            for i in range(self.N):
+                print(f"stage {i}: sl: {self.ocp_solver.get(i, 'sl')}")
+            for i in range(self.N):
+                print(f"stage {i}: su: {self.ocp_solver.get(i, 'su')}")
             if self.params["acados"]["raise_exception_on_failure"]:
                 raise Exception(f'acados acados_ocp_solver returned status {self.solver_status}')
 
