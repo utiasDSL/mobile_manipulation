@@ -35,7 +35,7 @@ controller:
   acados:
     ocp_solver_options:
       nlp_solver_max_iter: 100
-      qp_solver_warm_start: 1
+      qp_solver_warm_start: 2
     slack_enabled:
       x: True
       x_e: True

@@ -57,7 +57,7 @@ controller:
   # weights for each cost function
   cost_params:
     EEPos3:
-      Qk: 10.0
+      Qk: 1.0
       P: 1
     BasePos2:
       Qk: 1.
@@ -84,7 +84,7 @@ controller:
     use_custom_hess: True
     use_terminal_cost: False
     ocp_solver_options:
-      qp_solver: "PARTIAL_CONDENSING_HPIPM"
+      qp_solver: "FULL_CONDENSING_HPIPM"
       # FULL_CONDENSING_QPOASES
       # PARTIAL_CONDENSING_HPIPM, FULL_CONDENSING_QPOASES, FULL_CONDENSING_HPIPM,
       # PARTIAL_CONDENSING_QPDUNES, PARTIAL_CONDENSING_OSQP, FULL_CONDENSING_DAQP
@@ -94,9 +94,9 @@ controller:
       nlp_solver_type: "SQP"  #SQP_RTI, SQP
       globalization: "MERIT_BACKTRACKING"
       qp_solver_iter_max: 100
-      nlp_solver_tol_stat: 1.0e-05
+      nlp_solver_tol_stat: 1.0e-03
       nlp_solver_tol_eq: 1.0e-03
-      nlp_solver_tol_ineq: 1.0e-04
+      nlp_solver_tol_ineq: 1.0e-02
       nlp_solver_iter_max: 100
       qp_solver_warm_start: 1
     slack_enabled:

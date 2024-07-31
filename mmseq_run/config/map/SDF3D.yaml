@@ -2,11 +2,13 @@ controller:
   # local map params
   map:
     default_val: 1.8
-    map_coverage: [3, 3, 0.9]
+    map_coverage: [4, 4, 1.49]
     voxel_size: 0.1
     
-    filter_enabled: false
-    filter_type: "gaussian"   # gaussian or tv
+    filter_enabled: False
+    filter_type: "tv"   # gaussian or tv
+    guassian_filter_sigma: 3
+    tv_filter_weight: 0.2
   
   
   # Signed Distance Field Type, SDF3D vs SDF2D
