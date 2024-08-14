@@ -7,6 +7,7 @@ import numpy as np
 import casadi as cs
 from spatialmath.base import rotz
 from acados_template import AcadosModel, AcadosOcp, AcadosOcpSolver
+from scipy.interpolate import interp1d
 
 from mmseq_control.robot import MobileManipulator3D as MM
 from mmseq_control.robot import CasadiModelInterface as ModelInterface
