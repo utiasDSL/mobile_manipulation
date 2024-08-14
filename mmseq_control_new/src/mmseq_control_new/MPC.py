@@ -13,7 +13,7 @@ from mmseq_control.robot import MobileManipulator3D as MM
 from mmseq_control.robot import CasadiModelInterface as ModelInterface
 from mmseq_utils.math import wrap_pi_array
 from mmseq_utils.casadi_struct import casadi_sym_struct
-from mmseq_utils.parsing import parse_ros_path
+from mmseq_utils.parsing import parse_ros_path, parse_path
 import mmseq_control_new.MPCConstraints as MPCConstraints
 from mmseq_control_new.MPCCostFunctions import EEPos3CostFunction, BasePos2CostFunction, ControlEffortCostFunction, EEPos3BaseFrameCostFunction, SoftConstraintsRBFCostFunction, RegularizationCostFunction, CostFunctions
 from mmseq_control_new.MPCConstraints import SignedDistanceConstraint, StateBoxConstraints, ControlBoxConstraints
@@ -161,6 +161,62 @@ class MPC():
 
             vals.append(v)
         return vals
+    
+    def evaluate_sdf_h_fcn(self, constraints: MPCConstraints.Constraint, x_bar, u_bar, nlp_p_map_bar):
+        ps = []
+        cost_p_dict = constraints.get_p_dict()
+        cost_p_struct = casadi_sym_struct(cost_p_dict)
+        cost_p_map = cost_p_struct(0)
+
+        vals = []
+        for k in range(self.N+1):
+            nlp_p_map = nlp_p_map_bar[k]
+            for key in cost_p_map.keys():
+                cost_p_map[key] = nlp_p_map[key]
+            if k < self.N:
+                v = constraints.h_fcn(x_bar[k], u_bar[k], cost_p_map.cat.full().flatten())
+            else:
+                v = constraints.h_fcn(x_bar[k], u_bar[k-1], cost_p_map.cat.full().flatten())
+
+            vals.append(v)
+        return vals
+    
+    def evaluate_sdf_xdot_fcn(self, constraints: MPCConstraints.Constraint, x_bar, u_bar, nlp_p_map_bar):
+        ps = []
+        cost_p_dict = constraints.get_p_dict()
+        cost_p_struct = casadi_sym_struct(cost_p_dict)
+        cost_p_map = cost_p_struct(0)
+
+        vals = []
+        for k in range(self.N+1):
+            nlp_p_map = nlp_p_map_bar[k]
+            for key in cost_p_map.keys():
+                cost_p_map[key] = nlp_p_map[key]
+            if k < self.N:
+                v = constraints.xdot_fcn(x_bar[k], u_bar[k], cost_p_map.cat.full().flatten())
+            else:
+                v = constraints.xdot_fcn(x_bar[k], u_bar[k-1], cost_p_map.cat.full().flatten())
+
+            vals.append(v)
+        return vals
+
+    def evaluate_constraints_gradient(self, constraints: MPCConstraints.Constraint, x_bar, u_bar, nlp_p_map_bar):
+        ps = []
+        cost_p_dict = constraints.get_p_dict()
+        cost_p_struct = casadi_sym_struct(cost_p_dict)
+        cost_p_map = cost_p_struct(0)
+
+        vals = []
+        for k in range(self.N+1):
+            nlp_p_map = nlp_p_map_bar[k]
+            for key in cost_p_map.keys():
+                cost_p_map[key] = nlp_p_map[key]
+            if k < self.N:
+                v = constraints.g_grad_fcn(x_bar[k], u_bar[k], cost_p_map.cat.full().flatten()).T
+            else:
+                v = constraints.g_grad_fcn(x_bar[k], u_bar[k-1], cost_p_map.cat.full().flatten()).T
+            vals.append(v)
+        return vals
 
     def _construct(self, costs, constraints, num_terminal_cost, name="MM"):
         # Construct AcadosModel
@@ -222,16 +278,24 @@ class MPC():
         ocp.constraints.ubu = np.array(self.ssSymMdl["ub_u"])
         ocp.constraints.idxbu = np.arange(self.nu)
 
+        if self.params["acados"]["slack_enabled"]["u"]:
+            ocp.constraints.idxsbu = np.arange(self.nu)
+            ocp.constraints.lsbu = np.zeros(self.nu)
+            ocp.constraints.usbu = np.zeros(self.nu)
+            nsu = self.nu
+        else:
+            nsu = 0
+
         # state constraints
         ocp.constraints.lbx = np.array(self.ssSymMdl["lb_x"])
         ocp.constraints.ubx = np.array(self.ssSymMdl["ub_x"])
         ocp.constraints.idxbx = np.arange(self.nx)
 
         if self.params["acados"]["slack_enabled"]["x"]:
-            ocp.constraints.idxsbx = np.arange(self.DoF)
-            ocp.constraints.lsbx = np.zeros(self.DoF)
-            ocp.constraints.usbx = np.zeros(self.DoF)
-            nsx = self.DoF
+            ocp.constraints.idxsbx = np.arange(self.nx)
+            ocp.constraints.lsbx = np.zeros(self.nx)
+            ocp.constraints.usbx = np.zeros(self.nx)
+            nsx = self.nx
         else:
             nsx = 0
 
@@ -240,10 +304,10 @@ class MPC():
         ocp.constraints.idxbx_e = np.arange(self.nx)
 
         if self.params["acados"]["slack_enabled"]["x_e"]:
-            ocp.constraints.idxsbx_e = np.arange(self.DoF)
-            ocp.constraints.lsbx_e = np.zeros(self.DoF)
-            ocp.constraints.usbx_e = np.zeros(self.DoF)
-            nsx_e = self.DoF
+            ocp.constraints.idxsbx_e = np.arange(self.nx)
+            ocp.constraints.lsbx_e = np.zeros(self.nx)
+            ocp.constraints.usbx_e = np.zeros(self.nx)
+            nsx_e = self.nx
         else:
             nsx_e = 0
 
@@ -297,25 +361,26 @@ class MPC():
 
             
         # TODO: slack variables?
-        ns = nsx + nsh
+        ns = nsx + nsu + nsh
         if ns > 0:
             ocp.cost.Zl = np.eye(ns) * 10
             ocp.cost.Zu = np.eye(ns) * 10
-            ocp.cost.zl = np.ones(ns) * 1000
-            ocp.cost.zu = np.ones(ns) * 1000
+            ocp.cost.zl = np.ones(ns) * 0.5
+            ocp.cost.zu = np.ones(ns) * 0.5
 
         ns_e = nsx_e + nsh_e
         if ns_e > 0:
-            ocp.cost.Zl_e = np.eye(ns_e) * 10
-            ocp.cost.Zu_e = np.eye(ns_e) * 10
-            ocp.cost.zl_e = np.ones(ns_e) * 1000
-            ocp.cost.zu_e = np.ones(ns_e) * 1000
-        
-        if nsh_0 > 0:
-            ocp.cost.Zl_0 = np.eye(nsh_0) * 10
-            ocp.cost.Zu_0 = np.eye(nsh_0) * 10
-            ocp.cost.zl_0 = np.ones(nsh_0) * 1000
-            ocp.cost.zu_0 = np.ones(nsh_0) * 1000
+            ocp.cost.Zl_e = np.eye(ns_e) * 1
+            ocp.cost.Zu_e = np.eye(ns_e) * 1
+            ocp.cost.zl_e = np.ones(ns_e) * 0.5
+            ocp.cost.zu_e = np.ones(ns_e) * 0.5
+            
+        ns_0 = nsh_0 + nsu
+        if ns_0 > 0:
+            ocp.cost.Zl_0 = np.eye(ns_0) * 1
+            ocp.cost.Zu_0 = np.eye(ns_0) * 1
+            ocp.cost.zl_0 = np.ones(ns_0) * 0.5
+            ocp.cost.zu_0 = np.ones(ns_0) * 0.5
         # initial condition
         ocp.constraints.x0 = self.x_bar[0]
 
@@ -330,7 +395,9 @@ class MPC():
                 self.py_logger.warning(f"{key} not found in Acados solver options. Parameter is ignored.")
                 
         # Construct AcadosOCPSolver
-        ocp_solver = AcadosOcpSolver(ocp, json_file = str(self.output_dir/f"acados_ocp_{name}.json"))
+        ocp_solver = AcadosOcpSolver(ocp, 
+                                     json_file = str(self.output_dir/f"acados_ocp_{name}.json"),
+                                     build=True)
 
         return ocp, ocp_solver, p_struct
 
@@ -377,6 +444,8 @@ class STMPC(MPC):
             self.u_bar = self.u_t(t_bar_new)
             self.x_bar = self._predictTrajectories(xo, self.u_bar)
 
+        x_bar_initial = self.x_bar.copy()
+        u_bar_initial = self.u_bar.copy()
 
         # 0.2 Get ref, sdf map,
         r_bar_map = {}
@@ -441,9 +510,9 @@ class STMPC(MPC):
 
             # set initial guess
             t1 = time.perf_counter()
-            self.ocp_solver.set(i, 'x', self.x_bar[i])
+            self.ocp_solver.set(i, 'x', x_bar_initial[i])
             if i < self.N:
-                self.ocp_solver.set(i, 'u', self.u_bar[i])
+                self.ocp_solver.set(i, 'u', u_bar_initial[i])
 
             t2 = time.perf_counter()
             self.log["time_ocp_set_params_set_x"] += t2 - t1
@@ -472,7 +541,6 @@ class STMPC(MPC):
             self.ocp_solver.set(i, 'p', curr_p_map.cat.full().flatten())
             t2 = time.perf_counter()
             self.log["time_ocp_set_params_setp"] += t2 - t1
-
             curr_p_map_bar.append(curr_p_map)
         tp2 = time.perf_counter()
         self.log["time_ocp_set_params"] = tp2 - tp1
@@ -484,16 +552,27 @@ class STMPC(MPC):
 
         self.ocp_solver.print_statistics() # encapsulates: stat = ocp_solver.get_stats("statistics")
         self.log["solver_status"] = self.ocp_solver.status
-        self.log["step_size"] = np.mean(self.ocp_solver.get_stats('alpha'))
+        if self.ocp.solver_options.nlp_solver_type != "SQP_RTI":
+            self.log["step_size"] = np.mean(self.ocp_solver.get_stats('alpha'))
+        else:
+            self.log["step_size"] = -1
         self.log["sqp_iter"] = self.ocp_solver.get_stats('sqp_iter')
         self.log["qp_iter"] = sum(self.ocp_solver.get_stats('qp_iter'))
         self.log["cost_final"] = self.ocp_solver.get_cost()
 
         if self.ocp_solver.status !=0:
+
+            x_bar = []
+            u_bar = []
+            print(f"xo: {xo}")
             for i in range(self.N):
                 print(f"stage {i}: x: {self.ocp_solver.get(i, 'x')}")
+                x_bar.append(self.ocp_solver.get(i, 'x'))
                 print(f"stage {i}: u: {self.ocp_solver.get(i, 'u')}")
-                        
+                u_bar.append(self.ocp_solver.get(i, 'u'))
+            
+            x_bar.append(self.ocp_solver.get(self.N, 'x'))
+                
             for i in range(self.N):
                 print(f"stage {i}: lam: {self.ocp_solver.get(i, 'lam')}")
             
@@ -504,9 +583,53 @@ class STMPC(MPC):
                 print(f"stage {i}: sl: {self.ocp_solver.get(i, 'sl')}")
             for i in range(self.N):
                 print(f"stage {i}: su: {self.ocp_solver.get(i, 'su')}")
+            v = self.evaluate_constraints(self.collisionCsts['sdf'], 
+                                                   x_bar, u_bar, curr_p_map_bar)
+            h = self.evaluate_sdf_h_fcn(self.collisionCsts['sdf'], 
+                                        x_bar, u_bar, curr_p_map_bar)
+            xdot = self.evaluate_sdf_xdot_fcn(self.collisionCsts['sdf'], 
+                                        x_bar, u_bar, curr_p_map_bar)
+            for i in range(self.N):
+                print(f"stage {i}: t: {self.ocp_solver.get(i, 't')}")
+                print(f"state {i}: sdf: {v[i]}")
+                print(f"state {i}: h: {h[i]}")
+                print(f"state {i}: xdot: {xdot[i]}")
+            
+
+            self.log["iter_snapshot"] = {"t": t,
+                                         "xo": xo,
+                                         "p_map_bar": [p.cat.full().flatten() for p in curr_p_map_bar],
+                                         "x_bar_init": x_bar_initial,
+                                         "u_bar_init": u_bar_initial,
+                                         "x_bar": x_bar,
+                                         "u_bar": u_bar,
+                                         }
+
+            # get iterate:
+            solution = self.log["iter_snapshot"]
+
+            lN = len(str(self.N+1))
+            for i in range(self.N+1):
+                i_string = f'{i:0{lN}d}'
+                solution['x_'+i_string] = self.ocp_solver.get(i,'x')
+                solution['u_'+i_string] = self.ocp_solver.get(i,'u')
+                solution['z_'+i_string] = self.ocp_solver.get(i,'z')
+                solution['lam_'+i_string] = self.ocp_solver.get(i,'lam')
+                solution['t_'+i_string] = self.ocp_solver.get(i, 't')
+                solution['sl_'+i_string] = self.ocp_solver.get(i, 'sl')
+                solution['su_'+i_string] = self.ocp_solver.get(i, 'su')
+                if i < self.N:
+                    solution['pi_'+i_string] = self.ocp_solver.get(i,'pi')
+
+            # for k in list(solution.keys()):
+            #     if len(solution[k]) == 0:
+            #         del solution[k]
+
+            # self.ocp_solver.store_iterate(filename=str(self.output_dir / "iter_{:.2f}.json".format(t)))
             if self.params["acados"]["raise_exception_on_failure"]:
                 raise Exception(f'acados acados_ocp_solver returned status {self.solver_status}')
-
+        else:
+            self.log["iter_snapshot"] = None
 
         # get solution
         self.u_prev = self.u_bar[0].copy()
@@ -522,9 +645,16 @@ class STMPC(MPC):
         for name in self.collision_link_names: 
             self.log["_".join([name, "constraint"])] = self.evaluate_constraints(self.collisionCsts[name], 
                                                                    self.x_bar, self.u_bar, curr_p_map_bar)
+            self.log["_".join([name, "constraint", "gradient"])] = self.evaluate_constraints_gradient(self.collisionCsts[name], 
+                                                                   self.x_bar, self.u_bar, curr_p_map_bar)
         
         self.log["state_constraint"] = self.evaluate_constraints(self.stateCst, self.x_bar, self.u_bar, curr_p_map_bar)
         self.log["control_constraint"] = self.evaluate_constraints(self.controlCst, self.x_bar, self.u_bar, curr_p_map_bar)
+        self.log["ee_pos"] = self.ee_bar.copy()
+        self.log["base_pos"] = self.base_bar.copy()
+        self.log["ocp_param"] = curr_p_map_bar.copy()
+        self.log["x_bar"] = self.x_bar.copy()
+        self.log["u_bar"] = self.u_bar.copy()
 
         return self.v_cmd, self.u_prev, self.u_bar.copy(), self.x_bar[:, 9:].copy()
 
@@ -542,10 +672,17 @@ class STMPC(MPC):
                "time_ocp_set_params_tracking" : 0,
                "time_ocp_set_params_setp" : 0,
                "state_constraint": 0,
-               "control_constraint": 0
+               "control_constraint": 0,
+               "x_bar": 0,
+               "u_bar": 0,
+               "ee_pos":0,
+               "base_pos":0,
+               "ocp_param":{},
+               "iter_snapshot":{}
                }
         for name in self.collision_link_names:
             log["_".join([name, "constraint"])]= 0
+            log["_".join([name, "constraint", "gradient"])]= 0
 
         return log
 
@@ -554,7 +691,9 @@ if __name__ == "__main__":
     # robot mdl
     from mmseq_utils import parsing
     path_to_config = parse_ros_path({"package": "mmseq_run",
-                           "path":"config/simple_experiment.yaml"})
+                           "path":"config/3d_collision_sdf.yaml"})
     config = parsing.load_config(path_to_config)
 
-    STMPC(config["controller"])
+    controller = STMPC(config["controller"])
+
+    print(controller.collisionCsts["sdf"].g_eqn)
