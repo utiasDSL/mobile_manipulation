@@ -11,7 +11,13 @@ import os
 from spatialmath.base import rotz, r2q
 
 from mmseq_utils.parsing import parse_path, load_config
+from mmseq_utils.casadi_struct import casadi_sym_struct, reconstruct_sym_struct_map_from_array
+
 from mmseq_control.robot import CasadiModelInterface, MobileManipulator3D
+from mmseq_control_new.MPCConstraints import SignedDistanceConstraint,SignedDistanceConstraintCBF
+from mmseq_control_new.MPC import STMPC
+import mmseq_control_new.MPC as MPC
+import mmseq_control_new.HTMPC as HTMPC
 from mmseq_utils import parsing, math
 from matplotlib.backends.backend_pdf import PdfPages
 from mobile_manipulation_central import ros_utils
@@ -60,7 +66,13 @@ class DataPlotter:
         self.data["name"] = self.data.get('name', 'data')
         self.config = config
         if config is not None:
-            self.model_interface = CasadiModelInterface(config["controller"])
+            # controller
+            control_class = getattr(MPC, config["controller"]["type"], None)
+            if control_class is None:
+                control_class = getattr(HTMPC, config["controller"]["type"], None)
+
+            self.controller = control_class(config["controller"])
+            self.model_interface = self.controller.model_interface
 
         self._post_processing()
         self._get_statistics()
@@ -114,7 +126,7 @@ class DataPlotter:
             key = filename.split("_")[0]
             if os.path.isdir(d):
                 path_to_npz = os.path.join(d, "data.npz")
-                data_decoupled[key] = dict(np.load(path_to_npz))
+                data_decoupled[key] = dict(np.load(path_to_npz, allow_pickle=True))
 
             if key == 'control':
                 path_to_config = os.path.join(d, "config.yaml")
@@ -207,7 +219,6 @@ class DataPlotter:
         r_b = (Rbw @ (r_w - rbw).T).T    
 
         return r_b
-
 
     def _get_mean_violation(self, data_normalized):
         vio_mask = data_normalized > 1.05
@@ -362,6 +373,47 @@ class DataPlotter:
             stats.append(stats_dict.get(key, {}).get(val, None))
 
         return stats
+    
+    def run_mpc_iter(self, t):
+        t_sim = self.data["ts"]
+        t_index = np.argmin(np.abs(t_sim - t))
+
+        iter_snapshot = dict(enumerate(self.data["mpc_iter_snapshots"][t_index].flatten(), 1))[1]
+        controller = self.controller
+        ocp_solver = self.controller.ocp_solver
+
+        u_bar_init = iter_snapshot["u_bar_init"]
+        x_bar_init = iter_snapshot["x_bar_init"]
+        p_map_bar = self.data["mpc_ocp_params"][t_index]
+        p_map_bar = iter_snapshot["p_map_bar"]
+
+        xo = iter_snapshot["xo"]+ np.array([0,0.0]+[0]*16)
+        x_bar_init = controller._predictTrajectories(xo, u_bar_init)
+
+        for i in range(self.controller.N+1):
+            
+            ocp_solver.set(i, 'x', x_bar_init[i])
+            if i < controller.N:
+                ocp_solver.set(i, 'u', u_bar_init[i])
+            ocp_solver.set(i, 'p', p_map_bar[i])
+
+        ocp_solver.solve_for_x0(xo, fail_on_nonzero_status=False)
+        ocp_solver.print_statistics()
+
+        x_bar = np.zeros_like(iter_snapshot["x_bar"])
+        u_bar = np.zeros_like(iter_snapshot["u_bar"])
+
+        for i in range(controller.N):
+            x_bar[i,:] = ocp_solver.get(i, "x")
+            u_bar[i,:] = ocp_solver.get(i, "u")
+        x_bar[-1,:] = ocp_solver.get(controller.N, "x")
+
+        x_bar_diff = x_bar - iter_snapshot["x_bar"]
+        u_bar_diff = u_bar - iter_snapshot["u_bar"]
+
+        print("x bar diff {}".format(x_bar_diff))
+        print("u bar diff {}".format(u_bar_diff))
+        
 
     def plot_ee_position(self, axes=None, index=0, legend=None):
         ts = self.data["ts"]
@@ -1193,12 +1245,16 @@ class DataPlotter:
 
         return axes
 
-    def plot_mpc_prediction(self, data_name, axes=None, index=0, block=True, legend=None):
+    def plot_mpc_prediction(self, data_name, t=0, axes=None, index=0, block=True, legend=None):
+        t_sim = self.data["ts"]
+        t_index = np.argmin(np.abs(t_sim - t))
+        off_set = t_index % 4
         # Time x prediction step x data dim
         data = self.data.get(data_name)
         if data is None:
             print(f"Did not find {data_name}. Stop plotting.")
             return
+        print(data_name)
         print(data.shape)
         
         data = data.squeeze(axis=-1)
@@ -1233,14 +1289,15 @@ class DataPlotter:
                 data_num = len(axes)
 
             for i in range(data_num):
-                axes[i].plot(t_all[:, 0].flatten(), data[:,0, i+fi*3].flatten(), "o-", label=" ".join(["actual", legend]), linewidth=2, markersize=8)
-                axes[i].plot(t_all[1::2].T, data[1::2, :, i+fi*3].T, "o-", linewidth=1, fillstyle='none')
+                print(i+fi*data_per_figure)
+                axes[i].plot(t_all[:, 0].flatten(), data[:,0, i+fi*data_per_figure].flatten(), "o-", label=" ".join(["actual", legend]), linewidth=2, markersize=8)
+                axes[i].plot(t_all[off_set::4].T, data[off_set::4, :, i+fi*data_per_figure].T, "o-", linewidth=1, fillstyle='none')
                 
                 axes[i].set_title(" ".join(data_name.split("_")[1:] + ["figure", str(fi)+"/"+str(figs_num)]))
                 axes[i].legend()
                 axes[i].grid()
             plt.show(block=block)
-
+    
         return axes
 
     def show(self):
@@ -1269,19 +1326,16 @@ class DataPlotter:
         multipage(Path(str(self.data["dir_path"])) / "data.pdf", figs)
 
     def plot_mpc(self):
-        self.plot_cost_htmpc(block=False)
-        self.plot_solver_status_htmpc(block=False)
-        self.plot_solver_iters_htmpc(block=False)
-        self.plot_time_htmpc(block=False)
+        # self.plot_cost_htmpc(block=False)
+        # self.plot_solver_status_htmpc(block=False)
+        # self.plot_solver_iters_htmpc(block=False)
+        # self.plot_time_htmpc(block=False)
         # self.plot_solver_iters()
         # self.plot_mpc_prediction("mpc_obstacle_cylinder_1_link_constraints")
         # self.plot_mpc_prediction("mpc_sdf_constraints", block=False)
-        self.plot_mpc_prediction("mpc_control_constraints",block=False)
-        self.plot_mpc_prediction("mpc_state_constraints", block=False)
-
-        f, axes = plt.subplots(2, 1, sharex=True)
-        self.plot_mpc_prediction("mpc_sdf_constraints", axes=[axes[0]], block=False)
-        self.plot_time_series_data_htmpc("mpc_solver_statuss", axes=[axes[1]], block=False)
+        # self.plot_mpc_prediction("mpc_control_constraints",block=False)
+        # self.plot_mpc_prediction("mpc_state_constraints", block=False)
+        # self.plot_mpc_prediction("mpc_sdf_constraint_gradients", block=False)
 
 
         self.plot_run_time()
@@ -1309,6 +1363,183 @@ class DataPlotter:
     def plot_quick_check(self):
         self.plot_task_performance()
         self.plot_collision()
+    
+    def plot_sdf(self, t, use_iter_snapshot=False, block=True):
+        t_sim = self.data["ts"]
+        t_index = np.argmin(np.abs(t_sim - t))
+        if use_iter_snapshot:
+            iter_snapshot = dict(enumerate(self.data["mpc_iter_snapshots"][t_index].flatten(), 1))[1]
+            param_map_array = iter_snapshot["p_map_bar"][0]
+            param_map = reconstruct_sym_struct_map_from_array(self.controller.p_struct, param_map_array)
+            x_bar = np.array(iter_snapshot["x_bar"])
+            u_bar = np.array(iter_snapshot["u_bar"])
+        else:
+            param_map = self.data["mpc_ocp_params"][t_index][0]
+            x_bar = self.data["mpc_x_bars"][t_index]
+            u_bar = self.data["mpc_u_bars"][t_index]
+        sdf_map = self.model_interface.sdf_map
+
+        # for i in range(len(self.data["mpc_ocp_params"][t_index])-1):
+        #     param_map = self.data["mpc_ocp_params"][t_index][i]
+        #     param_next = self.data["mpc_ocp_params"][t_index][i+1]
+        #     keys = ['x_grid_sdf', 'y_grid_sdf', 'z_grid_sdf', 'value_sdf']
+        #     for key in keys:
+        #         diff = np.linalg.norm(param_map[key].toarray().flatten() - param_next[key].toarray().flatten())
+        #         print(f"{key} diff {diff}")
+        sdf_map.update_map(param_map["x_grid_sdf"].toarray().flatten(),
+                           param_map["y_grid_sdf"].toarray().flatten(),
+                           param_map["z_grid_sdf"].toarray().flatten(),
+                           param_map["value_sdf"].toarray().flatten())
+        
+        ee_pos = self.data["mpc_ee_poss"][t_index]
+        sd_val = sdf_map.query_val(ee_pos[:, 0],ee_pos[:, 1],ee_pos[:, 2]).flatten()
+        sd_grad = sdf_map.query_grad(ee_pos[:, 0],ee_pos[:, 1],ee_pos[:, 2])
+        sd_grad = sd_grad.reshape((3,-1))
+
+        # sample around the trajectory
+        # sample_grid = []
+        # for i in range(3):
+        #     sample_grid.append(np.linspace(min(ee_pos[:, i]), max(ee_pos[:, i]), 8))
+        # sample_mesh = np.meshgrid(*sample_grid)
+        # sample_mesh = [g.flatten() for g in sample_mesh]
+        # sd_val_sample = sdf_map.query_val(*sample_mesh)
+        # sd_grad_sample = sdf_map.query_grad(*sample_mesh)
+        # sd_grad_sample = sd_grad_sample.reshape((3,-1))
+
+        const = SignedDistanceConstraintCBF(self.model_interface.robot, self.model_interface.getSignedDistanceSymMdls("sdf"), 
+                                            self.config["controller"]["collision_safety_margin"]["sdf"], "sdf")
+        cst_p_dict = const.get_p_dict()
+        cst_p_struct = casadi_sym_struct(cst_p_dict)
+        cst_param_map = cst_p_struct(0)
+
+        cst_param_map["x_grid_sdf"] = param_map["x_grid_sdf"]
+        cst_param_map["y_grid_sdf"] = param_map["y_grid_sdf"]
+        cst_param_map["z_grid_sdf"] = param_map["z_grid_sdf"]
+        cst_param_map["value_sdf"] = param_map["value_sdf"]
+        cst_param_map["gamma_sdf"] = param_map["gamma_sdf"]
+
+        g_sdf = const.g_fcn(x_bar[:-1].T, u_bar.T, cst_param_map.cat).toarray()
+        print(f"g_sdf{g_sdf}")
+        h_sdf = const.h_fcn(x_bar[:-1].T, u_bar.T, cst_param_map.cat).toarray()
+        print(f"h_sdf{h_sdf}")
+
+
+        # sample around one point
+        violated_constraints_indices = np.where(g_sdf>1e-3)
+        if len(violated_constraints_indices[0])>0:
+            prediction_index = violated_constraints_indices[1][0]
+        else:
+            print("No violation found")
+            prediction_index = 0
+        # prediction_index = 5
+        print(prediction_index)
+        sample_center = ee_pos[prediction_index]
+        x_grid = np.linspace(-0.025, 0.025, 5) + sample_center[0]
+        y_grid = np.linspace(-0.025, 0.025, 5) + sample_center[1]
+        z_grid = np.linspace(0, 0, 1) + sample_center[2]
+        sample_grid = [x_grid, y_grid, z_grid]
+        sample_mesh = np.meshgrid(*sample_grid)
+        sample_mesh = [g.flatten() for g in sample_mesh]
+        sd_val_sample = sdf_map.query_val(*sample_mesh)
+        sd_grad_sample = sdf_map.query_grad(*sample_mesh)
+        sd_grad_sample = sd_grad_sample.reshape((3,-1))
+        print(sd_grad_sample)
+
+        # xdot = const.xdot_fcn(x_bar[prediction_index].T, u_bar[prediction_index].T, cst_param_map.cat).toarray()
+        # print(f"xdot{xdot}")
+        # print(f"x_bar : {x_bar}")
+        # print(f"u_bar : {u_bar}")
+        # h_grad = const.h_grad_fcn(x_bar[prediction_index] + np.array([0,+0.0]+16*[0]), u_bar[1], cst_param_map.cat).toarray()
+        # print(f"h_grad{h_grad}")
+        # print(h_grad@xdot)
+        # h_hess_fd= const.h_hess_fd_fcn(x_bar[prediction_index], u_bar[1], cst_param_map.cat).toarray()
+        # print(f"h_hess_fd: {h_hess_fd}")
+        # print(f"tr(h_hess_fd): {np.trace(np.abs(h_hess_fd))}")
+        # g_hess_fd= const.g_hess_fd_fcn(x_bar[prediction_index], u_bar[1], cst_param_map.cat).toarray()
+        # print(f"g_hess_fd: {g_hess_fd}")
+        # print(f"tr(g_hess_fd): {np.trace(g_hess_fd)}")
+
+
+        safety_margin = self.config["controller"]["collision_safety_margin"]["sdf"]
+        r = 0.26
+        collision_free = np.where(sd_val-r - safety_margin>=0)[0]
+        collided = np.where(sd_val-r - safety_margin<0)[0]
+        print(f"sd_val{sd_val-r - safety_margin}")
+        print(f"collision_free index {collision_free}")
+
+        print(np.linalg.norm(sd_grad, axis=0))
+        fig1= plt.figure()
+        ax1 = fig1.add_subplot(111, projection='3d')
+        ax1.plot(ee_pos[collision_free, 0],ee_pos[collision_free, 1],ee_pos[collision_free, 2], color='g')
+        ax1.plot(ee_pos[collided, 0],ee_pos[collided, 1],ee_pos[collided, 2], color='r')
+
+        ax1.quiver(ee_pos[:, 0],ee_pos[:, 1],ee_pos[:, 2],
+                   sd_grad[0]/5,sd_grad[1]/5, sd_grad[2]/5, arrow_length_ratio=0.2, normalize=False)
+        ax1.quiver(sample_mesh[0],sample_mesh[1], sample_mesh[2],
+                   sd_grad_sample[0]/5,sd_grad_sample[1]/5, sd_grad_sample[2]/5, arrow_length_ratio=0.2, normalize=False, color='r')
+        ax1.set_xlabel('x')
+        ax1.set_ylabel('y')
+        ax1.set_zlabel('z')
+        ax1.set_title(f"Time: {t_sim[t_index]}s")
+        # ax1.set_aspect('equal')
+
+        x_lim = [-2, 2]
+        y_lim = [-1, 2]
+        z_lim = [0.18, 0.43]
+        sdf_map.vis(x_lim=x_lim,
+                    y_lim=y_lim,
+                    z_lim=[0.1, 0.1],
+                    block=False)
+        sdf_map.vis(x_lim=x_lim,
+            y_lim=y_lim,
+            z_lim=[0.2, 0.2],
+            block=False)
+        sdf_map.vis(x_lim=x_lim,
+            y_lim=y_lim,
+            z_lim=[0.3, 0.3],
+            block=False)
+        sdf_map.vis(x_lim=x_lim,
+            y_lim=y_lim,
+            z_lim=[0.4, 0.4],
+            block=False)
+        
+        g_hess_fd = []
+        for i in range(u_bar.shape[0]):
+            g_hess_fd.append(const.g_hess_fd_fcn(x_bar[i], u_bar[i], cst_param_map.cat).toarray())
+        
+        tr_g_hess_fd = [np.trace(g) for g in g_hess_fd]
+
+        fig2= plt.figure()
+        plt.plot(tr_g_hess_fd, '-x')
+        plt.plot(prediction_index, tr_g_hess_fd[prediction_index], 'r-x')
+        plt.xlabel("MPC prediction step")
+        plt.ylabel("tr(g_cbf_hess)")
+
+
+
+        plt.show(block=block)
+
+        
+
+    def check_sdf(self):
+        t_sim = self.data["ts"]
+        N = len(t_sim)
+
+        for i in range(N-1):
+            param_map = self.data["mpc_ocp_params"][i][0]
+            param_map_next = self.data["mpc_ocp_params"][i+1][0]
+            keys = ['x_grid_sdf', 'y_grid_sdf', 'z_grid_sdf', 'value_sdf']
+            for key in keys:
+                diff = np.linalg.norm(param_map[key].toarray().flatten() - param_map_next[key].toarray().flatten())
+                print(f"time{t_sim[i]} {key} diff {diff}")
+    
+    def sdf_failure_debug(self, t):
+        f, axes = plt.subplots(2, 1, sharex=True)
+        self.plot_mpc_prediction("mpc_sdf_constraints", t, axes=[axes[0]], block=False)
+        self.plot_time_series_data_htmpc("mpc_solver_statuss", axes=[axes[1]], block=False)
+        self.plot_sdf(t, use_iter_snapshot=True, block=True)
+
+        
 
 class ROSBagPlotter:
     def __init__(self, bag_file, config_file="/home/tracy/Project/catkin_ws/src/mm_sequential_tasks/mmseq_run/config/robot/thing.yaml"):

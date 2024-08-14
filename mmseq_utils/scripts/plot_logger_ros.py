@@ -144,7 +144,12 @@ if __name__ == "__main__":
                         help="plot tracking data")
     parser.add_argument("--check", action="store_true",
                         help="check collision, constraint violation, tracking")
-
+    parser.add_argument("--sdf", action="store_true",
+                        help="plot sdf")
+    parser.add_argument("--runmpc", action="store_true", help="rerun mpc iters")
+    parser.add_argument("--timestep", type=float,help="control timestep to inspect")
+    parser.add_argument("--debug", action="store_true",
+                        help="debug")
     parser.add_argument("--compare", action="store_true",
                         help="plot comparisons")
     parser.add_argument("--compareidkc", action="store_true",
@@ -164,14 +169,20 @@ if __name__ == "__main__":
         data_plotter = construct_logger(args.folder)
         if args.htmpc:
             data_plotter.plot_mpc()
+        if args.sdf:
+            data_plotter.check_sdf()
         if args.tracking:
             data_plotter.plot_tracking()
         if args.robot:
             data_plotter.plot_robot()
         if args.check:
             data_plotter.plot_quick_check()
+        if args.debug:
+            data_plotter.sdf_failure_debug(args.timestep)
         if args.savefigs:
             data_plotter.save_figs()
+        if args.runmpc:
+            data_plotter.run_mpc_iter(args.timestep)
         plt.show()
 
 
