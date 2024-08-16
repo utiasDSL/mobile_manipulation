@@ -90,6 +90,15 @@ class MPC():
         self.py_logger = logging.getLogger("Controller")
         self.log = self._get_log()
 
+        self.ree_bar = None
+        self.rbase_bar = None
+        self.ee_bar = None
+        self.base_bar = None
+        self.sdf_bar = {"EE":None,
+                        "base": None}
+        self.sdf_grad_bar = {"EE":None,
+                            "base": None}
+
         self.output_dir = Path(parse_ros_path({"package": "mmseq_control_new", "path":"acados_outputs"}))
         if not self.output_dir.exists():
             self.output_dir.mkdir()
@@ -640,7 +649,14 @@ class STMPC(MPC):
         self.t_bar = t + np.arange(self.N) * self.dt
 
         self.v_cmd = self.x_bar[0][self.robot.DoF:].copy()
+
+        # For rviz visualization
         self.ee_bar, self.base_bar = self._getEEBaseTrajectories(self.x_bar)
+        self.sdf_bar["EE"] = self.model_interface.sdf_map.query_val(self.ee_bar[:, 0],self.ee_bar[:, 1],self.ee_bar[:, 2]).flatten()
+        self.sdf_grad_bar["EE"] = self.model_interface.sdf_map.query_grad(self.ee_bar[:, 0],self.ee_bar[:, 1],self.ee_bar[:, 2]).reshape((3,-1))
+        
+        self.sdf_bar["base"] = self.model_interface.sdf_map.query_val(self.base_bar[:, 0], self.base_bar[:, 1], np.ones(self.N+1)*0.2)
+        self.sdf_grad_bar["base"] = self.model_interface.sdf_map.query_grad(self.base_bar[:, 0], self.base_bar[:, 1], np.ones(self.N+1)*0.2).reshape((3,-1))
 
         for name in self.collision_link_names: 
             self.log["_".join([name, "constraint"])] = self.evaluate_constraints(self.collisionCsts[name], 
