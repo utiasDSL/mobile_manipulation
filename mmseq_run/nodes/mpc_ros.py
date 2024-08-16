@@ -11,7 +11,7 @@ import numpy as np
 import rospy
 from spatialmath.base import rotz
 from scipy.interpolate import interp1d
-from visualization_msgs.msg import Marker
+from visualization_msgs.msg import Marker, MarkerArray
 from geometry_msgs.msg import Point, Transform, Twist
 from trajectory_msgs.msg import MultiDOFJointTrajectory, MultiDOFJointTrajectoryPoint
 
@@ -119,6 +119,7 @@ class ControllerROSNode:
         self.map_interface = MapInterfaceNew(config=self.ctrl_config)
 
         self.controller_visualization_pub = rospy.Publisher("controller_visualization", Marker, queue_size=10)
+        self.controller_visualization_array_pub = rospy.Publisher("controller_visualization_array", MarkerArray, queue_size=10)
         self.plan_visualization_pub = rospy.Publisher("plan_visualization", Marker, queue_size=10)
         self.current_plan_visualization_pub = rospy.Publisher("current_plan_visualization", Marker, queue_size=10)
 
@@ -299,6 +300,32 @@ class ControllerROSNode:
         marker_rbase = self._make_marker(Marker.POINTS, 3, rgba=[0.0, 0.0, 1, 1], scale=[0.1]*3)
         marker_rbase.points = [Point(*pt[:2], 0) for pt in controller.rbase_bar]
         self.controller_visualization_pub.publish(marker_rbase)
+
+        # base sdf gradients
+        marker_array_sdf_grad = MarkerArray()
+        marker_id = 4
+        for i in range(0, controller.sdf_grad_bar["base"].shape[1], 3):
+            grad = controller.sdf_grad_bar["base"][:, i]
+
+            marker_sdf_grad_base = self._make_marker(Marker.ARROW, marker_id + i, rgba=[1.0, 0.0, 0, 1.0], scale=[0.05]*3)
+            marker_sdf_grad_base.points.append(Point(*controller.base_bar[i]))
+            marker_sdf_grad_base.points.append(Point(*(controller.base_bar[i] + grad)))
+            marker_array_sdf_grad.markers.append(marker_sdf_grad_base)
+            marker_id += 1
+
+
+        # ee sdf gradients
+        for i in range(0, controller.sdf_grad_bar["EE"].shape[1], 3):
+            grad = controller.sdf_grad_bar["EE"][:, i]
+
+            marker_sdf_grad_ee = self._make_marker(Marker.ARROW, marker_id+i, rgba=[1.0, 0.0, 0, 1.0], scale=[0.05]*3)
+            marker_sdf_grad_ee.points.append(Point(*(controller.ee_bar[i])))
+            marker_sdf_grad_ee.points.append(Point(*(controller.ee_bar[i] + grad)))
+            marker_array_sdf_grad.markers.append(marker_sdf_grad_ee)
+            marker_id += 1
+
+
+        self.controller_visualization_array_pub.publish(marker_array_sdf_grad)
 
     def run(self):
         rate = rospy.Rate(self.ctrl_rate)
