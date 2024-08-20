@@ -10,17 +10,17 @@ from mmseq_utils.trajectory_generation import sqaure_wave
 class BaseSingleWaypoint(Planner):
 
     def __init__(self, planner_params):
-        self.name = planner_params["name"]
+        super().__init__(name=planner_params["name"],
+                         type="base",
+                         ref_type="waypoint",
+                         ref_data_type="Vec2",
+                         frame_id=planner_params["frame_id"])
+
         self.target_pos = np.array(planner_params["target_pos"])
         self.tracking_err_tol = np.array(planner_params["tracking_err_tol"])
-        self.type = "base"
-        self.ref_type = "waypoint"
-        self.ref_data_type = "Vec2"
-        self.frame_id = planner_params["frame_id"]
 
         self.finished = False
 
-        super().__init__()
 
 
     def getTrackingPoint(self, t, robot_states=None):
@@ -52,12 +52,13 @@ class BaseSingleWaypoint(Planner):
 
 class BasePosTrajectoryCircle(TrajectoryPlanner):
     def __init__(self, config):
-        self.name = config["name"]
-        self.type = "base"
-        self.ref_type = "trajectory"
-        self.ref_data_type = "Vec2"
+        super().__init__(name=config["name"],
+                        type="base",
+                        ref_type="trajectory",
+                        ref_data_type="Vec2",
+                        frame_id=config["frame_id"])
+
         self.tracking_err_tol = config["tracking_err_tol"]
-        self.frame_id = config["frame_id"]
 
         self.finished = False
         self.started = False
@@ -73,8 +74,6 @@ class BasePosTrajectoryCircle(TrajectoryPlanner):
         self.dt = 0.01
         self.N = int(self.T * self.round / self.dt)
         self.plan = self._generatePlan()
-
-        super().__init__()
 
     def _generatePlan(self):
         plan_pos = np.repeat([self.c], self.N, axis=0)
@@ -121,12 +120,13 @@ class BasePosTrajectoryCircle(TrajectoryPlanner):
 
 class BasePosTrajectoryLine(TrajectoryPlanner):
     def __init__(self, config):
-        self.name = config["name"]
-        self.type = "base"
-        self.ref_type = "trajectory"
-        self.ref_data_type = "Vec2"
+        super().__init__(name=config["name"],
+                        type="base",
+                        ref_type="trajectory",
+                        ref_data_type="Vec2",
+                        frame_id=config["frame_id"])
+
         self.tracking_err_tol = config["tracking_err_tol"]
-        self.frame_id = config["frame_id"]
         self.end_stop = config.get("end_stop", False)
 
         self.finished = False
@@ -140,7 +140,6 @@ class BasePosTrajectoryLine(TrajectoryPlanner):
         self.dt = 0.01
         self.plan = self._generatePlan()
 
-        super().__init__()
 
     def regeneratePlan(self):
         self.plan = self._generatePlan()
@@ -198,12 +197,12 @@ class BasePosTrajectoryLine(TrajectoryPlanner):
 
 class BasePoseTrajectoryLine(TrajectoryPlanner):
     def __init__(self, config):
-        self.name = config["name"]
-        self.type = "base"
-        self.ref_type = "trajectory"
-        self.ref_data_type = "Vec3"
+        super().__init__(name=config["name"],
+                        type="base",
+                        ref_type="trajectory",
+                        ref_data_type="Vec3",
+                        frame_id=config["frame_id"])
         self.tracking_err_tol = config["tracking_err_tol"]
-        self.frame_id = config["frame_id"]
         self.end_stop = config.get("end_stop", False)
 
         self.finished = False
@@ -217,8 +216,6 @@ class BasePoseTrajectoryLine(TrajectoryPlanner):
 
         self.dt = 0.01
         self.plan = self._generatePlan()
-
-        super().__init__()
 
     def regeneratePlan(self):
         self.plan = self._generatePlan()
@@ -318,12 +315,12 @@ class BasePoseTrajectoryLine(TrajectoryPlanner):
 
 class BasePosTrajectorySqaureWave(TrajectoryPlanner):
     def __init__(self, config):
-        self.name = config["name"]
-        self.type = "base"
-        self.ref_type = "trajectory"
-        self.ref_data_type = "Vec2"
+        super().__init__(name=config["name"],
+                        type="base",
+                        ref_type="trajectory",
+                        ref_data_type="Vec2",
+                        frame_id=config["frame_id"])
         self.tracking_err_tol = config["tracking_err_tol"]
-        self.frame_id = config["frame_id"]
 
         self.finished = False
         self.started = False
@@ -331,9 +328,6 @@ class BasePosTrajectorySqaureWave(TrajectoryPlanner):
 
         self.dt = 0.01
         self.plan = sqaure_wave(config["peak_pos"], config["valley_pos"], config["period"], config["round"], self.dt)
-
-
-        super().__init__()
 
     def getTrackingPoint(self, t, robot_states=None):
 

@@ -14,12 +14,13 @@ from mmseq_utils.parsing import parse_number
 
 class EESimplePlanner(Planner):
     def __init__(self, planner_params):
-        self.name = planner_params["name"]
+        super().__init__(name=planner_params["name"],
+                         type="EE", 
+                         ref_type="waypoint", 
+                         ref_data_type="Vec3",
+                         frame_id=planner_params["frame_id"])
+
         self.target_pos = np.array(planner_params["target_pos"])
-        self.type = "EE"
-        self.ref_type = "waypoint"
-        self.ref_data_type = "Vec3"
-        self.frame_id = planner_params["frame_id"]
 
         self.started = False
         self.finished = False
@@ -28,7 +29,6 @@ class EESimplePlanner(Planner):
         self.hold_period = planner_params["hold_period"]
         self.tracking_err_tol = planner_params["tracking_err_tol"]
 
-        super().__init__()
 
     def getTrackingPoint(self, t, robot_states=None):
         return self.target_pos, np.zeros(3)
@@ -72,12 +72,12 @@ class EESimplePlanner(Planner):
 
 class EESimplePlannerBaseFrame(Planner):
     def __init__(self, planner_params):
-        self.name = planner_params["name"]
+        super().__init__(name=planner_params["name"],
+                         type="EE", 
+                         ref_type="waypoint", 
+                         ref_data_type="Vec3",
+                         frame_id=planner_params["frame_id"])
         self.target_pos = np.array(planner_params["target_pos"])
-        self.type = "EE"
-        self.ref_type = "waypoint"
-        self.ref_data_type = "Vec3"
-        self.frame_id = planner_params["frame_id"]
 
         self.started = False
         self.finished = False
@@ -86,7 +86,6 @@ class EESimplePlannerBaseFrame(Planner):
         self.hold_period = planner_params["hold_period"]
         self.tracking_err_tol = planner_params["tracking_err_tol"]
 
-        super().__init__()
 
     def getTrackingPoint(self, t, robot_states=None):
         q,_ = robot_states
@@ -139,12 +138,12 @@ class EESimplePlannerBaseFrame(Planner):
 
 class EEPosTrajectoryCircle(Planner):
     def __init__(self, config):
-        self.name = config["name"]
-        self.type = "EE"
-        self.ref_type = "trajectory"
-        self.ref_data_type = "Vec3"
+        super().__init__(name=config["name"],
+                         type="EE", 
+                         ref_type="trajectory", 
+                         ref_data_type="Vec3",
+                         frame_id=config["frame_id"])
         self.tracking_err_tol = config["tracking_err_tol"]
-        self.frame_id = config["frame_id"]
 
         self.finished = False
         self.started = False
@@ -162,7 +161,6 @@ class EEPosTrajectoryCircle(Planner):
         self.N = int(self.T * self.round / self.dt)
         self.plan = self._generatePlan()
 
-        super().__init__()
 
     def _generatePlan(self):
         ts = np.linspace(0, self.T * self.round, self.N)
@@ -226,12 +224,12 @@ class EEPosTrajectoryCircle(Planner):
 
 class EEPosTrajectoryLine(TrajectoryPlanner):
     def __init__(self, config):
-        self.name = config["name"]
-        self.type = "EE"
-        self.ref_type = "trajectory"
-        self.ref_data_type = "Vec3"
+        super().__init__(name=config["name"],
+                         type="EE", 
+                         ref_type="trajectory", 
+                         ref_data_type="Vec3",
+                         frame_id=config["frame_id"])
         self.tracking_err_tol = config["tracking_err_tol"]
-        self.frame_id = config["frame_id"]
         self.end_stop = config.get("end_stop", False)
 
         self.finished = False
@@ -246,7 +244,6 @@ class EEPosTrajectoryLine(TrajectoryPlanner):
         self.dt = 0.01
         self.plan = self._generatePlan()
 
-        super().__init__()
 
     def regeneratePlan(self):
         self.plan = self._generatePlan()
@@ -299,76 +296,50 @@ class EEPosTrajectoryLine(TrajectoryPlanner):
 
         return config
 
-class EEPosTrajectory(Planner):
-    def __init__(self, planner_params):
-        self.type = "EE"
-        self.finished = False
-        self.reached_target = False
-        self.stamp = 0
-        self.hold_period = planner_params["hold_period"]
-        self.ref_type = "pose"
+# class EESixDofWaypoint(Planner):
+#     def __init__(self, planner_params):
+#         self.target_pose = np.array(planner_params["target_pose"])
+#         self.type = "EE"
+#         self.finished = False
+#         self.reached_target = False
+#         self.stamp = 0
+#         self.hold_period = planner_params["hold_period"]
+#         self.ref_type = "pose"
 
-        super().__init__()
+#         super().__init__()
         
-    def getTrackingPoint(self, t, robot_states=None):
-        wp = np.array([np.sin(t), 0, np.sin(t)*np.cos(t)])
-        disp = np.array([0., 2., 1.])
-        
-        return wp+disp, np.zeros(3)
-        
+#     def getTrackingPoint(self, t, robot_states=None):
+#         if not self.finished:
+#             return self.target_pose, np.zeros(6)
+#         else:
+#             return self.target_pose, np.zeros(6)
     
-    def checkFinished(self, t, state_ee):
-        pass
-    
-    def reset(self):
-        self.reached_target = False
-        self.stamp = 0
-        self.finished = False
+#     def checkFinished(self, t, state_ee):
+#         # state_ee a Homogeneous Transformation matrix
+#         Terr = np.matmul(linalg.inv(state_ee), self.target_pose)
+#         # Terr = SE3(SO3(Terr[:3,:3]), Terr[:3, 3])
+#         Terr = SE3(Terr)
+#         # twist = Terr.log()
+#         twist = Terr.twist()
 
-class EESixDofWaypoint(Planner):
-    def __init__(self, planner_params):
-        self.target_pose = np.array(planner_params["target_pose"])
-        self.type = "EE"
-        self.finished = False
-        self.reached_target = False
-        self.stamp = 0
-        self.hold_period = planner_params["hold_period"]
-        self.ref_type = "pose"
-
-        super().__init__()
+#         if not self.finished and np.linalg.norm(twist) > 0.2:
+#             self.reset()
+#         if not self.reached_target and np.linalg.norm(twist) < 0.1:
+#             self.reached_target = True
+#             self.stamp=t
+#             self.py_logger.info("Reached")
+#         elif self.reached_target and not self.finished:
+#             if t - self.stamp > self.hold_period:
+#                 self.finished = True
+#                 self.py_logger.info("Finished")
         
-    def getTrackingPoint(self, t, robot_states=None):
-        if not self.finished:
-            return self.target_pose, np.zeros(6)
-        else:
-            return self.target_pose, np.zeros(6)
+#         # print("Target {}".format(self.target_pose))
+#         # print("Curret {}".format(state_ee))
     
-    def checkFinished(self, t, state_ee):
-        # state_ee a Homogeneous Transformation matrix
-        Terr = np.matmul(linalg.inv(state_ee), self.target_pose)
-        # Terr = SE3(SO3(Terr[:3,:3]), Terr[:3, 3])
-        Terr = SE3(Terr)
-        # twist = Terr.log()
-        twist = Terr.twist()
-
-        if not self.finished and np.linalg.norm(twist) > 0.2:
-            self.reset()
-        if not self.reached_target and np.linalg.norm(twist) < 0.1:
-            self.reached_target = True
-            self.stamp=t
-            self.py_logger.info("Reached")
-        elif self.reached_target and not self.finished:
-            if t - self.stamp > self.hold_period:
-                self.finished = True
-                self.py_logger.info("Finished")
-        
-        # print("Target {}".format(self.target_pose))
-        # print("Curret {}".format(state_ee))
-    
-    def reset(self):
-        self.reached_target = False
-        self.stamp = 0
-        self.finished = False
+#     def reset(self):
+#         self.reached_target = False
+#         self.stamp = 0
+#         self.finished = False
 
 
 if __name__ == '__main__':
@@ -377,10 +348,9 @@ if __name__ == '__main__':
     planner = EESimplePlanner(planner_params)
     planner_params = {"target_pose": [0., 1., 1.], 'hold_period':1}
     
-    T = make_trans_from_vec(np.array([0,0,1]) * np.pi/2, [1,0,0])
-    
-    planner_params = {"target_pose": T, 'hold_period': 0}
-    planner = EESixDofWaypoint(planner_params)
+    # T = make_trans_from_vec(np.array([0,0,1]) * np.pi/2, [1,0,0])
+    # planner_params = {"target_pose": T, 'hold_period': 0}
+    # planner = EESixDofWaypoint(planner_params)
     
     state_ee = make_trans_from_vec(np.array([0,0,1]) * np.pi/2*0.9, [1.,0,0])
     t = 0
