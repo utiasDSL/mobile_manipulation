@@ -414,8 +414,9 @@ class ControllerROSNode:
         t0 = t
         self.sot.started = True
 
-        sot_num_plans = 1 if self.ctrl_config["type"][:2] == "ST" else 2
-        # sot_num_plans = 2
+        sot_num_plans = self.ctrl_config.get("task_num", None)
+        if sot_num_plans is None:
+            sot_num_plans = 1 if self.ctrl_config["type"][:2] == "ST" else 2
         while not self.ctrl_c:
             t = rospy.Time.now().to_sec()
             if self.ctrl_config["sdf_collision_avoidance_enabled"]:

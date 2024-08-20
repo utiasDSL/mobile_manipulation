@@ -5,7 +5,7 @@ planner:
     planner_type: "EESimplePlanner"
     frame_id: "EE"
     initial_pos: [0.0, -0.0, 0.0]
-    target_pos: [0.0, 0.5, 0.0]
+    target_pos: [0.0, 0.0, 0.0]
     hold_period: 3.
     tracking_err_tol: 0.02
     cruise_speed: 0.5
