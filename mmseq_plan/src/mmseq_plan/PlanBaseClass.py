@@ -25,3 +25,82 @@ class TrajectoryPlanner(Planner):
         p,v = interpolate(t, plan)
 
         return p, v
+
+class WholeBodyPlanner(Planner):
+    def __init__(self):
+        super().__init__()
+
+    @abstractmethod
+    def interpolate(self, t):
+        pass
+
+    @abstractmethod
+    def processResults(self):
+        pass
+
+    @abstractmethod
+    def initiliazePartialPlanners(self):
+        pass
+    
+    def control(self, t):
+        ''' Given a time, return an interpolated velocity'''
+        q, q_dot = self.interpolate(t)
+        return q_dot
+    
+    def getTrackingPoint(self, t):
+        ''' Given a time, return the end effector position and base position'''
+        q, q_dot = self.interpolate(t)
+
+        end_effector_p = self.motion_class.end_effector_pose(q)
+        end_effector_v = self.motion_class.compute_jacobian_whole(q) @ q_dot
+
+        base_p = self.motion_class.base_xyz(q)
+        base_v = self.motion_class.base_jacobian(q) @ q_dot
+        return (end_effector_p, end_effector_v), (base_p, base_v)
+    
+    def checkFinished(self, t, ee_curr_pos):
+        return t > self.tf
+
+    def getBasePlanner(self):
+        return self.base_planner
+    
+    def getEEPlanner(self):
+        return self.ee_planner
+        
+
+class CasadiPartialPlanner(Planner):
+    def __init__(self, config, pose_calculator_func, jacobian_calculator_func):
+        super().__init__()
+
+        self.name = config["name"]
+        self.type = config["type"]
+        self.ref_type = "trajectory"
+        self.ref_data_type = config["ref_data_type"]
+        self.tracking_err_tol = config["tracking_err_tol"]
+        self.frame_id = config["frame_id"]
+
+        self.pose_calculator_func = pose_calculator_func
+        self.jacobian_calculator_func = jacobian_calculator_func
+
+    @abstractmethod
+    def interpolate(self, t):
+        pass
+
+    @abstractmethod
+    def _processResults(self):
+        pass
+
+    def getTrackingPoint(self, t):
+        ''' Given a time, return the end effector position and base position'''
+        q, q_dot = self.interpolate(t)
+
+        p = self.pose_calculator_func(q)
+        v = self.jacobian_calculator_func(q) @ q_dot
+
+        return (end_effector_p, end_effector_v), (base_p, base_v)
+    
+    def checkFinished(self, t, ee_curr_pos):
+        return t > self.tf
+
+    
+

@@ -10,6 +10,8 @@ import mmseq_plan.EEPlanner as eep
 import mmseq_plan.BasePlanner as basep
 from mmseq_utils import parsing
 from mmseq_utils.math import wrap_pi_scalar
+from mmseq_plan.CPCPlanner import CPCPlanner
+from mmseq_plan.SequentialPlanner import SequentialPlanner
 
 class SoTBase(ABC):
     def __init__(self, config):
@@ -18,7 +20,16 @@ class SoTBase(ABC):
 
         self.planners = []
         for task_entry in config["tasks"]:
-            if task_entry["name"][:2] == "EE":
+            if task_entry["name"] == "whole_body":
+                if task_entry["planner_type"] == "SequentialPlanner":
+                    whole_body_planner = SequentialPlanner(config)
+                else:
+                    whole_body_planner = CPCPlanner(config)
+                # generate plan
+
+                # generate partial planners
+
+            elif task_entry["name"][:2] == "EE":
                 planner_class = getattr(eep, task_entry["planner_type"])
             else:
                 planner_class = getattr(basep, task_entry["planner_type"])

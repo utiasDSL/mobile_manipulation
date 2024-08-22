@@ -124,3 +124,74 @@ controller:
       args:
         use_collision: "True"
         transform_params: "$(find mmseq_run)/config/robot/robot_transforms_real.yaml"
+
+planner:
+  motion_class_type: "MobileManipulatorPointMass"
+  robot:
+    dims:
+      q: 9  # generalized position
+      v: 9  # generalized velocity
+      x: 18 # state
+      u: 9  # input
+    x0: [ 1, -1, 0, 0.5pi, -0.25pi, 0.5pi, -0.25pi, 0.5pi, 0.417pi ]
+
+    limits:
+      input_rate:
+        lower: [-10, -10, -10, -80, -80, -80, -80, -80, -80]
+        upper: [10, 10, 10, 80, 80, 80, 80, 80, 80]
+      input:
+        lower: [ -2.5, -2.5, -1., -2.16, -2.16, -3.15, -3.2, -3.2, -3.2 ]
+        upper: [ 2.5, 2.5, 1., 2.16, 2.16, 3.15, 3.2, 3.2, 3.2 ]
+      state:
+        lower: [ -10, -10, -2.pi, -0.pi, -1pi, -1pi, -1pi, -1pi, -1pi,
+                 -1.1, -1.1, -2, -2, -2, -3, -3, -3, -3 ]
+        upper: [ 10, 10, 2pi, 1.pi, 1pi, 1pi, 1pi, 1pi, 1pi,
+                 1.1, 1.1, 2, 2, 2, 3, 3, 3, 3 ]
+
+    link_names:
+      - "base"
+      - "ur10_arm_base_link"
+      - "ur10_arm_shoulder_link"
+      - "ur10_arm_upper_arm_link"
+      - "ur10_arm_forearm_link"
+      - "ur10_arm_wrist_1_link"
+      - "ur10_arm_wrist_2_link"
+      - "ur10_arm_wrist_3_link"
+      - "gripped_object"
+    tool_link_name: "gripped_object"
+    base_link_name: "base"
+    base_type: omnidirectional
+
+    tool_vicon_name: "ThingContainer"
+
+    collision_link_names:
+      base:
+        - "base_collision_link"
+      rack:
+        - "rack_collision_link"
+      upper_arm:
+        - "ur10_arm_upper_arm_collision_link"
+        - "ur10_arm_upper_arm_collision_sphere_link1"
+        - "ur10_arm_upper_arm_collision_sphere_link2"
+        - "ur10_arm_upper_arm_collision_sphere_link3"
+      forearm:
+        - "ur10_arm_forearm_collision_link"
+        - "ur10_arm_forearm_collision_sphere_link1"
+        - "ur10_arm_forearm_collision_sphere_link2"
+      wrist:
+        - "ur10_arm_wrist1_collision_link"
+        - "ur10_arm_wrist3_collision_link"
+      tool:
+        - "gripped_object_collision_link"
+
+
+    urdf:
+      package: "mmseq_assets"
+      path: "thing/urdf/thing_ctrl.urdf"
+      includes:
+        - "$(find mobile_manipulation_central)/urdf/xacro/thing_no_wheels.urdf.xacro"
+        - "$(find mmseq_assets)/thing/xacro/end_effector_fingers.urdf.xacro"
+        - "$(find mmseq_assets)/thing/xacro/collision.urdf.xacro"
+      args:
+        use_collision: "True"
+        transform_params: "$(find mmseq_run)/config/robot/robot_transforms_real.yaml"

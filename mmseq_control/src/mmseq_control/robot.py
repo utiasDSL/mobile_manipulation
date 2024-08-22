@@ -525,6 +525,9 @@ class MobileManipulator3D:
                 self.collisionLinkKinSymMdls[name] = self._getFk(name)
 
     def _setupJacobianSymMdl(self):
+        """ Create jacobian symbolic model for MM links keyed by link name
+            Jacobian in the reference frame of the world frame
+        """
         self.jacSymMdls = {}
         for name in self.link_names:
             fk_fcn = self.kinSymMdls[name]
@@ -552,7 +555,7 @@ class MobileManipulator3D:
         if link_name == self.base_link_name:
             return cs.Function(link_name + "_fcn", [self.q_sym], [self.qb_sym[:2], self.qb_sym[2]], ["q"], ["pos2", "heading"])
 
-        Hwb = cs.MX.eye(4)
+        Hwb = cs.MX.eye(4) #T related to movement of base
         if not base_frame:
             Hwb[0, 0] = np.cos(self.qb_sym[2])
             Hwb[1, 0] = np.sin(self.qb_sym[2])
@@ -563,10 +566,10 @@ class MobileManipulator3D:
         fk_str = self.kindyn.fk(link_name)
         fk = cs.Function.deserialize(fk_str)
         link_pos, link_rot = fk(self.qa_sym)
-        Hbl = cs.MX.eye(4)
+        Hbl = cs.MX.eye(4) # T from base to link
         Hbl[:3, :3] = link_rot
         Hbl[:3, 3] = link_pos
-        Hwl = Hwb @ Hbl
+        Hwl = Hwb @ Hbl # overall transformation
 
         return cs.Function(link_name + "_fcn", [self.q_sym], [Hwl[:3, 3], Hwl[:3, :3]], ["q"], ["pos", "rot"])
 

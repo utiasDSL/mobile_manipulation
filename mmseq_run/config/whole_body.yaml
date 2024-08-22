@@ -1,0 +1,50 @@
+planner:
+  sot_type: "SoTStatic"
+  tasks:
+    - name: "whole_body"
+      planner_type: "SequentialPlanner"
+      N: 100
+      dt: 0.01
+      target_points: [[5,5,1], [4, 4, 1], [5, 5, 1], [4, 4, 0.5], [4, 4, 1]]
+      prediction_horizon: 5
+      initialization: "Pontryagin"
+      obstacle_avoidance: True
+      motion_class: 
+    - name: "whole_body"
+      planner_type: "CPCPlanner"
+      N: 100
+      dt: 0.01
+      target_points: [[5,5,1], [4, 4, 1], [5, 5, 1], [4, 4, 0.5], [4, 4, 1]]
+      prediction_horizon: 5
+      initialization: "Pontryagin"
+      obstacle_avoidance: True
+      cpc_tolerance: 0.1
+      d_tol: 0.1
+
+    #by having modified the thing.yaml, the planner should contain the robot's configuration
+    
+controller:
+  home: "default"
+  self_collision_avoidance_enabled: True
+  sdf_collision_avoidance_enabled: False
+  type: "STMPC"
+
+
+simulation:
+  duration: 25
+
+include:
+  - package: "mmseq_run"
+    path: "config/robot/thing.yaml"
+  - package: "mmseq_run"
+    path: "config/controller/MPC.yaml"
+  - package: "mmseq_run"
+    path: "config/sim/simulation.yaml"
+  - package: "mmseq_run"
+    path: "config/scene/empty.yaml"
+  - package: "mmseq_run"
+    path: "config/map/SDF2D.yaml"
+
+logging:
+  log_dir: "/home/ubuntu/"
+  log_level: 4 # 0 - not set, 10 - debug, 20 - info
