@@ -7,22 +7,28 @@ planner:
       dt: 0.01
       target_points: [[5,5,1], [4, 4, 1], [5, 5, 1], [4, 4, 0.5], [4, 4, 1]]
       prediction_horizon: 5
-      initialization: "Pontryagin"
+      initialization: "Pontryagin" #Pontryagin or InverseKinematics
       obstacle_avoidance: True
-      motion_class: 
-    - name: "whole_body"
-      planner_type: "CPCPlanner"
-      N: 100
-      dt: 0.01
-      target_points: [[5,5,1], [4, 4, 1], [5, 5, 1], [4, 4, 0.5], [4, 4, 1]]
-      prediction_horizon: 5
-      initialization: "Pontryagin"
-      obstacle_avoidance: True
-      cpc_tolerance: 0.1
-      d_tol: 0.1
-
-    #by having modified the thing.yaml, the planner should contain the robot's configuration
-    
+      motion_class_type: "MobileManipulatorPointMass"
+      tracking_err_tol: 0.1
+      motion_class_config_file: 
+          package: "mmseq_run"
+          path: "config/robot/default_thing_whole_body.yaml"
+      # - name: "whole_body"
+      #   planner_type: "CPCPlanner"
+      #   N: 100
+      #   dt: 0.01
+      #   target_points: [[5,5,1], [4, 4, 1], [5, 5, 1], [4, 4, 0.5], [4, 4, 1]]
+      #   prediction_horizon: 5
+      #   initialization: "Pontryagin"
+      #   obstacle_avoidance: True
+      #   cpc_tolerance: 0.1
+      #   d_tol: 0.1
+      #   motion_class_type: "MobileManipulatorPointMass"
+      #   tracking_err_tol: 0.1
+      #   motion_class_config_file: 
+      #       package: "mmseq_run"
+      #       path: "config/robot/default_thing_whole_body.yaml"
 controller:
   home: "default"
   self_collision_avoidance_enabled: True

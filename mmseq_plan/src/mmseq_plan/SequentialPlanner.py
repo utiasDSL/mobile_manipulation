@@ -5,36 +5,51 @@ import time
 
 from mmseq_utils.plot_casadi_time_optimal import decompose_X
 from mmseq_utils.point_mass_computation_scripts.casadi_initial_guess import initial_guess, initial_guess_simple
-from mmseq_control.mobile_manipulator_point_mass.mobile_manipulator_class import MobileManipulatorPointMass
+# for now import the mobile manipulators, in future we should be able to import a file and not having to update this if more motion classses are introduced
+# todo this we could declare all the motion classes in a file and import that file ? 
+import mmseq_control.mobile_manipulator_point_mass.mobile_manipulator_class as MobileManipulatorPointMass
+import mmseq_control.robot as robot
 from mmseq_plan.PlanBaseClass import WholeBodyPlanner, CasadiPartialPlanner
+from mmseq_utils.parsing import load_config, parse_ros_path, parse_array
 
 class SequentialPlanner(WholeBodyPlanner):
-    def __init__(self, motion_class):
-        self.motion_class = motion_class
-        self.qs_num = motion_class.DoF
-        self.q_max = motion_class.ub_x[:self.qs_num]
-        self.q_min = motion_class.lb_x[:self.qs_num]
-        self.q_dot_max = motion_class.ub_x[self.qs_num:]
-        self.q_dot_min = motion_class.lb_x[self.qs_num:]
-        self.u_max = motion_class.ub_u
-        self.u_min = motion_class.lb_u
-        self.motion_model = motion_class.ssSymMdl["fmdl"]
-        self.forward_kinematic = motion_class.end_effector_pose_func()
-        self.config = None
+    def __init__(self, config, motion_class=None):
+        if motion_class is not None:
+            self.motion_class = motion_class
+            self.config = None
+        else:
+            possibly_motion_class = getattr(MobileManipulatorPointMass, config["motion_class_type"], None)
+            if possibly_motion_class is None:
+                possibly_motion_class = getattr(robot, config["motion_class_type"], None)
+            if possibly_motion_class is None:
+                raise ValueError("Motion class {} not found".format(config["motion_class_type"]))
+            # take path from yaml that provide package and location given package
+            config_path = parse_ros_path(config["motion_class_config_file"])
+            robot_config = load_config(config_path)["controller"]
 
-    
+            self.motion_class = possibly_motion_class(robot_config)
+            self.points = config['target_points']
+            self.prediction_horizon = config['prediction_horizon']
+            self.N = config['N']
+            self.dt_config = config['dt']
+            self.init_config = config['initialization']
+            self.obs_avoidance = config['obstacle_avoidance']
+            self.starting_configuration = parse_array(robot_config["robot"]["x0"])
+            self.config = config
+
+        self.qs_num = self.motion_class.DoF
+        self.q_max = self.motion_class.ub_x[:self.qs_num]
+        self.q_min = self.motion_class.lb_x[:self.qs_num]
+        self.q_dot_max = self.motion_class.ub_x[self.qs_num:]
+        self.q_dot_min = self.motion_class.lb_x[self.qs_num:]
+        self.u_max = self.motion_class.ub_u
+        self.u_min = self.motion_class.lb_u
+        self.motion_model = self.motion_class.ssSymMdl["fmdl"]
+        self.forward_kinematic = self.motion_class.end_effector_pose_func()
+
+    @classmethod
     def initializeFromMotionClass(self, motion_class):
-        self.motion_class = motion_class
-        self.qs_num = motion_class.DoF
-        self.q_max = motion_class.ub_x[:self.qs_num]
-        self.q_min = motion_class.lb_x[:self.qs_num]
-        self.q_dot_max = motion_class.ub_x[self.qs_num:]
-        self.q_dot_min = motion_class.lb_x[self.qs_num:]
-        self.u_max = motion_class.ub_u
-        self.u_min = motion_class.lb_u
-        self.motion_model = motion_class.ssSymMdl["fmdl"]
-        self.forward_kinematic = motion_class.end_effector_pose_func()
-        self.config = None
+        return SequentialPlanner(None, motion_class)
 
 
     def setup_single_problem(self, start, goal, motion_model, forward_kinematic, N=100, d_tol=0.01, initial_point=False, state_dim=2, iteration=0, obstacles_avoidance=None, obstacles=[]):
@@ -142,6 +157,8 @@ class SequentialPlanner(WholeBodyPlanner):
             
         OPT_variables = ca.vertcat(*ts, X)
         opts = {'print_time': False, 'ipopt.print_level': 0}
+        opts = {'print_time': False, 'ipopt.sb': 'yes', 'ipopt.acceptable_tol': 1e-8, 'ipopt.acceptable_obj_change_tol': 1e-6, 'ipopt.print_level': 0, 'ipopt.max_iter': 10000}
+
         nlp = {'x': OPT_variables, 'f': obj, 'g': ca.vertcat(*g)}
         solver = ca.nlpsol('solver', 'ipopt', nlp, opts)
         res = solver(x0=X0, lbx=ca.vertcat(*lbx), ubx=ca.vertcat(*ubx), lbg=ca.vertcat(*lbg), ubg=ca.vertcat(*ubg))
@@ -149,18 +166,22 @@ class SequentialPlanner(WholeBodyPlanner):
         result = res['x']
         final_time = ca.sum1(result[:prediction_horizon])
         X_final = ca.vertcat(final_time, result[prediction_horizon:])
+        if solver.stats()['return_status'] != 'Solve_Succeeded':
+            print(solver.stats()['return_status'])
         # print dts
         # for i in range(len(Ns)):
         #     print(result[i]/Ns[i])
         return X_final, X_dim, result[:prediction_horizon]
     
-    def generateTrajectory(self, points, starting_configuration, prediction_horizon, N=100, t_bound=np.inf, obs_avoidance=True, init_configs='pont'):
+    def generateTrajectory(self, points, starting_configuration, prediction_horizon, N=100, t_bound=np.inf, obs_avoidance=True, init_config='Pontryagin'):
         points_full = [self.motion_class.end_effector_pose(starting_configuration).full().flatten()]
         points_full.extend(points)
-        if init_configs == 'pont':
+        if init_config == 'Pontryagin':
             X0_array, ts, Ns = initial_guess(self.motion_class, points_full, starting_configuration, prediction_horizon, N, is_sequential_guess=True)
-        else:
+        elif init_config == 'InverseKinematics':
             X0_array, ts, Ns = initial_guess_simple(self.motion_class, points_full, starting_configuration, prediction_horizon, N, is_sequential_guess=True)
+        else:
+            raise ValueError("Invalid initialization method")
         self.Ns = Ns
         X0 = ca.vertcat(*ts, *X0_array)
         obstacles_avoidance = None
@@ -173,6 +194,11 @@ class SequentialPlanner(WholeBodyPlanner):
         self.X = X
         self.total_elements = total_elements
         return X, total_elements
+
+    def generatePlanFromConfig(self):
+        self.generateTrajectory(self.points, self.starting_configuration, self.prediction_horizon, N=self.N, t_bound=np.inf, init_config=self.init_config, obs_avoidance=self.obs_avoidance)
+        self.processResults()
+        self.initiliazePartialPlanners()
     
     def processResults(self):
         self.dts = []
@@ -244,15 +270,15 @@ class SequentialPartialPlanner(CasadiPartialPlanner):
         self.qs_num = qs_num
         self.tfs = tfs
         self.Ns = Ns
+        self.processResults()
     
     def processResults(self):
         self.dts = []
         for i in range(len(self.Ns)):
             self.dts.append(float(self.tfs[i]/self.Ns[i]))
         qs, qs_dots, us = decompose_X(self.X, self.qs_num, self.total_elements)
-        qs_zero, qs_dot_zero, us_zero = decompose_X(self.X0, self.qs_num, self.total_elements)
         self.qs, self.qs_dots, self.us = qs.T, qs_dots.T, us.T
-        self.qs_zero, self.qs_dot_zero, self.us_zero = qs_zero.T, qs_dot_zero.T, us_zero.T
+        # self.qs_zero, self.qs_dot_zero, self.us_zero = qs_zero.T, qs_dot_zero.T, us_zero.T
         self.tf = np.sum(self.tfs)
 
     def interpolate(self, t):

@@ -30,7 +30,7 @@ controller:
 
 
 simulation:
-  duration: 5
+  duration: 25
 
 include:
   - package: "mmseq_run"

@@ -29,6 +29,10 @@ class TrajectoryPlanner(Planner):
 class WholeBodyPlanner(Planner):
     def __init__(self):
         super().__init__()
+    
+    @abstractmethod
+    def generatePlanFromConfig(self):
+        pass
 
     @abstractmethod
     def interpolate(self, t):
@@ -87,17 +91,17 @@ class CasadiPartialPlanner(Planner):
         pass
 
     @abstractmethod
-    def _processResults(self):
+    def processResults(self):
         pass
 
-    def getTrackingPoint(self, t):
+    def getTrackingPoint(self, t, robot_states=None):
         ''' Given a time, return the end effector position and base position'''
         q, q_dot = self.interpolate(t)
 
         p = self.pose_calculator_func(q)
         v = self.jacobian_calculator_func(q) @ q_dot
 
-        return (end_effector_p, end_effector_v), (base_p, base_v)
+        return p, v
     
     def checkFinished(self, t, ee_curr_pos):
         return t > self.tf
