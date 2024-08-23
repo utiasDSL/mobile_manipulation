@@ -439,7 +439,7 @@ class MobileManipulator3D:
 
         self.numjoint = self.kindyn.nq()
         self.DoF = self.numjoint + 3
-        self.dt = config["dt"]
+        self.dt = config["robot"]["time_discretization_dt"]
         self.ub_x = parsing.parse_array(config["robot"]["limits"]["state"]["upper"])
         self.lb_x = parsing.parse_array(config["robot"]["limits"]["state"]["lower"])
         self.ub_u = parsing.parse_array(config["robot"]["limits"]["input"]["upper"])

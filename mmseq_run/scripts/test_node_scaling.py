@@ -80,6 +80,8 @@ def main():
     
     pdf = PdfPages('results.pdf')
 
+    sequential_plan = SequentialPlanner.initializeFromMotionClass(mobile_robot)
+    cpc_plan = CPCPlanner.initializeFromMotionClass(mobile_robot)
 
     for i in range(int(args.scenarios)):
         plotting_labels = []
@@ -133,7 +135,6 @@ def main():
             for j in init_configs:
                 ## CPC optimization'
                 if args.optimization == "cpc":
-                    cpc_plan = CPCPlanner(mobile_robot)
                     if j=='inverse_kinematic':
                         start_time = time.time()
                         X0_array, tf = initial_guess_simple(mobile_robot, points_full, starting_configuration, prediction_horizon, N)
@@ -163,7 +164,6 @@ def main():
 
                 ## Sequential optimization
                 elif args.optimization == 'sequential':
-                    sequential_plan = SequentialPlanner(mobile_robot)
 
                     if j=='inverse_kinematic':
                         start_time = time.time()

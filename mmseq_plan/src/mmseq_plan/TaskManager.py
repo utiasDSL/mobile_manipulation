@@ -10,8 +10,8 @@ import mmseq_plan.EEPlanner as eep
 import mmseq_plan.BasePlanner as basep
 from mmseq_utils import parsing
 from mmseq_utils.math import wrap_pi_scalar
-from mmseq_plan.CPCPlanner import CPCPlanner
-from mmseq_plan.SequentialPlanner import SequentialPlanner
+import mmseq_plan.CPCPlanner as CPCPlanner
+import mmseq_plan.SequentialPlanner as SequentialPlanner
 
 class SoTBase(ABC):
     def __init__(self, config):
@@ -20,22 +20,28 @@ class SoTBase(ABC):
 
         self.planners = []
         for task_entry in config["tasks"]:
-            if task_entry["name"] == "whole_body":
-                if task_entry["planner_type"] == "SequentialPlanner":
-                    whole_body_planner = SequentialPlanner(config)
-                else:
-                    whole_body_planner = CPCPlanner(config)
+            if task_entry["name"] == "whole_body": 
+                planner = getattr(CPCPlanner, task_entry["planner_type"], None)
+                if planner is None:
+                    planner = getattr(SequentialPlanner, task_entry["planner_type"], None)
+                if planner is None:
+                    raise ValueError("Planner type {} not found".format(task_entry["planner_type"]))
                 # generate plan
+                planner = planner(task_entry)
+                planner.generatePlanFromConfig()
 
                 # generate partial planners
+                self.planners.append(planner.getBasePlanner())
+                self.planners.append(planner.getEEPlanner())
 
-            elif task_entry["name"][:2] == "EE":
-                planner_class = getattr(eep, task_entry["planner_type"])
             else:
-                planner_class = getattr(basep, task_entry["planner_type"])
+                if task_entry["name"][:2] == "EE":
+                    planner_class = getattr(eep, task_entry["planner_type"])
+                else:
+                    planner_class = getattr(basep, task_entry["planner_type"])
 
-            planner = planner_class(task_entry)
-            self.planners.append(planner)
+                planner = planner_class(task_entry)
+                self.planners.append(planner)
 
         self.planner_num = len(self.planners)
 

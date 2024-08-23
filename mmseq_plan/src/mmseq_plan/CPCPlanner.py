@@ -4,36 +4,57 @@ import matplotlib.pyplot as plt
 
 from mmseq_utils.plot_casadi_time_optimal import decompose_X
 from mmseq_utils.point_mass_computation_scripts.casadi_initial_guess import initial_guess, initial_guess_simple
-from mmseq_control.mobile_manipulator_point_mass.mobile_manipulator_class import MobileManipulatorPointMass
+# for now import the mobile manipulators, in future we should be able to import a file and not having to update this if more motion classses are introduced
+# todo this we could declare all the motion classes in a file and import that file ? 
+import mmseq_control.mobile_manipulator_point_mass.mobile_manipulator_class as MobileManipulatorPointMass
+import mmseq_control.robot as robot
 from mmseq_plan.PlanBaseClass import WholeBodyPlanner, CasadiPartialPlanner
+from mmseq_utils.parsing import load_config, parse_ros_path, parse_array
 
 
 class CPCPlanner(WholeBodyPlanner):
-    def __init__(self, motion_class):
-        self.motion_class = motion_class
-        self.qs_num = motion_class.DoF
-        self.q_max = motion_class.ub_x[:self.qs_num]
-        self.q_min = motion_class.lb_x[:self.qs_num]
-        self.q_dot_max = motion_class.ub_x[self.qs_num:]
-        self.q_dot_min = motion_class.lb_x[self.qs_num:]
-        self.u_max = motion_class.ub_u
-        self.u_min = motion_class.lb_u
-        self.motion_model = motion_class.ssSymMdl["fmdl"]
-        self.forward_kinematic = motion_class.end_effector_pose_func()
-        self.config = None
+    def __init__(self, config, motion_class=None):
+        if motion_class is not None:
+            self.motion_class = motion_class
+            self.config = None
+        else:
+            possibly_motion_class = getattr(MobileManipulatorPointMass, config["motion_class_type"], None)
+            if possibly_motion_class is None:
+                possibly_motion_class = getattr(robot, config["motion_class_type"], None)
+            if possibly_motion_class is None:
+                raise ValueError("Motion class {} not found".format(config["motion_class_type"]))
+            # take path from yaml that provide package and location given package
+            config_path = parse_ros_path(config["motion_class_config_file"])
+            robot_config = load_config(config_path)["controller"]
 
+            self.motion_class = possibly_motion_class(robot_config)
+            self.points = config['target_points']
+            self.prediction_horizon = config['prediction_horizon']
+            self.N = config['N']
+            self.dt_config = config['dt']
+            self.d_tol = config['d_tol']
+            self.cpc_tolerance = config['cpc_tolerance']
+            self.init_config = config['initialization']
+            self.obs_avoidance = config['obstacle_avoidance']
+            self.starting_configuration = parse_array(robot_config["robot"]["x0"])
+            self.config = config
+
+            
+        self.qs_num = self.motion_class.DoF
+        self.q_max = self.motion_class.ub_x[:self.qs_num]
+        self.q_min = self.motion_class.lb_x[:self.qs_num]
+        self.q_dot_max = self.motion_class.ub_x[self.qs_num:]
+        self.q_dot_min = self.motion_class.lb_x[self.qs_num:]
+        self.u_max = self.motion_class.ub_u
+        self.u_min = self.motion_class.lb_u
+        self.motion_model = self.motion_class.ssSymMdl["fmdl"]
+        self.forward_kinematic = self.motion_class.end_effector_pose_func()
+
+
+    @classmethod
     def initializeFromMotionClass(self, motion_class):
-        self.motion_class = motion_class
-        self.qs_num = motion_class.DoF
-        self.q_max = motion_class.ub_x[:self.qs_num]
-        self.q_min = motion_class.lb_x[:self.qs_num]
-        self.q_dot_max = motion_class.ub_x[self.qs_num:]
-        self.q_dot_min = motion_class.lb_x[self.qs_num:]
-        self.u_max = motion_class.ub_u
-        self.u_min = motion_class.lb_u
-        self.motion_model = motion_class.ssSymMdl["fmdl"]
-        self.forward_kinematic = motion_class.end_effector_pose_func()
-        self.config = None
+        return CPCPlanner(None, motion_class=motion_class)
+
 
 
     def optimize(self, points, prediction_horizon, X0, t_bound, motion_model, forward_kinematic, N=100, d_tol=0.01, constrain_final_point=False, cpc_tolerance=0.001, obstacles_avoidance=None):
@@ -209,23 +230,30 @@ class CPCPlanner(WholeBodyPlanner):
 
         return X, total_elements
 
-    def generateTrajectory(self, points, starting_configuration, prediction_horizon, N=100, t_bound=np.inf, d_tol=0.01, cpc_tolerance=0.001, simple=False, obs_avoidance=True):
+    def generateTrajectory(self, points, starting_configuration, prediction_horizon, N=100, t_bound=np.inf, d_tol=0.01, cpc_tolerance=0.001, init_config='Pontryagin', obs_avoidance=True):
         self.N = N
         obstacles_avoidance = None
         if obs_avoidance:
             obstacles_avoidance = self.motion_class.casadi_model_interface.signedDistanceSymMdlsPerGroup["self"]
         points_full = [self.motion_class.end_effector_pose(starting_configuration).full().flatten()]
         points_full.extend(points)
-        if simple:
+        if init_config == 'Pontryagin':
             X0_array, tf = initial_guess_simple(self.motion_class, points_full, starting_configuration, prediction_horizon, N)
-        else:
+        elif init_config == 'InverseKinematics':
             X0_array, tf = initial_guess(self.motion_class, points_full, starting_configuration, prediction_horizon, N, d_tol=d_tol)
+        else:
+            raise ValueError("Invalid initialization method")
         X0 = ca.vertcat(tf, *X0_array)
         X, total_elements = self.optimize(points_full, prediction_horizon, X0, t_bound, self.motion_model, self.forward_kinematic, N=N, d_tol=d_tol, cpc_tolerance=cpc_tolerance, obstacles_avoidance=obstacles_avoidance)
         
         self.X = X
         self.total_elements = total_elements
         return X, total_elements
+
+    def generatePlanFromConfig(self):
+        self.generateTrajectory(self.points, self.starting_configuration, self.prediction_horizon, N=self.N, t_bound=np.inf, d_tol=self.d_tol, cpc_tolerance=self.cpc_tolerance, init_config=self.init_config, obs_avoidance=self.obs_avoidance)
+        self.processResults()
+        self.initiliazePartialPlanners()
     
     def processResults(self):
         self.dt = float(self.X[0]/self.N)
@@ -269,6 +297,7 @@ class CPCPartialPlanner(CasadiPartialPlanner):
         self.N = N
         self.total_elements = total_elements
         self.qs_num = qs_num
+        self.processResults()
 
     def processResults(self):
         self.dt = float(self.X[0]/self.N)

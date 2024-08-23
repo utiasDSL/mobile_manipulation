@@ -56,9 +56,12 @@ def main():
     print(f"Time taken to compute sampling: {time.time()-start_time}")
     print()
 
+
+    sequential_plan = SequentialPlanner.initializeFromMotionClass(mobile_robot)
+    cpc_plan = CPCPlanner.initializeFromMotionClass(mobile_robot)
+
     ## CPC optimization'
     if args.optimization == "cpc":
-        cpc_plan = CPCPlanner(mobile_robot)
         t = []
         for i in range(int(args.loop)):
             if args.init == 'inverse':
@@ -83,7 +86,6 @@ def main():
 
     ## Sequential optimization
     elif args.optimization == 'sequential':
-        sequential_plan = SequentialPlanner(mobile_robot)
 
         t = []
         for i in range(int(args.loop)):
