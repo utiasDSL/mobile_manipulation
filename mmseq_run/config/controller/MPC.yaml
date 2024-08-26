@@ -15,7 +15,7 @@ controller:
   cmd_vel_pub_rate: 100 # hz
   soft_cst: True
   penalize_du: False
-  self_collision_avoidance_enabled: True
+  self_collision_avoidance_enabled: False
   sdf_collision_avoidance_enabled: False
   static_obstacles_collision_avoidance_enabled: False
   ee_upward_constraint_enabled: False

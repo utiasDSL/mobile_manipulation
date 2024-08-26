@@ -278,12 +278,12 @@ class CPCPlanner(WholeBodyPlanner):
 
     def initiliazePartialPlanners(self):
         if self.config is None:
-            base_config = {"name": "base_planner", "type": "base", "tracking_err_tol": 0.02, "frame_id": "base", "ref_data_type": "Vec2"}
-            ee_config = {"name": "ee_planner", "type": "end_effector", "tracking_err_tol": 0.02, "frame_id": "EE", "ref_data_type": "Vec3"}
+            base_config = {"name": "BasePosTrajectoryLine", "type": "base", "tracking_err_tol": 0.02, "frame_id": "base", "ref_data_type": "Vec2"}
+            ee_config = {"name": "EESimplePlanner", "type": "EE", "tracking_err_tol": 0.02, "frame_id": "EE", "ref_data_type": "Vec3"}
 
         else:
-            base_config = {"name": "base_planner", "type": "base", "tracking_err_tol": self.config["tracking_err_tol"], "frame_id": "base", "ref_data_type": "Vec2"}
-            ee_config = {"name": "ee_planner", "type": "end_effector", "tracking_err_tol": self.config["tracking_err_tol"], "frame_id": "EE", "ref_data_type": "Vec3"}
+            base_config = {"name": "BasePosTrajectoryLine", "type": "base", "tracking_err_tol": self.config["tracking_err_tol"], "frame_id": "base", "ref_data_type": "Vec2"}
+            ee_config = {"name": "EESimplePlanner", "type": "EE", "tracking_err_tol": self.config["tracking_err_tol"], "frame_id": "EE", "ref_data_type": "Vec3"}
 
         self.base_planner =  CPCPartialPlanner(self.X, self.N, self.total_elements, base_config, self.qs_num, self.motion_class.base_xyz, self.motion_class.base_jacobian)
         self.ee_planner = CPCPartialPlanner(self.X, self.N, self.total_elements, ee_config, self.qs_num, self.motion_class.end_effector_pose, self.motion_class.compute_jacobian_whole)
@@ -309,6 +309,7 @@ class CPCPartialPlanner(CasadiPartialPlanner):
         ''' Given a time, return the interpolated q and q_dot'''
         lower_index = int(t/self.dt)
         upper_index = lower_index + 1
+        print('time:', t, 'final time:', self.tf)
         if upper_index >= len(self.qs_dots):
             q = self.qs[-1]
             return q, [0]*self.qs_num

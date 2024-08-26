@@ -30,7 +30,7 @@ controller:
 
 
 simulation:
-  duration: 25
+  duration: 5
 
 include:
   - package: "mmseq_run"
@@ -42,7 +42,7 @@ include:
   - package: "mmseq_run"
     path: "config/scene/empty.yaml"
   - package: "mmseq_run"
-    path: "config/map/SDF2D.yaml"
+    path: "config/map/SDF3D.yaml"
 
 logging:
   log_dir: "/home/ubuntu/"

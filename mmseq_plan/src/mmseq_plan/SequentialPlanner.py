@@ -250,12 +250,12 @@ class SequentialPlanner(WholeBodyPlanner):
 
     def initiliazePartialPlanners(self):
         if self.config is None:
-            base_config = {"name": "base_planner", "type": "base", "tracking_err_tol": 0.02, "frame_id": "base", "ref_data_type": "Vec2"}
-            ee_config = {"name": "ee_planner", "type": "end_effector", "tracking_err_tol": 0.02, "frame_id": "EE", "ref_data_type": "Vec3"}
+            base_config = {"name": "BasePosTrajectoryLine", "type": "base", "tracking_err_tol": 0.02, "frame_id": "base", "ref_data_type": "Vec2"}
+            ee_config = {"name": "EESimplePlanner", "type": "EE", "tracking_err_tol": 0.02, "frame_id": "EE", "ref_data_type": "Vec3"}
 
         else:
-            base_config = {"name": "base_planner", "type": "base", "tracking_err_tol": self.config["tracking_err_tol"], "frame_id": "base", "ref_data_type": "Vec2"}
-            ee_config = {"name": "ee_planner", "type": "end_effector", "tracking_err_tol": self.config["tracking_err_tol"], "frame_id": "EE", "ref_data_type": "Vec3"}
+            base_config = {"name": "BasePosTrajectoryLine", "type": "base", "tracking_err_tol": self.config["tracking_err_tol"], "frame_id": "base", "ref_data_type": "Vec2"}
+            ee_config = {"name": "EESimplePlanner", "type": "EE", "tracking_err_tol": self.config["tracking_err_tol"], "frame_id": "EE", "ref_data_type": "Vec3"}
 
         self.base_planner = SequentialPartialPlanner(self.X, self.total_elements, base_config, self.qs_num, self.motion_class.base_xyz, self.motion_class.base_jacobian, self.tfs, self.Ns)
         self.ee_planner = SequentialPartialPlanner(self.X, self.total_elements, ee_config, self.qs_num, self.motion_class.end_effector_pose, self.motion_class.compute_jacobian_whole, self.tfs, self.Ns)
@@ -283,7 +283,6 @@ class SequentialPartialPlanner(CasadiPartialPlanner):
 
     def interpolate(self, t):
         offset=0
-        print('t:', t, 'ts:', self.tfs, 'total time:', sum(self.tfs))
         if t > sum(self.tfs):
             return self.qs[-1], [0]*self.qs_num
         for i in range(len(self.tfs)):

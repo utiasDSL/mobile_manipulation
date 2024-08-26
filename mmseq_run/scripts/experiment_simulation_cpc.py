@@ -82,23 +82,23 @@ def main():
     # here probably put the code for generating trajectory
     # initialize robot (needed for generating trajectory)
 
-    future_points = [[5,5,1], [4, 4, 1], [5, 5, 1], [4, 4, 0.5], [4, 4, 1]]
+    future_points =  [[1, 2, 1], [4, 4, 1], [1, 2, 1]]
     # future_points = [[5,5,1]]
     for point in future_points:
         debug_frame_world(0.5, point)
     starting_configuration = robot.home
     prediction_horizon = len(future_points)
-    N = 200
+    N = 400
 
     mobile_robot = MobileManipulatorPointMass(ctrl_config)
 
     # Calculate CPC Solution
-    # cpc_plan = CPCPlanner(mobile_robot)
+    # cpc_plan = CPCPlanner.initializeFromMotionClass(mobile_robot)
     # X, total_elements = cpc_plan.generateTrajectory(future_points, starting_configuration, prediction_horizon, N)
     # cpc_plan.processResults()
 
     # Calculate Sequential Solution
-    sequential_plan = SequentialPlanner(mobile_robot)
+    sequential_plan = SequentialPlanner.initializeFromMotionClass(mobile_robot)
     X, total_elements = sequential_plan.generateTrajectory(future_points, starting_configuration, prediction_horizon, N, obs_avoidance=True)
     sequential_plan.processResults()
 

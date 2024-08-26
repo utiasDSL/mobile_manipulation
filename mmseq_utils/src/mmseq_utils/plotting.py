@@ -105,7 +105,7 @@ class DataPlotter:
         :return:
         """
         npz_file_path = os.path.join(folder_path, "data.npz")
-        data = dict(np.load(npz_file_path))
+        data = dict(np.load(npz_file_path, allow_pickle=True))
         config_file_path = os.path.join(folder_path, "config.yaml")
         config = parsing.load_config(config_file_path)
         folder_name = folder_path.split("/")[-1]

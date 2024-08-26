@@ -3,29 +3,29 @@ planner:
   tasks:
     - name: "whole_body"
       planner_type: "SequentialPlanner"
-      N: 100
+      N: 500
       dt: 0.01
-      target_points: [[5,5,1], [4, 4, 1], [5, 5, 1], [4, 4, 0.5], [4, 4, 1]]
-      prediction_horizon: 5
+      target_points: [[1, 2, 1], [4, 4, 1], [1, 2, 1]]
+      prediction_horizon: 3
       initialization: "Pontryagin" #Pontryagin or InverseKinematics
       obstacle_avoidance: True
       motion_class_type: "MobileManipulatorPointMass"
-      tracking_err_tol: 0.1
+      tracking_err_tol: 0.02
       motion_class_config_file: 
           package: "mmseq_run"
           path: "config/robot/default_thing_whole_body.yaml"
       # - name: "whole_body"
       #   planner_type: "CPCPlanner"
-      #   N: 100
+      #   N: 200
       #   dt: 0.01
-      #   target_points: [[5,5,1], [4, 4, 1], [5, 5, 1], [4, 4, 0.5], [4, 4, 1]]
-      #   prediction_horizon: 5
+      #   target_points: [[1, 2, 1], [4, 4, 1]]
+      #   prediction_horizon: 2
       #   initialization: "Pontryagin"
       #   obstacle_avoidance: True
-      #   cpc_tolerance: 0.1
+      #   cpc_tolerance: 0.0001
       #   d_tol: 0.1
       #   motion_class_type: "MobileManipulatorPointMass"
-      #   tracking_err_tol: 0.1
+      #   tracking_err_tol: 0.01
       #   motion_class_config_file: 
       #       package: "mmseq_run"
       #       path: "config/robot/default_thing_whole_body.yaml"
@@ -37,7 +37,7 @@ controller:
 
 
 simulation:
-  duration: 25
+  duration: 10
 
 include:
   - package: "mmseq_run"
@@ -49,7 +49,7 @@ include:
   - package: "mmseq_run"
     path: "config/scene/empty.yaml"
   - package: "mmseq_run"
-    path: "config/map/SDF2D.yaml"
+    path: "config/map/SDF3D.yaml"
 
 logging:
   log_dir: "/home/ubuntu/"
