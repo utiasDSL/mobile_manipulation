@@ -302,30 +302,31 @@ class ControllerROSNode:
         self.controller_visualization_pub.publish(marker_rbase)
 
         # base sdf gradients
-        marker_array_sdf_grad = MarkerArray()
-        marker_id = 4
-        for i in range(0, controller.sdf_grad_bar["base"].shape[1], 3):
-            grad = controller.sdf_grad_bar["base"][:, i]
+        if self.ctrl_config["sdf_collision_avoidance_enabled"]:
+            marker_array_sdf_grad = MarkerArray()
+            marker_id = 4
+            for i in range(0, controller.sdf_grad_bar["base"].shape[1], 3):
+                grad = controller.sdf_grad_bar["base"][:, i]
 
-            marker_sdf_grad_base = self._make_marker(Marker.ARROW, marker_id + i, rgba=[1.0, 0.0, 0, 1.0], scale=[0.05]*3)
-            marker_sdf_grad_base.points.append(Point(*controller.base_bar[i]))
-            marker_sdf_grad_base.points.append(Point(*(controller.base_bar[i] + grad)))
-            marker_array_sdf_grad.markers.append(marker_sdf_grad_base)
-            marker_id += 1
-
-
-        # ee sdf gradients
-        for i in range(0, controller.sdf_grad_bar["EE"].shape[1], 3):
-            grad = controller.sdf_grad_bar["EE"][:, i]
-
-            marker_sdf_grad_ee = self._make_marker(Marker.ARROW, marker_id+i, rgba=[1.0, 0.0, 0, 1.0], scale=[0.05]*3)
-            marker_sdf_grad_ee.points.append(Point(*(controller.ee_bar[i])))
-            marker_sdf_grad_ee.points.append(Point(*(controller.ee_bar[i] + grad)))
-            marker_array_sdf_grad.markers.append(marker_sdf_grad_ee)
-            marker_id += 1
+                marker_sdf_grad_base = self._make_marker(Marker.ARROW, marker_id + i, rgba=[1.0, 0.0, 0, 1.0], scale=[0.05]*3)
+                marker_sdf_grad_base.points.append(Point(*controller.base_bar[i]))
+                marker_sdf_grad_base.points.append(Point(*(controller.base_bar[i] + grad)))
+                marker_array_sdf_grad.markers.append(marker_sdf_grad_base)
+                marker_id += 1
 
 
-        self.controller_visualization_array_pub.publish(marker_array_sdf_grad)
+            # ee sdf gradients
+            for i in range(0, controller.sdf_grad_bar["EE"].shape[1], 3):
+                grad = controller.sdf_grad_bar["EE"][:, i]
+
+                marker_sdf_grad_ee = self._make_marker(Marker.ARROW, marker_id+i, rgba=[1.0, 0.0, 0, 1.0], scale=[0.05]*3)
+                marker_sdf_grad_ee.points.append(Point(*(controller.ee_bar[i])))
+                marker_sdf_grad_ee.points.append(Point(*(controller.ee_bar[i] + grad)))
+                marker_array_sdf_grad.markers.append(marker_sdf_grad_ee)
+                marker_id += 1
+
+
+            self.controller_visualization_array_pub.publish(marker_array_sdf_grad)
 
     def run(self):
         rate = rospy.Rate(self.ctrl_rate)
