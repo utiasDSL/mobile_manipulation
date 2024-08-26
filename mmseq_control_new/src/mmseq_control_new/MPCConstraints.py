@@ -222,7 +222,7 @@ class SignedDistanceConstraintCBF(NonlinearConstraint):
 
 
 class StateBoxConstraints(NonlinearConstraint):
-    def __init__(self, robot_mdl, name="state_constraints"):
+    def __init__(self, robot_mdl, name="state"):
         """ Signed Distance Constraint
                    lb_x < x < ub_x
 
@@ -243,7 +243,7 @@ class StateBoxConstraints(NonlinearConstraint):
         self.g_fcn = cs.Function("g_"+self.name, [self.x_sym, self.u_sym, self.p_sym], [self.g_eqn])
 
 class ControlBoxConstraints(NonlinearConstraint):
-    def __init__(self, robot_mdl, name="state_constraints"):
+    def __init__(self, robot_mdl, name="control"):
         """ Signed Distance Constraint
                    lb_u < u < ub_u
 

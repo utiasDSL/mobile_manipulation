@@ -23,7 +23,7 @@ from matplotlib.backends.backend_pdf import PdfPages
 from mobile_manipulation_central import ros_utils
 
 VICON_TOOL_NAME = "ThingWoodLumber"
-
+THING_BASE_NAME = "ThingBase_3"
 def multipage(filename, figs=None, dpi=200):
     pp = PdfPages(filename)
     if figs is None:
@@ -165,7 +165,7 @@ class DataPlotter:
                 path_to_bag = d
 
         path_to_npz = os.path.join(path_to_control_folder, "data.npz")
-        data = dict(np.load(path_to_npz))
+        data = dict(np.load(path_to_npz, allow_pickle=True))
 
         path_to_config = os.path.join(path_to_control_folder, "config.yaml")
         config = parsing.load_config(path_to_config)
@@ -237,12 +237,15 @@ class DataPlotter:
         # signed distance
         nq = self.data["nq"]
         qs = self.data["xs"][:, :nq]
-        sdf_param_names = ["_".join(["mpc","sdf","param", str(i)])+"s" for i in range(self.model_interface.sdf_map.dim+1)]
-        sdf_param = [self.data[name] for name in sdf_param_names]
+
         # keyed by obstacle names or "self"
         names = ["self", "static_obstacles"]
-        names += ["sdf"] if self.config["controller"]["sdf_collision_avoidance_enabled"] else []
-        params = {"self": [], "static_obstacles":[],"sdf": sdf_param}
+        params = {"self": [], "static_obstacles":[]}
+        if self.config["controller"]["sdf_collision_avoidance_enabled"]:
+            names += ["sdf"]
+            sdf_param_names = ["_".join(["mpc","sdf","param", str(i)])+"s" for i in range(self.model_interface.sdf_map.dim+1)]
+            sdf_param = [self.data[name] for name in sdf_param_names]
+            params["sdf"] = sdf_param
         sds_dict = self.model_interface.evaluteSignedDistance(names, qs, params)
         sds = np.array([sd for sd in sds_dict.values()])
         self.data["signed_distance"] = np.min(sds, axis=0)
@@ -298,6 +301,30 @@ class DataPlotter:
         self.data["r_bw_bs"] = self._transform_w2b_SE2(qb, self.data["r_bw_ws"])
         if "r_bw_w_ds" in self.data.keys():
             self.data["r_bw_b_ds"] = self._transform_w2b_SE2(qb, self.data["r_bw_w_ds"])
+        
+        # mpc constraints with prediction
+        N = len(self.data["ts"])
+        for constraint in self.controller.constraints:
+            name = "_".join(["mpc", constraint.name,"constraint", "predictions"])
+            self.data[name] = []
+            for t_index in range(N):
+                param_map_bar = [reconstruct_sym_struct_map_from_array(self.controller.p_struct, param_map_array) for param_map_array in self.data["mpc_ocp_params"][t_index]]
+                x_bar = self.data["mpc_x_bars"][t_index]
+                u_bar = self.data["mpc_u_bars"][t_index]
+                self.data[name].append(self.controller.evaluate_constraints(constraint, x_bar, u_bar, param_map_bar))
+            self.data[name] = np.array(self.data[name])
+
+        self.data["mpc_ee_predictions"] = []
+        self.data["mpc_base_predictions"] = []
+
+        for t_index in range(N):
+            x_bar = self.data["mpc_x_bars"][t_index]
+            ee_bar, base_bar = self.controller._getEEBaseTrajectories(x_bar)
+            self.data["mpc_ee_predictions"].append(ee_bar)
+            self.data["mpc_base_predictions"].append(base_bar)
+        
+        self.data["mpc_ee_predictions"] = np.array(self.data["mpc_ee_predictions"])
+        self.data["mpc_base_predictions"] = np.array(self.data["mpc_base_predictions"])
 
 
     def _get_statistics(self):
@@ -1281,7 +1308,7 @@ class DataPlotter:
         if len(data.shape) == 3:
             N, P, D = data.shape
         
-        data_per_figure = 12
+        data_per_figure = 6
         if D%data_per_figure == 0:
             figs_num = D//data_per_figure
         else:
@@ -1307,13 +1334,16 @@ class DataPlotter:
                 data_num = len(axes)
 
             for i in range(data_num):
-                print(i+fi*data_per_figure)
-                axes[i].plot(t_all[:, 0].flatten(), data[:,0, i+fi*data_per_figure].flatten(), "o-", label=" ".join(["actual", legend]), linewidth=2, markersize=8)
-                axes[i].plot(t_all[off_set::4].T, data[off_set::4, :, i+fi*data_per_figure].T, "o-", linewidth=1, fillstyle='none')
+                data_index = i+fi*data_per_figure
+                axes[i].plot(t_all[:, 0].flatten(), data[:,0, data_index].flatten(), "o-", label=" ".join(["actual", legend]), linewidth=2, markersize=8)
+                axes[i].plot(t_all[off_set::4].T, data[off_set::4, :, data_index].T, "o-", linewidth=1, fillstyle='none')
                 
-                axes[i].set_title(" ".join(data_name.split("_")[1:] + ["figure", str(fi)+"/"+str(figs_num)]))
+                axes[i].set_ylabel("d[{}]".format(data_index))
+
                 axes[i].legend()
                 axes[i].grid()
+            axes[0].set_title(" ".join(data_name.split("_")[1:] + ["figure", str(fi+1)+"/"+str(figs_num)]))
+            
             plt.show(block=block)
     
         return axes
@@ -1349,14 +1379,11 @@ class DataPlotter:
         # self.plot_solver_iters_htmpc(block=False)
         self.plot_time_htmpc(block=False)
         # self.plot_solver_iters()
-        # self.plot_mpc_prediction("mpc_obstacle_cylinder_1_link_constraints")
-        self.plot_mpc_prediction("mpc_sdf_constraints", block=False)
-        # self.plot_mpc_prediction("mpc_control_constraints",block=False)
-        # self.plot_mpc_prediction("mpc_state_constraints", block=False)
-        # self.plot_mpc_prediction("mpc_sdf_constraint_gradients", block=False)
-
-
         self.plot_run_time()
+
+        mpc_failure_steps = np.where(self.data["mpc_solver_statuss"] == 4)[0]
+        if mpc_failure_steps.size > 0:
+            self.mpc_constraint_debug(self.data["ts"][mpc_failure_steps[0]])
 
     def plot_robot(self):
         self.plot_cmd_vs_real_vel()
@@ -1598,16 +1625,19 @@ class DataPlotter:
         self.plot_sdf(t, use_iter_snapshot=True, block=True)
 
     def mpc_constraint_debug(self, t):
-        f, axes = plt.subplots(2, 1, sharex=True)
-        self.plot_mpc_prediction("mpc_sdf_constraints", t, axes=[axes[0]], block=False)
-        self.plot_time_series_data_htmpc("mpc_solver_statuss", axes=[axes[1]], block=False)
+        self.plot_time_series_data_htmpc("mpc_solver_statuss", block=False)
 
-        self.plot_mpc_prediction("mpc_sdf_constraints", t, axes=[axes[0]], block=False)
-        self.plot_mpc_prediction("mpc_control_constraints", t,block=False)
-        self.plot_mpc_prediction("mpc_state_constraints", t, block=False)
+        for constraint in self.controller.constraints:
+            data_name = "_".join(["mpc", constraint.name, "constraint", "predictions"])
+            self.plot_mpc_prediction(data_name, t, block=False)
+
+        # self.plot_mpc_prediction("mpc_sdf_constraints", t, axes=[axes[0]], block=False)
+        # self.plot_mpc_prediction("mpc_control_constraints", t,block=False)
+        # self.plot_mpc_prediction("mpc_state_constraints", t, block=False)
+
 
 class ROSBagPlotter:
-    def __init__(self, bag_file, config_file="/home/tracy/Project/catkin_ws/src/mm_sequential_tasks/mmseq_run/config/robot/thing.yaml"):
+    def __init__(self, bag_file, config_file="/home/tracy/Projects/mm_slam/mm_ws/src/mm_sequential_tasks/mmseq_run/config/3d_collision.yaml"):
         self.data = {"ur10": {}, "ridgeback": {}, "mpc": {}, "vicon": {}, "model":{}}
         self.bag = rosbag.Bag(bag_file)
         self.config = load_config(config_file)
@@ -1675,7 +1705,7 @@ class ROSBagPlotter:
             if name == 'markers':
                 continue
             msgs = [msg for _, msg, _ in bag.read_messages(topic)]
-            if name == "ThingBase_2":
+            if name == THING_BASE_NAME:
                 ts, qs = ros_utils.parse_ridgeback_vicon_msgs(msgs)         # q is a 3-element vector x, y, theta
                 self.data["vicon"]["ThingBase"] = {"ts": ts, "pos": qs[:, :2], "orn": qs[:, 2]}
 
@@ -1812,7 +1842,7 @@ class ROSBagPlotter:
                    label=labels_v[i])
 
             ax[i].plot(self.data["ridgeback"]["cmd_vels"]["ts"],
-                   self.data["ridgeback"]["cmd_vels"]["vc_bs"][:, i], '--',
+                   self.data["ridgeback"]["cmd_vels"]["vc_bs"][:, i], '-x',
                    label=labels_vc[i])
         for i in range(3):
             ax[i].legend()

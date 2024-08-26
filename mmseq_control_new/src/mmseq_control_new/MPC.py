@@ -77,6 +77,9 @@ class MPC():
         self.stateCst = StateBoxConstraints(self.robot)
         self.controlCst = ControlBoxConstraints(self.robot)
 
+        self.cost = []
+        self.constraints = []
+
         self.x_bar = np.zeros((self.N + 1, self.nx))  # current best guess x0,...,xN
         self.x_bar[:, :self.DoF] = self.home
         self.u_bar = np.zeros((self.N, self.nu))  # current best guess u0,...,uN-1
@@ -434,6 +437,9 @@ class STMPC(MPC):
         # constraints = [cst for cst in self.collisionCsts.values()]
         self.ocp, self.ocp_solver, self.p_struct = self._construct(costs, constraints, num_terminal_cost)
 
+        self.cost = costs
+        self.constraints = constraints + [self.controlCst, self.stateCst]
+
     def control(self, t, robot_states, planners, map=None):
 
         self.py_logger.debug("control time {}".format(t))
@@ -660,14 +666,14 @@ class STMPC(MPC):
         self.sdf_bar["base"] = self.model_interface.sdf_map.query_val(self.base_bar[:, 0], self.base_bar[:, 1], np.ones(self.N+1)*0.2)
         self.sdf_grad_bar["base"] = self.model_interface.sdf_map.query_grad(self.base_bar[:, 0], self.base_bar[:, 1], np.ones(self.N+1)*0.2).reshape((3,-1))
 
-        for name in self.collision_link_names: 
-            self.log["_".join([name, "constraint"])] = self.evaluate_constraints(self.collisionCsts[name], 
-                                                                   self.x_bar, self.u_bar, curr_p_map_bar)
-            # self.log["_".join([name, "constraint", "gradient"])] = self.evaluate_constraints_gradient(self.collisionCsts[name], 
-            #                                                        self.x_bar, self.u_bar, curr_p_map_bar)
+        # for name in self.collision_link_names: 
+        #     self.log["_".join([name, "constraint"])] = self.evaluate_constraints(self.collisionCsts[name], 
+        #                                                            self.x_bar, self.u_bar, curr_p_map_bar)
+        #     # self.log["_".join([name, "constraint", "gradient"])] = self.evaluate_constraints_gradient(self.collisionCsts[name], 
+        #     #                                                        self.x_bar, self.u_bar, curr_p_map_bar)
         # For data plotting
-        self.log["state_constraint"] = self.evaluate_constraints(self.stateCst, self.x_bar, self.u_bar, curr_p_map_bar)
-        self.log["control_constraint"] = self.evaluate_constraints(self.controlCst, self.x_bar, self.u_bar, curr_p_map_bar)
+        # self.log["state_constraint"] = self.evaluate_constraints(self.stateCst, self.x_bar, self.u_bar, curr_p_map_bar)
+        # self.log["control_constraint"] = self.evaluate_constraints(self.controlCst, self.x_bar, self.u_bar, curr_p_map_bar)
         self.log["ee_pos"] = self.ee_bar.copy()
         self.log["base_pos"] = self.base_bar.copy()
         self.log["ocp_param"] = [p.cat.full().flatten() for p in curr_p_map_bar]
