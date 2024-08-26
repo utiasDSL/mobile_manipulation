@@ -1,6 +1,6 @@
 import argparse
 import rosbag
-from mmseq_utils.logging import ROSBagPlotter
+from mmseq_utils.plotting import ROSBagPlotter
 
 def main():
     parser = argparse.ArgumentParser()
