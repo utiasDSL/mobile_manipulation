@@ -162,11 +162,17 @@ class ControllerROSNode:
     
     def _publish_cmd_vel_new(self, event):
         if self.mpc_plan is not None:
-            self.lock.acquire()
             t = rospy.Time.now().to_sec()
+            # print("cmd vel loopo {}".format(t))
             t_elasped = t - self.mpc_plan_time_stamp
+            # print("cmd t elapsed {}".format(t_elasped))
+            self.lock.acquire()
             self.cmd_vel = self.mpc_plan_interp(t_elasped)
             self.lock.release()
+
+            # print("mpc plan start {} pub {}".format(self.mpc_plan[0], self.cmd_vel))
+
+
 
         self.robot_interface.publish_cmd_vel(self.cmd_vel)
 
@@ -438,13 +444,15 @@ class ControllerROSNode:
             tc2 = time.perf_counter()
             self.controller_log.log(20, "Controller Run Time: {}".format(tc2 - tc1))
 
-            self.lock.acquire()
-            self.mpc_plan = v_bar
-            self.mpc_plan_time_stamp = t
-            N = self.mpc_plan.shape[0]
+            mpc_plan = v_bar
+            N = mpc_plan.shape[0]
             t_mpc = np.arange(N) * self.mpc_dt
-            self.mpc_plan_interp = interp1d(t_mpc, self.mpc_plan, axis=0, 
+            mpc_plan_interp = interp1d(t_mpc, mpc_plan, axis=0, 
                                             bounds_error=False, fill_value="extrapolate")
+            self.lock.acquire()
+            self.mpc_plan = mpc_plan
+            self.mpc_plan_time_stamp = t
+            self.mpc_plan_interp = mpc_plan_interp
             self.lock.release()
 
             # publish data
