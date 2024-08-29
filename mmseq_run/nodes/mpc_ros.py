@@ -356,6 +356,8 @@ class ControllerROSNode:
                     return
             
             _, map_latest = self.map_interface.get_map()
+            # self.controller.model_interface.sdf_map.update_map(*map_latest)
+            # self.controller.model_interface.sdf_map.vis([-0, 4],[-2,2], [0.2,0.2])
             print("Received Map. Proceed ...")
         else:
             map_latest = None
@@ -427,7 +429,12 @@ class ControllerROSNode:
         while not self.ctrl_c:
             t = rospy.Time.now().to_sec()
             if self.ctrl_config["sdf_collision_avoidance_enabled"]:
+                tm0 = time.perf_counter()
                 status, map = self.map_interface.get_map()
+                tm1 = time.perf_counter()
+
+                t_get_map = tm1 - tm0
+                
                 if status:
                     map_latest = map
                 else:
@@ -506,6 +513,7 @@ class ControllerROSNode:
                 self.logger.append("r_bw_w_ds", r_bw_wd)
             self.logger.append("cmd_vels", u)
             self.logger.append("cmd_accs", acc)
+            self.logger.append("time_get_map", t_get_map)
 
             if self.use_joy and self.start_end_button_interface.button == 1:
                 break
