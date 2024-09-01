@@ -70,8 +70,8 @@ def compare_trajectories_casadi_plot(casadi_results, points, dict_res, shortest,
         for j in range(q_size):
             a = [float(us[j][k]) for k in range(len(us[j]))]
             if a_bounds:
-                axes[j+q_size+1].plot(t, [a_bounds[0][j]]*len(t), 'r--')
-                axes[j+q_size+1].plot(t, [a_bounds[1][j]]*len(t), 'r--')
+                axes[j+q_size+1].plot(t, [a_bounds[i][0][j]]*len(t), 'r--')
+                axes[j+q_size+1].plot(t, [a_bounds[i][1][j]]*len(t), 'r--')
             axes[j+q_size+1].plot(t, a, label=f'{cur_label}')
             axes[j+q_size+1].set_title(f'Accelerations of q{j}')
             axes[j+q_size+1].set_xlabel('Time')
@@ -235,7 +235,7 @@ def plot_whisker_plots(data, x_axis, show=True, titles=[], ylabel='Values'):
         return fig
     plt.show()
 
-def plot_obstacle_avoidance(casadi_results, obstacles_avoidance, state_dim, q_size=2, labels=[], show=True):
+def plot_obstacle_avoidance(casadi_results, obstacles_avoidance, state_dim, q_size=2, labels=[], show=True, limit=0):
     number_of_plots = max(obstacles_avoidance(np.zeros(q_size)).shape[0], obstacles_avoidance(np.zeros(q_size)).shape[1])
     # define the subplots
     rows = int(np.ceil(np.sqrt(number_of_plots)))
@@ -262,7 +262,7 @@ def plot_obstacle_avoidance(casadi_results, obstacles_avoidance, state_dim, q_si
         for j in range(number_of_plots):
             axes[j].plot(x_axis, obstacle_values[j], label=f'{labels[i]}')
             # plot bound
-            axes[j].plot(x_axis, [0]*len(qs), 'r--')
+            axes[j].plot(x_axis, [limit]*len(qs), 'r--')
 
     for j in range(number_of_plots):
         axes[j].set_title(f'Obstacle avoidance for pair {j}')
@@ -337,6 +337,51 @@ def simple_plot(x, Y, titles=['Simple plot'], x_label='x', y_label='y', show=Tru
         ax[i].set_ylabel(y_label)
         if labels:
             ax[i].legend()
+    if not show:
+        return fig
+    plt.show()
+
+def plot_base_ee_pos(casadi_results, motion_class, state_dim, ts, Ns, q_size=2, labels=[], show=True):
+    # define the subplots
+    rows = 3
+    cols = 2
+    fig, axes = plt.subplots(rows, cols, figsize=(15, 15))
+    axes = np.ravel(axes)
+    velocities_titles = ['Base traj x', 'Base traj y', 'End effector traj x', 'End effector traj y', 'End effector traj z']
+    ts = [i.full().flatten() for i in ts]
+
+    for i in range(len(casadi_results)):
+        tf = float(casadi_results[i][0])
+        qs, qs_dots, us = decompose_X(casadi_results[i], q_size, state_dim[i])
+        # generate trajectory graph
+        qs = [k for k in zip(*qs)]
+        velocities = []
+        ps = []
+
+        for j in range(len(qs)):
+            p_base = motion_class.base_xyz(qs[j])
+            p_ee = motion_class.end_effector_pose(qs[j])
+            ps.append([*p_base.full().flatten(), *p_ee.full().flatten()])
+
+        ps = np.array(ps).T
+        print(ps)
+        offset = 0
+        if len(ts[i]) == 1:
+            t = np.linspace(0, tf, len(qs))
+        else:
+            t = []
+            for j in range(len(ts[i])):
+                if j > 0:
+                    offset += ts[i][j-1] + (ts[i][j]/Ns[i][j])
+                t.extend(np.linspace(0, float(ts[i][j]), Ns[i][j])+offset)
+        
+        for j in range(5):
+            axes[j].plot(t, ps[j], label=f'{labels[i]}')
+            axes[j].set_title(velocities_titles[j])
+            axes[j].set_xlabel('Time')
+            axes[j].set_ylabel('Trajectory')
+
+    fig.subplots_adjust(hspace=0.4, wspace=0.4)
     if not show:
         return fig
     plt.show()

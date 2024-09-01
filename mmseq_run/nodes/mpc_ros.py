@@ -63,7 +63,7 @@ class ControllerROSNode:
 
         self.ctrl_config = config["controller"]
         self.planner_config = config["planner"].copy()
-
+        print(self.ctrl_config["type"])
         # controller
         control_class = getattr(HTMPC, self.ctrl_config["type"], None)
         if control_class is None:
@@ -392,7 +392,7 @@ class ControllerROSNode:
             ee_pos, _ = self.robot.getEE(self.robot_interface.q)
             self.planner_coord_transform(self.robot_interface.q, ee_pos, self.sot.planners)
 
-        rospy.Timer(rospy.Duration(0, int(1e8)), self._publish_planner_data)
+        # rospy.Timer(rospy.Duration(0, int(1e8)), self._publish_planner_data)
         states = (self.robot_interface.q ,self.robot_interface.v)
         print("robot coord: {}".format(self.robot_interface.q))
         for planner in self.sot.planners:

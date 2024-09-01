@@ -165,7 +165,7 @@ class DataPlotter:
                 path_to_bag = d
 
         path_to_npz = os.path.join(path_to_control_folder, "data.npz")
-        data = dict(np.load(path_to_npz))
+        data = dict(np.load(path_to_npz, allow_pickle=True))
 
         path_to_config = os.path.join(path_to_control_folder, "config.yaml")
         config = parsing.load_config(path_to_config)
@@ -644,6 +644,8 @@ class DataPlotter:
         v_ew_ws = self.data["v_ew_ws"]
         ω_ew_ws = self.data["ω_ew_ws"]
 
+        v_ref = self.data.get("v_ew_w_ds", [])
+
         if axes is None:
             axes = []
             f, axes = plt.subplots(1, 1, sharex=True)
@@ -653,6 +655,10 @@ class DataPlotter:
         axes.plot(ts, v_ew_ws[:, 0], label=legend + "$v_x$")
         axes.plot(ts, v_ew_ws[:, 1], label=legend + "$v_y$")
         axes.plot(ts, v_ew_ws[:, 2], label=legend + "$v_z$")
+        if len(v_ref) > 0:
+            axes.plot(ts, v_ref[:, 0], label=legend + "$v_{x,plan}$", linestyle="--")
+            axes.plot(ts, v_ref[:, 1], label=legend + "$v_{y,plan}$", linestyle="--")
+            axes.plot(ts, v_ref[:, 2], label=legend + "$v_{z,plan}$", linestyle="--")
         axes.plot(ts, ω_ew_ws[:, 0], label=legend + "$ω_x$")
         axes.plot(ts, ω_ew_ws[:, 1], label=legend + "$ω_y$")
         axes.plot(ts, ω_ew_ws[:, 2], label=legend + "$ω_z$")
@@ -734,6 +740,8 @@ class DataPlotter:
         cmd_vels = self.data["cmd_vels"]
         cmd_accs = self.data.get("cmd_accs")
         cmd_jerks = self.data.get("cmd_jerks")
+        ref_vels = self.data.get("ref_vels")
+        ref_accs = self.data.get("ref_accs")
         nq = int(self.data["nq"])
         nv = int(self.data["nv"])
 
@@ -758,6 +766,15 @@ class DataPlotter:
                 linestyle="--",
                 color=colors[index],
             )
+            if len(ref_vels) > 0:
+                ax[i].plot(
+                    ts,
+                    ref_vels[:, i],
+                    '-x',
+                    label=legend + f"$v_{{plan_{i + 1}}}$",
+                    linestyle="--",
+                    color='r',
+                )
 
             ax[i].grid()
             ax[i].legend()
@@ -770,11 +787,20 @@ class DataPlotter:
                 ax[i].plot(
                     ts,
                     cmd_accs[:, i],
-                    '-x',
+                    '--',
                     label=legend + f"$a_{{cmd_{i + 1}}}$" + f"max = " + str(max(cmd_accs[:, i])),
                     linestyle="--",
                     color=colors[index],
                 )
+                if len(ref_accs) > 0:
+                    ax[i].plot(
+                        ts,
+                        ref_accs[:, i],
+                        '-x',
+                        label=legend + f"$a_{{plan_{i + 1}}}$",
+                        linestyle="--",
+                        color='r',
+                    )
 
                 ax[i].grid()
                 ax[i].legend()
@@ -888,6 +914,7 @@ class DataPlotter:
         ts = self.data["ts"]
         xs = self.data["xs"]
         cmd_vels = self.data["cmd_vels"]
+        ref_vels = self.data["ref_vels"]
         nq = int(self.data["nq"])
         nv = int(self.data["nv"])
 
@@ -907,6 +934,15 @@ class DataPlotter:
                 # linestyle="-x",
                 color=colors[i],
             )
+            if len(ref_vels) > 0:
+                axes[i].plot(
+                    ts,
+                    ref_vels[:, i], '-o',
+                    label=f"$v_{{plan_{i + 1}}}$",
+                    linestyle="--",
+                    color=colors[i],
+                )
+
 
             axes[i].grid()
             axes[i].legend()
@@ -1607,7 +1643,7 @@ class DataPlotter:
         self.plot_mpc_prediction("mpc_state_constraints", t, block=False)
 
 class ROSBagPlotter:
-    def __init__(self, bag_file, config_file="/home/tracy/Project/catkin_ws/src/mm_sequential_tasks/mmseq_run/config/robot/thing.yaml"):
+    def __init__(self, bag_file, config_file="/home/ubuntu/Workspace/catkin_ws/src/mm_sequential_tasks/mmseq_run/config/robot/thing.yaml"):
         self.data = {"ur10": {}, "ridgeback": {}, "mpc": {}, "vicon": {}, "model":{}}
         self.bag = rosbag.Bag(bag_file)
         self.config = load_config(config_file)
@@ -1675,7 +1711,7 @@ class ROSBagPlotter:
             if name == 'markers':
                 continue
             msgs = [msg for _, msg, _ in bag.read_messages(topic)]
-            if name == "ThingBase_2":
+            if name == "ThingBase_3":
                 ts, qs = ros_utils.parse_ridgeback_vicon_msgs(msgs)         # q is a 3-element vector x, y, theta
                 self.data["vicon"]["ThingBase"] = {"ts": ts, "pos": qs[:, :2], "orn": qs[:, 2]}
 
