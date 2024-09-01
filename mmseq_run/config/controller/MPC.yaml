@@ -11,7 +11,7 @@ controller:
   ST_MaxIntvl: 1
   hierarchy_constraint_type: "HierarchicalTrackingConstraint"    # error, cost_value, cost_value_sum
   collision_constraint_type: "SignedDistanceConstraint" # SignedDistanceConstraint or SignedDistanceConstraintCBF 
-  ctrl_rate: 10 #hz
+  ctrl_rate: 20 #hz
   cmd_vel_pub_rate: 100 # hz
   soft_cst: True
   penalize_du: False
@@ -58,18 +58,18 @@ controller:
   # weights for each cost function
   cost_params:
     EEPos3:
-      Qk: 1.0
-      P: 1
+      Qk: 10.0
+      P: 1.
     BasePos2:
-      Qk: 1.
+      Qk: 10.
       P: 1
     Effort:
       Qqa: 0.
       Qqb: 0.
       Qva: 0.01
       Qvb: 0.1
-      Qua: 0.01
-      Qub: 0.1
+      Qua: 0.005
+      Qub: 0.05
       Qdua: 0.
       Qdub: 0.1
     Regularization:
