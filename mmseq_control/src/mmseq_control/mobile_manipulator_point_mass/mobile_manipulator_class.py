@@ -46,14 +46,9 @@ class MobileManipulatorPointMass(MobileManipulator3D):
         setattr(MobileManipulatorPointMass, 'create_graph', trajectory_graph.create_graph)
         from . import q_velocity_generation
         setattr(MobileManipulatorPointMass, 'generate_waypoints_q_dot', q_velocity_generation.generate_waypoints_q_dot)
-        from . import motion_model
-        setattr(MobileManipulatorPointMass, 'robot_motion_model', motion_model.robot_motion_model)
         from . import trajectory_computation
         setattr(MobileManipulatorPointMass, 'calculate_trajectory', trajectory_computation.calculate_trajectory)
         setattr(MobileManipulatorPointMass, 'calculate_trajectory_simple', trajectory_computation.calculate_trajectory_simple)
-        from . import generate_balls
-        setattr(MobileManipulatorPointMass, 'generate_balls', generate_balls.generate_balls)
-        setattr(MobileManipulatorPointMass, 'generate_balls_constraints', generate_balls.generate_balls_constraints)
         from . import obstacle_detection_function 
         setattr(MobileManipulatorPointMass, 'object_detection_func', obstacle_detection_function.object_detection_func)
 
