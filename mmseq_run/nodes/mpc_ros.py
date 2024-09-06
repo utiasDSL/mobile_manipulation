@@ -192,25 +192,24 @@ class ControllerROSNode:
                 transform.translation.x = p[0]
                 transform.translation.y = p[1]
                 transform.translation.z = p[2]
-
-                velocity = Twist()
-                velocity.linear.x = v[0]
-                velocity.linear.y = v[1]
-                velocity.linear.z = v[2]
-
                 pt_msg.transforms.append(transform)
-                pt_msg.velocities.append(velocity)
+                
+                if v is not None:
+                    velocity = Twist()
+                    velocity.linear.x = v[0]
+                    velocity.linear.y = v[1]
+                    velocity.linear.z = v[2]
+                    pt_msg.velocities.append(velocity)
             elif planner.ref_data_type == "Vec2":
                 transform = Transform()
                 transform.translation.x = p[0]
                 transform.translation.y = p[1]
-
-                velocity = Twist()
-                velocity.linear.x = v[0]
-                velocity.linear.y = v[1]
-
                 pt_msg.transforms.append(transform)
-                pt_msg.velocities.append(velocity)
+                if v is not None:
+                    velocity = Twist()
+                    velocity.linear.x = v[0]
+                    velocity.linear.y = v[1]
+                    pt_msg.velocities.append(velocity)
 
             msg.points.append(pt_msg)
 
