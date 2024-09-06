@@ -171,9 +171,20 @@ class ControllerROSNode:
             r_bw_wd = []
             for planner in planners:
                 if planner.type == "EE":
-                    r_ew_wd, _ = planner.getTrackingPoint(t-t0, robot_states)
+                    if planner.name == "PartialPlanner":
+                        r_ew_wd, ref_v_ee = planner.getTrackingPoint(t, robot_states)
+                        logger.append("ref_v_ee", ref_v_ee)
+                    else:
+                        r_ew_wd, _ = planner.getTrackingPoint(t, robot_states)
                 elif planner.type == "base":
-                    r_bw_wd, _ = planner.getTrackingPoint(t-t0, robot_states)
+                    if planner.name == "PartialPlanner":
+                        r_bw_wd, ref_v_base = planner.getTrackingPoint(t, robot_states)
+                        ref_q_dot, ref_u = planner.getRefVelandAcc(t)
+                        logger.append("ref_v_base", ref_v_base)
+                        logger.append("ref_vels", ref_q_dot)
+                        logger.append("ref_accs", ref_u)
+                    else:
+                        r_bw_wd, _ = planner.getTrackingPoint(t, robot_states)
             if len(r_ew_wd) > 0:
                 self.logger.append("r_ew_w_ds", r_ew_wd)
             if len(r_bw_wd) > 0:

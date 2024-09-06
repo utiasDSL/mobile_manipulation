@@ -76,7 +76,7 @@ controller:
                  -1.1, -1.1, -2, -2, -2, -3, -3, -3, -3 ]
         upper: [ 10, 10, 2pi, 1.pi, 1pi, 1pi, 1pi, 1pi, 1pi,
                  1.1, 1.1, 2, 2, 2, 3, 3, 3, 3 ]
-
+    time_discretization_dt: 0.1
     link_names:
       - "base"
       - "ur10_arm_base_link"
@@ -124,3 +124,4 @@ controller:
       args:
         use_collision: "True"
         transform_params: "$(find mmseq_run)/config/robot/robot_transforms_real.yaml"
+  

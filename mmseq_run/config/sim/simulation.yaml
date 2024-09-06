@@ -4,10 +4,11 @@ simulation:
   gravity: [0, 0, -9.81]
 
   robot:
-#    home: [0, 0, 0, 0.5pi, -0.5pi, 0, -0.pi, 0.5pi, 0]  # upright
+    # home: [0, 0, 0, 0.5pi, -0.5pi, 0, -0.pi, 0.5pi, 0]  # upright
 #    home: [0, 0, 0, 0.5pi, 0., 0., 0., 0.5pi, 0.]  # upright
-    home: [ 0., -0, 0.pi, 0.5pi, -0.25pi, 0.5pi, -0.25pi, 0.5pi, -0.261 ]  # standard
-#    home: [ -0., 0, 0.pi, 0.5pi, -0.25pi, 0.5pi, 0.25pi, 0.5pi, 0.417pi ]  # grasping box directly
+    # home: [ 0., -0, 0.pi, 0.5pi, -0.25pi, 0.5pi, -0.25pi, 0.5pi, -0.261 ]  # standard
+    # home: [0, 0, 0, 0, 0, 0, 0, 0, 0]
+    home: [ -0., 0, 0.pi, 0.5pi, -0.25pi, 0.5pi, 0.25pi, 0.5pi, 0.417pi ]  # grasping box directly
     tool_vicon_name: ThingContainer
 
   pybullet_connection: "DIRECT"  # "Direct" or "GUI"

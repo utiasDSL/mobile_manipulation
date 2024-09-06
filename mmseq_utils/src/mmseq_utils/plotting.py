@@ -105,7 +105,7 @@ class DataPlotter:
         :return:
         """
         npz_file_path = os.path.join(folder_path, "data.npz")
-        data = dict(np.load(npz_file_path))
+        data = dict(np.load(npz_file_path, allow_pickle=True))
         config_file_path = os.path.join(folder_path, "config.yaml")
         config = parsing.load_config(config_file_path)
         folder_name = folder_path.split("/")[-1]
@@ -675,6 +675,8 @@ class DataPlotter:
         v_ew_ws = self.data["v_ew_ws"]
         ω_ew_ws = self.data["ω_ew_ws"]
 
+        v_ref = self.data.get("v_ew_w_ds", [])
+
         if axes is None:
             axes = []
             f, axes = plt.subplots(1, 1, sharex=True)
@@ -684,6 +686,10 @@ class DataPlotter:
         axes.plot(ts, v_ew_ws[:, 0], label=legend + "$v_x$")
         axes.plot(ts, v_ew_ws[:, 1], label=legend + "$v_y$")
         axes.plot(ts, v_ew_ws[:, 2], label=legend + "$v_z$")
+        if len(v_ref) > 0:
+            axes.plot(ts, v_ref[:, 0], label=legend + "$v_{x,plan}$", linestyle="--")
+            axes.plot(ts, v_ref[:, 1], label=legend + "$v_{y,plan}$", linestyle="--")
+            axes.plot(ts, v_ref[:, 2], label=legend + "$v_{z,plan}$", linestyle="--")
         axes.plot(ts, ω_ew_ws[:, 0], label=legend + "$ω_x$")
         axes.plot(ts, ω_ew_ws[:, 1], label=legend + "$ω_y$")
         axes.plot(ts, ω_ew_ws[:, 2], label=legend + "$ω_z$")
@@ -765,6 +771,8 @@ class DataPlotter:
         cmd_vels = self.data["cmd_vels"]
         cmd_accs = self.data.get("cmd_accs")
         cmd_jerks = self.data.get("cmd_jerks")
+        ref_vels = self.data.get("ref_vels")
+        ref_accs = self.data.get("ref_accs")
         nq = int(self.data["nq"])
         nv = int(self.data["nv"])
 
@@ -789,6 +797,15 @@ class DataPlotter:
                 linestyle="--",
                 color=colors[index],
             )
+            if len(ref_vels) > 0:
+                ax[i].plot(
+                    ts,
+                    ref_vels[:, i],
+                    '-x',
+                    label=legend + f"$v_{{plan_{i + 1}}}$",
+                    linestyle="--",
+                    color='r',
+                )
 
             ax[i].grid()
             ax[i].legend()
@@ -801,11 +818,20 @@ class DataPlotter:
                 ax[i].plot(
                     ts,
                     cmd_accs[:, i],
-                    '-x',
+                    '--',
                     label=legend + f"$a_{{cmd_{i + 1}}}$" + f"max = " + str(max(cmd_accs[:, i])),
                     linestyle="--",
                     color=colors[index],
                 )
+                if len(ref_accs) > 0:
+                    ax[i].plot(
+                        ts,
+                        ref_accs[:, i],
+                        '-x',
+                        label=legend + f"$a_{{plan_{i + 1}}}$",
+                        linestyle="--",
+                        color='r',
+                    )
 
                 ax[i].grid()
                 ax[i].legend()
@@ -919,6 +945,7 @@ class DataPlotter:
         ts = self.data["ts"]
         xs = self.data["xs"]
         cmd_vels = self.data["cmd_vels"]
+        ref_vels = self.data["ref_vels"]
         nq = int(self.data["nq"])
         nv = int(self.data["nv"])
 
@@ -938,6 +965,15 @@ class DataPlotter:
                 # linestyle="-x",
                 color=colors[i],
             )
+            if len(ref_vels) > 0:
+                axes[i].plot(
+                    ts,
+                    ref_vels[:, i], '-o',
+                    label=f"$v_{{plan_{i + 1}}}$",
+                    linestyle="--",
+                    color=colors[i],
+                )
+
 
             axes[i].grid()
             axes[i].legend()
@@ -1658,7 +1694,7 @@ class DataPlotter:
             print("time step {} param:{}".format(k, param[param_name]))
 
 class ROSBagPlotter:
-    def __init__(self, bag_file, config_file="/home/tracy/Projects/mm_slam/mm_ws/src/mm_sequential_tasks/mmseq_run/config/3d_collision.yaml"):
+    def __init__(self, bag_file, config_file="$(rospack find mmseq_run)/config/3d_collision.yaml"):
         self.data = {"ur10": {}, "ridgeback": {}, "mpc": {}, "vicon": {}, "model":{}}
         self.bag = rosbag.Bag(bag_file)
         self.config = load_config(config_file)
