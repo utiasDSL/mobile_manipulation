@@ -1,6 +1,7 @@
 import numpy as np  
 
 from .point_mass_trajectory_optimization import space_curve, velocity_curve, acceleration_curve
+from .trajectory_computations import compute_all_trajectories_multi_pose
 
 def initial_guess(mobile_robot, points, starting_configurations, prediction_horizon, N, d_tol=0.01, lambda_num_cols=1, analyze=False, remove_bad=False, position_noise=0, velocity_noise=0, acceleration_noise=0, is_sequential_guess=False):
     results, dict_res, shortest = mobile_robot.calculate_trajectory(points, starting_configurations, prediction_horizon, magnitude_step=1)
@@ -190,3 +191,99 @@ def initial_guess_simple(mobile_robot, points, starting_configurations, predicti
     if is_sequential_guess:
         return X0_no_tn, ts, Ns
     return X0_no_tn, np.sum(ts)
+
+def slow_down_guess(start_state, end_state, N, mobile_robot, position_noise=0, velocity_noise=0, acceleration_noise=0, a_bounds=None):
+    # create pose dict
+    waypoints_poses = []
+    waypoints_poses.append(start_state[:mobile_robot.DoF].full().flatten())
+    waypoints_poses.append(end_state[:mobile_robot.DoF].full().flatten())
+    dict_graph = mobile_robot.create_graph(waypoints_poses)
+
+    # create dictionary of results
+    velocities = {}
+    velocities[0] = {}
+    velocities[1] = {}
+    velocities[0][0] = [start_state[mobile_robot.DoF:2*mobile_robot.DoF].full().flatten()]
+    velocities[1][0] = [end_state[mobile_robot.DoF:2*mobile_robot.DoF].full().flatten()]
+
+    # set accelerations
+    if a_bounds is None:
+        a_max = mobile_robot.ub_u
+        a_min = mobile_robot.lb_u
+    else:
+        a_min = a_bounds[0]
+        a_max = a_bounds[1]
+    v_max = mobile_robot.ub_x[mobile_robot.DoF:]
+    v_min = mobile_robot.lb_x[mobile_robot.DoF:]
+
+    # compute trajectories
+    results, dict_res, shortest = compute_all_trajectories_multi_pose(dict_graph, velocities, a_max, a_min, v_max, v_min, prediction_horizon=1)
+
+    X0_no_tn = []   
+    tf = results[0][0][6]
+
+    qs, q_dots, us = equally_spaced_in_time(0, shortest, dict_res, N)
+    qs_reshaped = np.array(qs)
+    q_dots_reshaped = np.array(q_dots)
+    us_reshaped = np.array(us)
+    # q_dots_reshaped = np.zeros(qs_reshaped.shape)
+    # us_reshaped = np.zeros(qs_reshaped.shape)
+    end_effector_pose_func = mobile_robot.end_effector_pose_func()
+    for k in range(N): 
+        if k == 0:
+            X0_no_tn.extend([*qs_reshaped[:,k], *q_dots_reshaped[:,k], *us_reshaped[:,k]])
+        else:
+            X0_no_tn.extend([*qs_reshaped[:,k]+position_noise*np.random.random(qs_reshaped[:,k].shape), *q_dots_reshaped[:,k]+velocity_noise*np.random.random(q_dots_reshaped[:,k].shape), *us_reshaped[:,k]+acceleration_noise*np.random.random(us_reshaped[:,k].shape)])
+
+    return X0_no_tn, tf
+
+def slow_down_guess_only_ee(start_state, ee_goal, N, mobile_robot, position_noise=0, velocity_noise=0, acceleration_noise=0, a_bounds=None):
+    # find configuration that reaches the end effector goal
+    starting_ee = mobile_robot.end_effector_pose(start_state[:mobile_robot.DoF].full().flatten())
+    waypoints_poses, _ = mobile_robot.compute_positions(start_state[:mobile_robot.DoF].full().flatten(), [starting_ee, ee_goal])
+    dict_graph = mobile_robot.create_graph(waypoints_poses)
+    print('waypoints_poses:', waypoints_poses)
+
+    for i in range(1, len(waypoints_poses)):
+        for j in range(len(waypoints_poses[i])):
+            if abs(waypoints_poses[i][j] - waypoints_poses[i-1][j])<0.000001:
+                waypoints_poses[i][j] += 0.00001
+
+    # create dictionary of results
+    velocities = {}
+    velocities[0] = {}
+    velocities[1] = {}
+    velocities[0][0] = [start_state[mobile_robot.DoF:2*mobile_robot.DoF].full().flatten()]
+    velocities[1][0] = [np.zeros(mobile_robot.DoF)]
+
+    # set accelerations
+    if a_bounds is None:
+        a_max = mobile_robot.ub_u
+        a_min = mobile_robot.lb_u
+    else:
+        a_min = a_bounds[0]
+        a_max = a_bounds[1]
+    v_max = mobile_robot.ub_x[mobile_robot.DoF:]
+    v_min = mobile_robot.lb_x[mobile_robot.DoF:]
+
+    # compute trajectories
+    results, dict_res, shortest = compute_all_trajectories_multi_pose(dict_graph, velocities, a_max, a_min, v_max, v_min, prediction_horizon=1)
+
+    X0_no_tn = []   
+    tf = results[0][0][6]
+
+    qs, q_dots, us = equally_spaced_in_time(0, shortest, dict_res, N)
+    qs_reshaped = np.array(qs)
+    q_dots_reshaped = np.array(q_dots)
+    us_reshaped = np.array(us)
+    # q_dots_reshaped = np.zeros(qs_reshaped.shape)
+    # us_reshaped = np.zeros(qs_reshaped.shape)
+    end_effector_pose_func = mobile_robot.end_effector_pose_func()
+    for k in range(N): 
+        if k == 0:
+            X0_no_tn.extend([*qs_reshaped[:,k], *q_dots_reshaped[:,k], *us_reshaped[:,k]])
+        else:
+            X0_no_tn.extend([*qs_reshaped[:,k]+position_noise*np.random.random(qs_reshaped[:,k].shape), *q_dots_reshaped[:,k]+velocity_noise*np.random.random(q_dots_reshaped[:,k].shape), *us_reshaped[:,k]+acceleration_noise*np.random.random(us_reshaped[:,k].shape)])
+
+    return X0_no_tn, tf
+

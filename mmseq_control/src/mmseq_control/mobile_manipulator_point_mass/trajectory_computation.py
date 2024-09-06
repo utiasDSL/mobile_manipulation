@@ -23,7 +23,7 @@ def calculate_trajectory(self, points, starting_configurations, prediction_horiz
         points.append(points[0])
 
     max_vel_mag = np.linalg.norm(v_max)/2
-    dict_graph = self.create_graph(waypoints_poses, points, sampling_rate=sampling_rate)
+    dict_graph = self.create_graph(waypoints_poses)
     end_effector_velocities = compute_velocities_in_cone_3d(points, 0, max_vel_mag, vertex_angle_deg=vertex_angle_deg, magnitude_step=magnitude_step, angle_step=angle_step, loop=loop, prediction_horizon=prediction_horizon)
     # plot_velocity_cone_3d(end_effector_velocities, points)
     q_dot_dict = self.generate_waypoints_q_dot(dict_graph, end_effector_velocities, v_max, v_min)
