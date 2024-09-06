@@ -158,6 +158,8 @@ if __name__ == "__main__":
                         help="plot comparisons")
     parser.add_argument("--benchmark", action="store_true", help="gather benchmark results")
     parser.add_argument("--savefigs", action="store_true", help="export figures to file")
+    parser.add_argument("--printparam", action="store_true", help="export figures to file")
+    parser.add_argument("--paramname", type=str,help="control timestep to inspect")
 
     args = parser.parse_args()
 
@@ -187,6 +189,8 @@ if __name__ == "__main__":
             data_plotter.save_figs()
         if args.runmpc:
             data_plotter.run_mpc_iter(args.timestep)
+        if args.printparam:
+            data_plotter.print_mpc_param(args.paramname)
         plt.show()
 
 
