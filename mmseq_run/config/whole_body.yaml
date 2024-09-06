@@ -14,7 +14,7 @@ planner:
       obstacle_avoidance: True
       motion_class_type: "MobileManipulatorPointMass"
       tracking_err_tol: 0.02
-      file_path: "/home/ubuntu/sequential/2wpts_arm0.8_ee"
+      file_path: "$MOBILE_MANIPULATION_CENTRAL_BAG_DIR/time_optimal_planning/sequential/2wpts_arm0.8_ee"
       load_save_generate: "generate"
       file_name: "test3"
       slowdown_enabled: True
@@ -52,7 +52,7 @@ controller:
 
 
 simulation:
-  duration: 15
+  duration: 30
 
 include:
   - package: "mmseq_run"
@@ -67,5 +67,5 @@ include:
     path: "config/map/SDF3D.yaml"
 
 logging:
-  log_dir: "/home/ubuntu/Aug29"
+  log_dir: "$MOBILE_MANIPULATION_CENTRAL_BAG_DIR/Sep6"
   log_level: 4 # 0 - not set, 10 - debug, 20 - info
