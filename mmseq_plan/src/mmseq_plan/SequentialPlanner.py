@@ -6,7 +6,7 @@ import pickle
 import os
 
 from mmseq_utils.plot_casadi_time_optimal import decompose_X
-from mmseq_utils.point_mass_computation_scripts.casadi_initial_guess import initial_guess, initial_guess_simple
+from mmseq_utils.point_mass_computation_scripts.casadi_initial_guess import initial_guess, initial_guess_simple, slow_down_guess_only_ee
 import mobile_manipulation_central as mm
 
 # for now import the mobile manipulators, in future we should be able to import a file and not having to update this if more motion classses are introduced
@@ -16,7 +16,10 @@ import mmseq_control.robot as robot
 from mmseq_plan.PlanBaseClass import WholeBodyPlanner, CasadiPartialPlanner
 from mmseq_utils.parsing import load_config, parse_ros_path, parse_array
 from pyb_utils.frame import debug_frame_world
-from mmseq_utils.plot_casadi_time_optimal import plot_obstacle_avoidance, compare_trajectories_casadi_plot
+from mmseq_utils.plot_casadi_time_optimal import plot_obstacle_avoidance, compare_trajectories_casadi_plot, plot_motion_model
+from mmseq_plan.BasePlanner import BaseSingleWaypoint, BasePosTrajectoryLine
+from mmseq_plan.EEPlanner import EESimplePlanner, EEPosTrajectoryLine
+
 
 
 class SequentialPlanner(WholeBodyPlanner):
@@ -53,8 +56,8 @@ class SequentialPlanner(WholeBodyPlanner):
             self.slowdown_enabled = config["slowdown_enabled"]
             self.base_scaling_factor = config["base_acc_sf"]
             self.ee_scaling_factor = config["arm_acc_sf"]
-            # for point in self.points:
-            #     debug_frame_world(0.5, point, line_width=3)
+            for point in self.points:
+                debug_frame_world(0.5, point, line_width=3)
 
         self.X_slow = None
         self.qs_num = self.motion_class.DoF
@@ -115,6 +118,7 @@ class SequentialPlanner(WholeBodyPlanner):
                     cur_lbx[:vel_start_index] = start[:vel_start_index]
                     cur_ubx[:vel_start_index] = start[:vel_start_index]
                     if start[vel_start_index] is not None:
+                        print("Setting initial velocity")
                         cur_lbx[vel_start_index:u_start_index] = start[vel_start_index:]
                         cur_ubx[vel_start_index:u_start_index] = start[vel_start_index:]
                 else:
@@ -174,7 +178,7 @@ class SequentialPlanner(WholeBodyPlanner):
         X = X.reshape((-1, 1))
         return X, g, lbg, ubg, lbx, ubx, t      
 
-    def optimize_sequential(self, points, prediction_horizon, X0, motion_model, forward_kinematic, Ns, d_tol=0.01, self_avoidance=None, obs_avoidance=None):
+    def optimize_sequential(self, points, prediction_horizon, X0, motion_model, forward_kinematic, Ns, d_tol=0.01, self_avoidance=None, obs_avoidance=None, end_zero_velocity=False):
         X = []
         g = []
         lbg = []
@@ -186,12 +190,16 @@ class SequentialPlanner(WholeBodyPlanner):
         obj =0
         for i in range(prediction_horizon):
             is_initial_point = False
+            zero_vel = False
             if i == 0:
                 is_initial_point = True
                 start_point = X0[prediction_horizon:prediction_horizon+2*state_dim]
+                print("Start point", start_point)
             else:
                 start_point = X[-3*state_dim:]
-            X_i, g_i, lbg_i, ubg_i, lbx_i, ubx_i, t_i = self.setup_single_problem(start_point, points[i+1], motion_model, forward_kinematic, N=Ns[i], d_tol=d_tol, initial_point=is_initial_point, state_dim=state_dim, iteration=i, obstacles_avoidance=obs_avoidance, self_avoidance=self_avoidance)
+            if i == prediction_horizon-1 and end_zero_velocity:
+                zero_vel = True
+            X_i, g_i, lbg_i, ubg_i, lbx_i, ubx_i, t_i = self.setup_single_problem(start_point, points[i+1], motion_model, forward_kinematic, N=Ns[i], d_tol=d_tol, initial_point=is_initial_point, state_dim=state_dim, iteration=i, obstacles_avoidance=obs_avoidance, self_avoidance=self_avoidance, end_zero_velocity=zero_vel)
             X = ca.vertcat(X, X_i)
             g.extend(g_i)
             lbg.extend(lbg_i)
@@ -217,8 +225,14 @@ class SequentialPlanner(WholeBodyPlanner):
         # print dts
         # for i in range(len(Ns)):
         #     print(result[i]/Ns[i])
-        compare_trajectories_casadi_plot([X_final], points, None, None, forward_kinematic, [X_dim], [X_final[0]], [Ns], q_size=state_dim, show=True, a_bounds=[(self.u_min, self.u_max)], v_bounds=(self.q_dot_min, self.q_dot_max))
-        plot_obstacle_avoidance([X_final], self_avoidance, [X_dim], q_size=state_dim, show=True, labels=["Slow Down"], limit=self.self_collision_safety_margin)
+        # compare_trajectories_casadi_plot([X_final], points, None, None, forward_kinematic, [X_dim], [X_final[0]], [Ns], q_size=state_dim, show=True, a_bounds=[(self.u_min, self.u_max)], v_bounds=(self.q_dot_min, self.q_dot_max))
+        # plot_obstacle_avoidance([X_final], self_avoidance, [X_dim], q_size=state_dim, show=True, labels=["Slow Down"], limit=self.self_collision_safety_margin)
+        ts1 = X0[:prediction_horizon]
+
+        X0 = ca.vertcat(ca.sum1(ts1), X0[prediction_horizon:])
+        # compare_trajectories_casadi_plot([X_final, X0], points, None, None, forward_kinematic, [X_dim, X_dim], [X_final[0], X0[0]], [Ns, Ns], q_size=state_dim, show=True, a_bounds=[(self.u_min, self.u_max), (self.u_min, self.u_max)], v_bounds=(self.q_dot_min, self.q_dot_max))
+        # plot_obstacle_avoidance([X_final, X0], self_avoidance, [X_dim, X_dim], q_size=state_dim, show=True, labels=["Slow Down", "Initial guess"], limit=self.self_collision_safety_margin)
+        # plot_motion_model([X_final, X0], motion_model, [X_dim, X_dim], q_size=state_dim, show=True, labels=["Slow Down", "Initial guess"], limit=0)
 
         return X_final, X_dim, result[:prediction_horizon]
     
@@ -249,7 +263,7 @@ class SequentialPlanner(WholeBodyPlanner):
             obstacles_avoidance = self.motion_class.casadi_model_interface.signedDistanceSymMdlsPerGroup["static_obstacles"]["ground"]
 
         start_time = time.time()
-        X, total_elements, ts = self.optimize_sequential(points_full, prediction_horizon, X0, self.motion_model, self.forward_kinematic, Ns, self_avoidance=self_avoidance, obs_avoidance=obstacles_avoidance)
+        X, total_elements, ts = self.optimize_sequential(points_full, prediction_horizon, X0, self.motion_model, self.forward_kinematic, Ns, self_avoidance=self_avoidance, obs_avoidance=obstacles_avoidance)  
         self.optimization_time = time.time()-start_time
         self.ts = ts
         self.X0 = ca.vertcat(float(ts[-1]), *X0_array)
@@ -273,15 +287,37 @@ class SequentialPlanner(WholeBodyPlanner):
             self.initiliazePartialPlanners()
         elif self.load_save_generate == "generate":
             X, total_elements = self.generateTrajectory(self.points, self.starting_configuration, self.prediction_horizon, N=self.N, t_bound=np.inf, init_config=self.init_config, obs_avoidance=self.obs_avoidance, base_scaling_factor=self.base_scaling_factor, ee_scaling_factor=self.ee_scaling_factor)
+            start_state = X[-3*self.motion_class.DoF:]
+            print(start_state)
+            # start_state = ca.vertcat(ca.DM.ones(self.motion_class.DoF), ca.DM.zeros(self.motion_class.DoF), ca.DM.zeros(self.motion_class.DoF))
             if self.slowdown_enabled:
-                self.slowDownTrajectory(X[-3*self.motion_class.DoF:], self.motion_class.end_effector_pose(self.starting_configuration).full().flatten(), self.motion_model, self.forward_kinematic, obstacle_avoidance=obstacles_avoidance, self_avoidance=self_avoidance)
+                final_ee = self.motion_class.end_effector_pose(self.starting_configuration).full().flatten()
+                # self.slowDownTrajectory(start_state, final_ee, self.motion_model, self.forward_kinematic, obstacle_avoidance=ground_avoidance, self_avoidance=self_avoidance)
+                start_state = ca.vertcat(X[-3*self.motion_class.DoF:-2*self.motion_class.DoF], ca.DM.zeros(self.motion_class.DoF), X[-self.motion_class.DoF:])
+                self.slowDownTrajectorySecond(start_state, final_ee, self.motion_model, self.forward_kinematic, obstacle_avoidance=ground_avoidance, self_avoidance=self_avoidance)
             self.processResults()
             self.initiliazePartialPlanners()
         elif self.load_save_generate == "save":
             X, total_elements = self.generateTrajectory(self.points, self.starting_configuration, self.prediction_horizon, N=self.N, t_bound=np.inf, init_config=self.init_config, obs_avoidance=self.obs_avoidance, base_scaling_factor=self.base_scaling_factor, ee_scaling_factor=self.ee_scaling_factor)
             if self.slowdown_enabled:
-                self.slowDownTrajectory(X[-3*self.motion_class.DoF:], self.motion_class.end_effector_pose(self.starting_configuration).full().flatten(), self.motion_model, self.forward_kinematic, obstacle_avoidance=obstacles_avoidance, self_avoidance=self_avoidance)
+                self.slowDownTrajectory(X[-3*self.motion_class.DoF:], self.motion_class.end_effector_pose(self.starting_configuration).full().flatten(), self.motion_model, self.forward_kinematic, obstacle_avoidance=ground_avoidance, self_avoidance=self_avoidance)
             self.saveSolution(name=self.file_name)
+    
+    def slowDownTrajectorySecond(self, start_state, end_ee, motion_model, forward_kinematic, N=50, obstacle_avoidance=None, self_avoidance=None):
+        X0_array, tf = slow_down_guess_only_ee(start_state, end_ee, N, self.motion_class, a_bounds=(self.u_min, self.u_max))
+        X0 = ca.vertcat(tf, X0_array)
+        # self.slowDownTrajectory(start_state, final_ee, self.motion_model, self.forward_kinematic, obstacle_avoidance=ground_avoidance, self_avoidance=self_avoidance)
+        points_full = [self.motion_class.end_effector_pose(start_state[:self.motion_class.DoF]).full().flatten()]
+        points_full.extend([end_ee])
+        state_dim = self.motion_class.DoF
+        X_final, total_elements, ts = self.optimize_sequential(points_full, 1, X0, self.motion_model, self.forward_kinematic, [N], self_avoidance=self_avoidance, obs_avoidance=obstacle_avoidance, end_zero_velocity=True)
+        
+        # compare_trajectories_casadi_plot([X_final, X0], points_full, None, None, forward_kinematic, [total_elements, total_elements], [X_final[0], X0[0]], [N, N], q_size=state_dim, show=True, a_bounds=[(self.u_min, self.u_max), (self.u_min, self.u_max)], v_bounds=(self.q_dot_min, self.q_dot_max))
+        # plot_obstacle_avoidance([X_final, X0], self_avoidance, [total_elements, total_elements], q_size=state_dim, show=True, labels=["Slow Down", "Initial guess"], limit=self.self_collision_safety_margin)
+        # plot_motion_model([X_final, X0], motion_model, [total_elements, total_elements], q_size=state_dim, show=True, labels=["Slow Down", "Initial guess"], limit=0)
+
+        self.X_slow = X_final
+        self.total_elements_slow = total_elements
 
     def saveSolution(self, name=None):
         if name is None:
@@ -313,6 +349,7 @@ class SequentialPlanner(WholeBodyPlanner):
         return configurations, initial_configurations
 
     def initiliazePartialPlanners(self):
+        
         if self.config is None:
             base_config = {"name": "PartialPlanner", "type": "base", "tracking_err_tol": 0.02, "frame_id": "base", "ref_data_type": "Vec2"}
             ee_config = {"name": "PartialPlanner", "type": "EE", "tracking_err_tol": 0.02, "frame_id": "EE", "ref_data_type": "Vec3"}
@@ -320,10 +357,31 @@ class SequentialPlanner(WholeBodyPlanner):
         else:
             base_config = {"name": "PartialPlanner", "type": "base", "tracking_err_tol": self.config["tracking_err_tol"], "frame_id": "base", "ref_data_type": "Vec2"}
             ee_config = {"name": "PartialPlanner", "type": "EE", "tracking_err_tol": self.config["tracking_err_tol"], "frame_id": "EE", "ref_data_type": "Vec3"}
+        
+       
 
         self.base_planner = CasadiPartialPlanner(self.qs, self.qs_dots, self.us, self.tfs, self.Ns, base_config, self.motion_class.base_xyz, self.motion_class.base_jacobian)
         self.ee_planner = CasadiPartialPlanner(self.qs, self.qs_dots, self.us, self.tfs, self.Ns, ee_config, self.motion_class.end_effector_pose, self.motion_class.compute_jacobian_whole)
+        self.planners = [self.base_planner, self.ee_planner]
 
+        # last_pose_base = BaseSingleWaypoint.getDefaultParams()
+        # last_pose_ee = EESimplePlanner.getDefaultParams()
+        # last_pose_base["target_pos"]= self.motion_class.base_xyz(self.qs[0])
+        # last_pose_ee["target_pos"]= self.motion_class.end_effector_pose(self.qs[0])
+        # finale_base = BaseSingleWaypoint(last_pose_base)
+        # finale_ee = EESimplePlanner(last_pose_ee)
+
+        last_pose_base = BasePosTrajectoryLine.getDefaultParams()
+        last_pose_ee = EEPosTrajectoryLine.getDefaultParams()
+        last_pose_base["target_pos"]= self.motion_class.base_xyz(self.qs[0]).full().flatten()
+        last_pose_ee["target_pos"]= self.motion_class.end_effector_pose(self.qs[0]).full().flatten()
+        last_pose_base["initial_pos"]= self.motion_class.base_xyz(self.qs[-1]).full().flatten()
+        last_pose_ee["initial_pos"]= self.motion_class.end_effector_pose(self.qs[-1]).full().flatten()
+        finale_base = BasePosTrajectoryLine(last_pose_base)
+        finale_ee = EEPosTrajectoryLine(last_pose_ee)
+
+        self.planners.append(finale_base)
+        self.planners.append(finale_ee)
     
 
 

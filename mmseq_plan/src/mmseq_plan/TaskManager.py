@@ -31,8 +31,7 @@ class SoTBase(ABC):
                 planner.generatePlanFromConfig()
 
                 # generate partial planners
-                self.planners.append(planner.getBasePlanner())
-                self.planners.append(planner.getEEPlanner())
+                self.planners.extend(planner.getPlanners())
 
             else:
                 if task_entry["name"][:2] == "EE":
