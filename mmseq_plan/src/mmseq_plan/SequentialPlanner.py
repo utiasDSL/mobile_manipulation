@@ -7,10 +7,7 @@ import os
 
 from mmseq_utils.plot_casadi_time_optimal import decompose_X
 from mmseq_utils.point_mass_computation_scripts.casadi_initial_guess import initial_guess, initial_guess_simple, slow_down_guess_only_ee
-<<<<<<< HEAD
-=======
 from mmseq_utils.parsing import parse_path
->>>>>>> checkpoint/control_for_time_optimal_planning
 import mobile_manipulation_central as mm
 
 # for now import the mobile manipulators, in future we should be able to import a file and not having to update this if more motion classses are introduced
