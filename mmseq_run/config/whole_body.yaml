@@ -67,11 +67,7 @@ controller:
 
 
 simulation:
-<<<<<<< HEAD
   duration: 15
-=======
-  duration: 30
->>>>>>> checkpoint/control_for_time_optimal_planning
 
 include:
   - package: "mmseq_run"
@@ -86,9 +82,5 @@ include:
     path: "config/map/SDF3D.yaml"
 
 logging:
-<<<<<<< HEAD
-  log_dir: "/home/ubuntu/Sep1_updated"
-=======
   log_dir: "$MOBILE_MANIPULATION_CENTRAL_BAG_DIR/Sep6"
->>>>>>> checkpoint/control_for_time_optimal_planning
   log_level: 4 # 0 - not set, 10 - debug, 20 - info
