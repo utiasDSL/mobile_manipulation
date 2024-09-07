@@ -5,21 +5,22 @@ planner:
   tasks:
     - name: "whole_body"
       planner_type: "SequentialPlanner"
-      N: 50
+      N: 100  
       dt: 0.01
       home: "default"
-      target_points: [[-0.75, 0.0, 0.25], [0.25, 0.75, 0.5]]
+      target_points: [ [1.5, 0, 1.5], [1.5, 1, 0.75] ]
       prediction_horizon: 2
       initialization: "Pontryagin" #Pontryagin or InverseKinematics
       obstacle_avoidance: True
       motion_class_type: "MobileManipulatorPointMass"
       tracking_err_tol: 0.01
-      file_path: "/home/ubuntu/Sep1/sequential/2wpts_arm0.5_ee"
-      load_save_generate: "generate"
-      file_name: "scenario_1_Pontryagin_sf_0.1"
+      file_path: "/home/ubuntu/Sep7/scenarios/2wpts_arm0.5_ee_for_simulation/"
+      load_save_generate: "load"
+      file_name: "small_base_move"
       base_acc_sf: 0.1
       arm_acc_sf: 0.5
       slowdown_enabled: False
+      base_pose_tracking_enabled: True
       collision_safety_margin:
         self: 0.25
         ground: 0.2
@@ -52,6 +53,7 @@ controller:
   self_collision_avoidance_enabled: True
   sdf_collision_avoidance_enabled: False
   static_obstacles_collision_avoidance_enabled: True
+  base_pose_tracking_enabled: True
   acados:
     ocp_solver_options:
       nlp_solver_max_iter: 30
@@ -82,5 +84,5 @@ include:
     path: "config/map/SDF3D.yaml"
 
 logging:
-  log_dir: "$MOBILE_MANIPULATION_CENTRAL_BAG_DIR/Sep6"
+  log_dir: "$MOBILE_MANIPULATION_CENTRAL_BAG_DIR/SEP7"
   log_level: 4 # 0 - not set, 10 - debug, 20 - info

@@ -503,16 +503,14 @@ class ControllerROSNode:
             for planner in planners:
                 if planner.type == "EE":
                     if planner.name == "PartialPlanner":
-                        r_ew_wd, ref_v_ee = planner.getTrackingPoint(t-t0, robot_states)
-                        self.logger.append("ref_v_ee", ref_v_ee)
+                        r_ew_wd, v_ew_wd = planner.getTrackingPoint(t-t0, robot_states)
                     else:
                         r_ew_wd, v_ew_wd  = planner.getTrackingPoint(t-t0, robot_states)
                 elif planner.type == "base":
                     if planner.name == "PartialPlanner":
                         print("PartialPlanner")
-                        r_bw_wd, ref_v_base = planner.getTrackingPoint(t-t0, robot_states)
+                        r_bw_wd, v_bw_wd = planner.getTrackingPoint(t-t0, robot_states)
                         ref_q_dot, ref_u = planner.getRefVelandAcc(t-t0)
-                        self.logger.append("ref_v_base", ref_v_base)
                         self.logger.append("ref_vels", ref_q_dot)
                         self.logger.append("ref_accs", ref_u)
                     else:

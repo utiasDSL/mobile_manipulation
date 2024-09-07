@@ -57,6 +57,7 @@ class SequentialPlanner(WholeBodyPlanner):
             self.slowdown_enabled = config["slowdown_enabled"]
             self.base_scaling_factor = config["base_acc_sf"]
             self.ee_scaling_factor = config["arm_acc_sf"]
+            self.base_point_tracking_enabled = config["base_pose_tracking_enabled"]
             # for point in self.points:
             #     debug_frame_world(0.5, point, line_width=3)
 
@@ -330,12 +331,12 @@ class SequentialPlanner(WholeBodyPlanner):
         if not os.path.exists(self.file_path):
             os.makedirs(self.file_path)
         with open(path, 'wb') as f:
-            pickle.dump((self.X, self.total_elements, self.ts, self.Ns, self.points, self.prediction_horizon, self.starting_configuration, self.X0, self.init_config, self.initialization_time, self.optimization_time, self.X_slow), f)
+            pickle.dump((self.X, self.total_elements, self.ts, self.Ns, self.points, self.prediction_horizon, self.starting_configuration, self.X0, self.init_config, self.initialization_time, self.optimization_time, self.X_slow, self.base_scaling_factor, self.ee_scaling_factor), f)
 
     def loadSolution(self, name):
         path = os.path.join(self.file_path, name)
         with open(path, 'rb') as f:
-            self.X, self.total_elements, self.ts, self.Ns, self.points, self.prediction_horizon, self.starting_configuration, self.X0, self.init_config, self.initialization_time, self.optimization_time, self.X_slow = pickle.load(f)
+            self.X, self.total_elements, self.ts, self.Ns, self.points, self.prediction_horizon, self.starting_configuration, self.X0, self.init_config, self.initialization_time, self.optimization_time, self.X_slow, self.base_scaling_factor, self.ee_scaling_factor = pickle.load(f)
 
     def returnWaypointConfigurations(self):
         offset = 0
@@ -350,41 +351,46 @@ class SequentialPlanner(WholeBodyPlanner):
         return configurations, initial_configurations
 
     def initiliazePartialPlanners(self):
-        
-        if self.config is None:
-            base_config = {"name": "PartialPlanner", "type": "base", "tracking_err_tol": 0.02, "frame_id": "base", "ref_data_type": "Vec2"}
+        base_config = {"name": "PartialPlanner", "type": "base", "tracking_err_tol": 0.02, "frame_id": "base", "ref_data_type": "Vec2"}
+        if self.base_point_tracking_enabled:
             base_config = {"name": "PartialPlanner", "type": "base", "tracking_err_tol": 0.02, "frame_id": "base", "ref_data_type": "Vec3"}
 
-            ee_config = {"name": "PartialPlanner", "type": "EE", "tracking_err_tol": 0.02, "frame_id": "EE", "ref_data_type": "Vec3"}
+        ee_config = {"name": "PartialPlanner", "type": "EE", "tracking_err_tol": 0.02, "frame_id": "EE", "ref_data_type": "Vec3"}
 
-        else:
-            base_config = {"name": "PartialPlanner", "type": "base", "tracking_err_tol": self.config["tracking_err_tol"], "frame_id": "base", "ref_data_type": "Vec2"}
-            base_config = {"name": "PartialPlanner", "type": "base", "tracking_err_tol": 0.02, "frame_id": "base", "ref_data_type": "Vec3"}
-            ee_config = {"name": "PartialPlanner", "type": "EE", "tracking_err_tol": self.config["tracking_err_tol"], "frame_id": "EE", "ref_data_type": "Vec3"}
+        if self.config is not None:
+            base_config["tracking_err_tol"] = self.config["tracking_err_tol"]
+            ee_config["tracking_err_tol"] = self.config["tracking_err_tol"]
         
        
+        if self.base_point_tracking_enabled:
+            self.base_planner = CasadiPartialPlanner(self.qs, self.qs_dots, self.us, self.tfs, self.Ns, base_config, self.motion_class.base_xytheta, self.motion_class.base_jacobian_xytheta)
+        else:
+            self.base_planner = CasadiPartialPlanner(self.qs, self.qs_dots, self.us, self.tfs, self.Ns, base_config, self.motion_class.base_xyz, self.motion_class.base_jacobian)
 
-        # self.base_planner = CasadiPartialPlanner(self.qs, self.qs_dots, self.us, self.tfs, self.Ns, base_config, self.motion_class.base_xyz, self.motion_class.base_jacobian)
-        self.base_planner = CasadiPartialPlanner(self.qs, self.qs_dots, self.us, self.tfs, self.Ns, base_config, self.motion_class.base_xytheta, self.motion_class.base_jacobian_xytheta)
         
         self.ee_planner = CasadiPartialPlanner(self.qs, self.qs_dots, self.us, self.tfs, self.Ns, ee_config, self.motion_class.end_effector_pose, self.motion_class.compute_jacobian_whole)
         self.planners = [self.base_planner, self.ee_planner]
 
-        # last_pose_base = BaseSingleWaypoint.getDefaultParams()
-        # last_pose_ee = EESimplePlanner.getDefaultParams()
-        # last_pose_base["target_pos"]= self.motion_class.base_xyz(self.qs[0])
-        # last_pose_ee["target_pos"]= self.motion_class.end_effector_pose(self.qs[0])
-        # finale_base = BaseSingleWaypoint(last_pose_base)
-        # finale_ee = EESimplePlanner(last_pose_ee)
+        if self.base_point_tracking_enabled:
 
-        last_pose_base = BasePoseTrajectoryLine.getDefaultParams()
-        last_pose_ee = EEPosTrajectoryLine.getDefaultParams()
-        last_pose_base["target_pose"]= self.motion_class.base_xytheta(self.qs[0]).full().flatten()
-        last_pose_ee["target_pos"]= self.motion_class.end_effector_pose(self.qs[0]).full().flatten()
-        last_pose_base["initial_pose"]= self.motion_class.base_xytheta(self.qs[-1]).full().flatten()
-        last_pose_ee["initial_pos"]= self.motion_class.end_effector_pose(self.qs[-1]).full().flatten()
-        finale_base = BasePoseTrajectoryLine(last_pose_base)
-        finale_ee = EEPosTrajectoryLine(last_pose_ee)
+            last_pose_base = BasePoseTrajectoryLine.getDefaultParams()
+            last_pose_ee = EEPosTrajectoryLine.getDefaultParams()
+            last_pose_base["target_pose"]= self.motion_class.base_xytheta(self.qs[0]).full().flatten()
+            last_pose_ee["target_pos"]= self.motion_class.end_effector_pose(self.qs[0]).full().flatten()
+            last_pose_base["initial_pose"]= self.motion_class.base_xytheta(self.qs[-1]).full().flatten()
+            last_pose_ee["initial_pos"]= self.motion_class.end_effector_pose(self.qs[-1]).full().flatten()
+            finale_base = BasePoseTrajectoryLine(last_pose_base)
+            finale_ee = EEPosTrajectoryLine(last_pose_ee)
+        
+        else:
+            last_pose_base = BasePosTrajectoryLine.getDefaultParams()
+            last_pose_ee = EEPosTrajectoryLine.getDefaultParams()
+            last_pose_base["initial_pos"]= self.motion_class.base_xyz(self.qs[-1]).full().flatten()
+            last_pose_ee["initial_pos"]= self.motion_class.end_effector_pose(self.qs[-1]).full().flatten()
+            last_pose_base["target_pos"]= self.motion_class.base_xyz(self.qs[0]).full().flatten()
+            last_pose_ee["target_pos"]= self.motion_class.end_effector_pose(self.qs[0]).full().flatten()
+            finale_base = BasePosTrajectoryLine(last_pose_base)
+            finale_ee = EEPosTrajectoryLine(last_pose_ee)
 
         self.planners.append(finale_base)
         self.planners.append(finale_ee)

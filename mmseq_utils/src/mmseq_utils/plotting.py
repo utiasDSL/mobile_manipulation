@@ -200,8 +200,14 @@ class DataPlotter:
 
     def _get_tracking_err(self, ref_name, robot_traj_name):
         N = len(self.data["ts"])
-        rs = self.data.get(robot_traj_name, np.zeros((N,0)))
-        rds = self.data.get(ref_name, rs)
+        rs = self.data.get(robot_traj_name, None)
+        rds = self.data.get(ref_name, None) 
+        
+        if rds is None:
+            return np.zeros(N)
+        if rs is None:
+            rs = np.zeros_like(rds)
+
         if len(rs) == len(rds):
             errs = np.linalg.norm(rds - rs, axis=1)
         else:
@@ -824,8 +830,8 @@ class DataPlotter:
         cmd_vels = self.data["cmd_vels"]
         cmd_accs = self.data.get("cmd_accs")
         cmd_jerks = self.data.get("cmd_jerks")
-        ref_vels = self.data.get("ref_vels")
-        ref_accs = self.data.get("ref_accs")
+        ref_vels = self.data.get("ref_vels", [])
+        ref_accs = self.data.get("ref_accs", [])
         nq = int(self.data["nq"])
         nv = int(self.data["nv"])
 
@@ -852,7 +858,7 @@ class DataPlotter:
             )
             if len(ref_vels) > 0:
                 ax[i].plot(
-                    ts,
+                    ts[:len(ref_vels)],
                     ref_vels[:, i],
                     '-x',
                     label=legend + f"$v_{{plan_{i + 1}}}$",
@@ -878,7 +884,7 @@ class DataPlotter:
                 )
                 if len(ref_accs) > 0:
                     ax[i].plot(
-                        ts,
+                        ts[:len(ref_accs)],
                         ref_accs[:, i],
                         '-x',
                         label=legend + f"$a_{{plan_{i + 1}}}$",
@@ -998,7 +1004,7 @@ class DataPlotter:
         ts = self.data["ts"]
         xs = self.data["xs"]
         cmd_vels = self.data["cmd_vels"]
-        ref_vels = self.data["ref_vels"]
+        ref_vels = self.data.get("ref_vels", [])
         nq = int(self.data["nq"])
         nv = int(self.data["nv"])
 
@@ -1020,7 +1026,7 @@ class DataPlotter:
             )
             if len(ref_vels) > 0:
                 axes[i].plot(
-                    ts,
+                    ts[:len(ref_vels)],
                     ref_vels[:, i], '-o',
                     label=f"$v_{{plan_{i + 1}}}$",
                     linestyle="--",

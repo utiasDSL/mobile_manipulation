@@ -84,6 +84,13 @@ class MobileManipulatorPointMass(MobileManipulator3D):
     def end_effector_pose(self, q):
         ''' Compute the end effector pose given the parameters. '''
         return self.end_effector_pose_func()(q)
+
+    def base_xyz_func(self):
+        ''' Create a function that computes the base pose. '''
+        forward_kinematic = self.kinSymMdls['base']
+        q = ca.MX.sym('q', self.DoF)
+        return ca.Function('base_xyz', [q], [forward_kinematic(q)[0]])
+
     
     def base_xyz(self, q):
         ''' Compute the base pose given the parameters. '''
@@ -109,7 +116,6 @@ class MobileManipulatorPointMass(MobileManipulator3D):
         J = self.jacSymMdls['base'](q)
         bottom_row = ca.horzcat(*[0,0], 1, *[0]*(self.DoF-3))
         J = ca.vertcat(J, bottom_row)
-        print("jacobian", J)
         return J
 
 

@@ -128,7 +128,6 @@ def main():
         robot_states = robot.joint_states(add_noise=False)
 
         t0 = time.perf_counter()
-        # u = cpc_plan.control(t)
         u = planner.control(t)
         # print(u)
         t1 = time.perf_counter()
@@ -140,13 +139,6 @@ def main():
         ee_states = (ee_curr_pos, ee_cur_orn)
         states = {"base": (robot_states[0][:3], robot_states[1][:3]), "EE": ee_states}
 
-        # ee, base = cpc_plan.getTrackingPoint(t)
-        # ee, base = sequential_plan.getTrackingPoint(t)
-        # print("EE p", ee[0], "EE v", ee[1])
-        # print("Base p", base[0], "Base v", base[1])
-        # for point in future_points:
-        #     if np.linalg.norm(np.array(point) - np.array(ee[0])) < 0.1:
-        #         width, height, rgb_img
 
         # log
         r_ew_w, Q_we = robot.link_pose()

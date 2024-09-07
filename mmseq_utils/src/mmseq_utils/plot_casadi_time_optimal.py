@@ -138,10 +138,10 @@ def compare_trajectories_casadi_plot(casadi_results, points, dict_res, shortest,
     fig.subplots_adjust(hspace=0.4, wspace=0.4)
     if not show:
         return fig
-    plt.show()
+    plt.show()    
 
 
-def plot_3d_trajectory(casadi_results, points, dict_res, shortest, forward_kinematic, state_dim, ts, Ns, q_size=2, labels=[], obstacles=[], title='Trajectories', show=True):
+def plot_3d_trajectory(casadi_results, points, dict_res, shortest, forward_kinematic, state_dim, ts, Ns, q_size=2, labels=[], obstacles=[], title='Trajectories', show=True, base_kin=None):
     fig = plt.figure(figsize=(15, 10))  
     ax = fig.add_subplot(111, projection='3d')
     ts = [i.full().flatten() for i in ts]
@@ -156,13 +156,21 @@ def plot_3d_trajectory(casadi_results, points, dict_res, shortest, forward_kinem
         # generate trajectory graph
         qs = [k for k in zip(*qs)]
         ee_list = []
+        base_list = []
         for j in range(len(qs)):
             ee_list.append(forward_kinematic(qs[j]))
+            if base_kin:
+                base_list.append(base_kin(qs[j]))
 
         x = [float(point[0]) for point in ee_list]
         y = [float(point[1]) for point in ee_list]
         z = [float(point[2]) for point in ee_list]
-        ax.plot(x, y, z, label=f'{cur_label} trajectory')
+        ax.plot(x, y, z, label=f'{cur_label} ee trajectory')
+        if base_kin:
+            x = [float(point[0]) for point in base_list]
+            y = [float(point[1]) for point in base_list]
+            z = np.zeros_like(y)
+            ax.plot(x, y, z, label=f'{cur_label} base trajectory ', linestyle='--')
 
         offset = 0
         if len(ts[i]) == 1:
@@ -193,12 +201,20 @@ def plot_3d_trajectory(casadi_results, points, dict_res, shortest, forward_kinem
         #convert qs into ee
         qs = [i for i in zip(*qs)]
         ee_list = []
+        base_list = []
         for i in range(len(qs)):
             ee_list.append(forward_kinematic(qs[i]))
+            if base_kin:
+                base_list.append(base_kin(qs[i]))
         xs = [float(point[0]) for point in ee_list]
         ys = [float(point[1]) for point in ee_list]
         zs = [float(point[2]) for point in ee_list]
-        ax.plot(xs, ys, zs, label='Fastest trajectory, sampling algo', color='red')
+        ax.plot(xs, ys, zs, label='Fastest trajectory ee, sampling algo', color='red')
+        if base_kin:
+            xs = [float(point[0]) for point in base_list]
+            ys = [float(point[1]) for point in base_list]
+            zs = np.zeros_like(ys)
+            ax.plot(xs, ys, zs, label='Fastest base trajectory, sampling algo', color='red', linestyle='--')
     # plot points
     ax.scatter([point[0] for point in points[1:]], [point[1] for point in points[1:]], [point[2] for point in points[1:]], color='green', label='Points to visit')
     # plot start point

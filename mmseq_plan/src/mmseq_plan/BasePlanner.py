@@ -281,7 +281,6 @@ class BasePoseTrajectoryLine(TrajectoryPlanner):
         te = t - self.start_time
 
         p, v = self._interpolate(te, self.plan)
-
         return p, v
 
     def checkFinished(self, t, states):
