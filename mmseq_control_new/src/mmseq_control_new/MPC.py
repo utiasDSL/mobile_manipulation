@@ -427,7 +427,7 @@ class STMPC(MPC):
     def __init__(self, config):
         super().__init__(config)
         num_terminal_cost = 2
-        costs = [self.BasePos2Cost, self.BaseVel2Cost, self.EEPos3Cost, self.EEVel3Cost, self.CtrlEffCost]
+        costs = [self.BasePos3Cost, self.BaseVel3Cost, self.EEPos3Cost, self.EEVel3Cost, self.CtrlEffCost]
         # costs += [cost for cost in self.collisionSoftCsts.values()]
         constraints = []
         for name in self.collision_link_names:
@@ -496,7 +496,7 @@ class STMPC(MPC):
                     r_bar_map["BasePos2"] = p_bar
                     if velocity_ref_available:
                         r_bar_map["BaseVel2"] = v_bar
-                elif planner.ref_data_typ == "Vec3":
+                elif planner.ref_data_type == "Vec3":
                     r_bar_map["BasePos3"] = p_bar
                     if velocity_ref_available:
                         r_bar_map["BaseVel3"] = v_bar
