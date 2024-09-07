@@ -19,7 +19,7 @@ planner:
       file_name: "scenario_1_Pontryagin_sf_0.1"
       base_acc_sf: 0.1
       arm_acc_sf: 0.5
-      slowdown_enabled: True
+      slowdown_enabled: False
       collision_safety_margin:
         self: 0.25
         ground: 0.2

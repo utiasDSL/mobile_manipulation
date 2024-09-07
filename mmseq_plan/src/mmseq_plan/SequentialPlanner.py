@@ -352,15 +352,20 @@ class SequentialPlanner(WholeBodyPlanner):
         
         if self.config is None:
             base_config = {"name": "PartialPlanner", "type": "base", "tracking_err_tol": 0.02, "frame_id": "base", "ref_data_type": "Vec2"}
+            # base_config = {"name": "PartialPlanner", "type": "base", "tracking_err_tol": 0.02, "frame_id": "base", "ref_data_type": "Vec3"}
+
             ee_config = {"name": "PartialPlanner", "type": "EE", "tracking_err_tol": 0.02, "frame_id": "EE", "ref_data_type": "Vec3"}
 
         else:
             base_config = {"name": "PartialPlanner", "type": "base", "tracking_err_tol": self.config["tracking_err_tol"], "frame_id": "base", "ref_data_type": "Vec2"}
+            # base_config = {"name": "PartialPlanner", "type": "base", "tracking_err_tol": 0.02, "frame_id": "base", "ref_data_type": "Vec3"}
             ee_config = {"name": "PartialPlanner", "type": "EE", "tracking_err_tol": self.config["tracking_err_tol"], "frame_id": "EE", "ref_data_type": "Vec3"}
         
        
 
         self.base_planner = CasadiPartialPlanner(self.qs, self.qs_dots, self.us, self.tfs, self.Ns, base_config, self.motion_class.base_xyz, self.motion_class.base_jacobian)
+        # self.base_planner = CasadiPartialPlanner(self.qs, self.qs_dots, self.us, self.tfs, self.Ns, ee_config, self.motion_class.end_effector_pose, self.motion_class.base_jacobian)
+        
         self.ee_planner = CasadiPartialPlanner(self.qs, self.qs_dots, self.us, self.tfs, self.Ns, ee_config, self.motion_class.end_effector_pose, self.motion_class.compute_jacobian_whole)
         self.planners = [self.base_planner, self.ee_planner]
 
