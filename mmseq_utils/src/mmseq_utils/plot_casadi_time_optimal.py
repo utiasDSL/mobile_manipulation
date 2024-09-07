@@ -1,5 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import casadi as ca
 
 from mmseq_utils.point_mass_computation_scripts.point_mass_trajectory_optimization import space_curve, velocity_curve, acceleration_curve
 
@@ -386,6 +387,48 @@ def plot_base_ee_pos(casadi_results, motion_class, state_dim, ts, Ns, q_size=2, 
         return fig
     plt.show()
 
+def plot_motion_model(casadi_results, motion_model, state_dim, q_size=2, labels=[], show=True, limit=0):
+    number_of_plots = q_size
+    # define the subplots
+    rows = int(np.ceil(np.sqrt(number_of_plots)))
+    cols = int(np.ceil(number_of_plots / rows))
+    fig, axes = plt.subplots(rows, cols, figsize=(15, 15))
+    axes = np.ravel(axes)
+    
+    for i in range(len(casadi_results)):
+        qs, qs_dots, us = decompose_X(casadi_results[i], q_size, state_dim[i])
+        qs, qs_dots, us = np.array(qs).T, np.array(qs_dots).T, np.array(us).T
+        N = len(qs)
+        dt = float(casadi_results[i][0])/N
+        constraints_values = []
+
+        for j in range(N-1):
+        
+        # generate trajectory 
+            X_j = ca.vertcat(qs[j], qs_dots[j])
+            X_j1 = ca.vertcat(qs[j+1], qs_dots[j+1])
+            differences = X_j1 - X_j - dt*motion_model(X_j, us[j])
+            constraints_values.append(differences.full().flatten())
+        x_axis = np.arange(0, N-1)
+        constraints_values = np.array(constraints_values).T
+
+        for k in range(q_size):
+            axes[k].plot(x_axis, constraints_values[k], label=f'{labels[i]}')
+            # plot bound
+            axes[k].plot(x_axis, [limit]*(N-1), 'r--', label='')
+
+    for j in range(number_of_plots):
+        axes[j].set_title(f'Motion model constraint for joint {j}')
+        axes[j].set_xlabel('Node number')
+        # axes[j].set_ylabel('Signed distance')
+        if j == 0:
+            axes[j].legend()
+
+    fig.subplots_adjust(hspace=0.4, wspace=0.4)
+    if not show:
+        return fig, obstacles_violated
+    plt.show()
+    
     
 
 
