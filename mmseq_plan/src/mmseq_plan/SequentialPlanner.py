@@ -7,6 +7,7 @@ import os
 
 from mmseq_utils.plot_casadi_time_optimal import decompose_X
 from mmseq_utils.point_mass_computation_scripts.casadi_initial_guess import initial_guess, initial_guess_simple, slow_down_guess_only_ee
+from mmseq_utils.parsing import parse_path
 import mobile_manipulation_central as mm
 
 # for now import the mobile manipulators, in future we should be able to import a file and not having to update this if more motion classses are introduced
@@ -333,7 +334,7 @@ class SequentialPlanner(WholeBodyPlanner):
 
     def loadSolution(self, name):
         path = os.path.join(self.file_path, name)
-        with open(path, 'rb') as f:
+        with open(parse_path(path), 'rb') as f:
             self.X, self.total_elements, self.ts, self.Ns, self.points, self.prediction_horizon, self.starting_configuration, self.X0, self.init_config, self.initialization_time, self.optimization_time, self.X_slow = pickle.load(f)
 
     def returnWaypointConfigurations(self):
