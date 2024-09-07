@@ -1,30 +1,38 @@
 planner:
   sot_type: "SoTStatic"
   tasks:
-  - name: "EE Pos 1"
-    planner_type: "EESimplePlanner"
-    frame_id: "EE"
-    initial_pos: [0.0, -0.0, 0.0]
-    target_pos: [0.0, 0.0, 0.0]
-    hold_period: 3.
-    tracking_err_tol: 0.02
-    cruise_speed: 0.5
-  - frame_id: base
-    name: Base Position
-    planner_type: BaseSingleWaypoint
-    target_pos:
-    - -1.5
-    - 0.
-    tracking_err_tol: 0.02
+  # - name: "EE Pos 1"
+  #   planner_type: "EESimplePlanner"
+  #   frame_id: "EE"
+  #   initial_pos: [0.0, -0.0, 0.0]
+  #   target_pos: [0.0, 0.0, 0.0]
+  #   hold_period: 3.
+  #   tracking_err_tol: 0.02
+  #   cruise_speed: 0.5
+  # - name: "EE Pos 1"
+  #   planner_type: "EEPosTrajectoryLine"
+  #   frame_id: "EE"
+  #   initial_pos: [0.0, -0.0, 0.0]
+  #   target_pos: [-0.0, 2.0, 0.0]
+  #   hold_period: 3.
+  #   tracking_err_tol: 0.02
+  #   cruise_speed: 0.75
   # - frame_id: base
   #   name: Base Position
-  #   planner_type: BasePosTrajectoryLine
-  #   initial_pos: [0,0]
+  #   planner_type: BaseSingleWaypoint
   #   target_pos:
-  #   - 2.5
-  #   - 0.4
-  #   cruise_speed: 1.0
-  #   tracking_err_tol: 0.2
+  #   - -1.5
+  #   - 0.
+  #   tracking_err_tol: 0.02
+  - frame_id: base
+    name: Base Position
+    planner_type: BasePosTrajectoryLine
+    initial_pos: [0,0]
+    target_pos:
+    - 2.5
+    - 0.4
+    cruise_speed: 1.0
+    tracking_err_tol: 0.2
   # - frame_id: base
   #   name: Base Position
   #   planner_type: BasePosTrajectoryLine
@@ -54,7 +62,17 @@ planner:
   #   radius: 0.5
   #   angular_offset: 0.0pi
   #   tracking_err_tol: 0.02
-
+  # - frame_id: base
+  #   name: Base Position
+  #   planner_type: BasePoseTrajectoryLine
+  #   initial_pose: [0,0,0]
+  #   target_pose:
+  #   - 2.5
+  #   - 0.4
+  #   - 0.7
+  #   cruise_speed: 1.0
+  #   yaw_speed: 0.5
+  #   tracking_err_tol: 0.2
 include:
   - package: "mmseq_run"
     path: "config/robot/thing.yaml"

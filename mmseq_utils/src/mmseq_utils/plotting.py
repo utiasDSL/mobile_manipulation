@@ -13,6 +13,7 @@ import time
 
 from mmseq_utils.parsing import parse_path, load_config
 from mmseq_utils.casadi_struct import casadi_sym_struct, reconstruct_sym_struct_map_from_array
+from mmseq_utils.math import wrap_pi_array
 
 from mmseq_control.robot import CasadiModelInterface, MobileManipulator3D
 from mmseq_control_new.MPCConstraints import SignedDistanceConstraint,SignedDistanceConstraintCBF
@@ -302,6 +303,12 @@ class DataPlotter:
         self.data["r_bw_bs"] = self._transform_w2b_SE2(qb, self.data["r_bw_ws"])
         if "r_bw_w_ds" in self.data.keys():
             self.data["r_bw_b_ds"] = self._transform_w2b_SE2(qb, self.data["r_bw_w_ds"])
+        if "yaw_bw_w_ds" in self.data.keys():
+            self.data["yaw_bw_w_ds"] -= qb[2]
+            self.data["yaw_bw_w_ds"] = wrap_pi_array(self.data["yaw_bw_w_ds"])
+        if  "yaw_bw_ws" in self.data.keys():
+            self.data["yaw_bw_ws"] -= qb[2]
+            self.data["yaw_bw_ws"] = wrap_pi_array(self.data["yaw_bw_ws"])
         
         # mpc constraints with prediction
         N = len(self.data["ts"])
@@ -455,7 +462,7 @@ class DataPlotter:
         print("u0 {}".format(u_bar[0]))
         
 
-    def plot_ee_position(self, axes=None, index=0, legend=None):
+    def plot_ee_tracking(self, axes=None, index=0, legend=None):
         ts = self.data["ts"]
         r_ew_w_ds = self.data.get("r_ew_w_ds", [])
         r_ew_ws = self.data.get("r_ew_ws", [])
@@ -471,9 +478,9 @@ class DataPlotter:
             legend = self.data["name"]
 
         if len(r_ew_w_ds) > 0:
-            axes.plot(ts, r_ew_w_ds[:, 0], label=legend + "$x_d$", color="r", linestyle="--")
-            axes.plot(ts, r_ew_w_ds[:, 1], label=legend + "$y_d$", color="g", linestyle="--")
-            axes.plot(ts, r_ew_w_ds[:, 2], label=legend + "$z_d$", color="b", linestyle="--")
+            axes.plot(ts, r_ew_w_ds[:, 0], '-x', label=legend + "$x_d$", color="r")
+            axes.plot(ts, r_ew_w_ds[:, 1], '-x', label=legend + "$y_d$", color="g")
+            axes.plot(ts, r_ew_w_ds[:, 2], '-x', label=legend + "$z_d$", color="b")
         if len(r_ew_ws) > 0:
             axes.plot(ts, r_ew_ws[:, 0], label=legend + "$x$", color="r")
             axes.plot(ts, r_ew_ws[:, 1], label=legend + "$y$", color="g")
@@ -621,11 +628,14 @@ class DataPlotter:
 
         return axes
 
-    def plot_base_position(self, axes=None, index=0, legend=None):
+    def plot_base_tracking(self, axes=None, index=0, legend=None):
         ts = self.data["ts"]
         r_ew_w_ds = self.data.get("r_bw_w_ds", [])
         r_ew_ws = self.data.get("r_bw_ws",[])
-        if len(r_ew_w_ds) == 0 and len(r_ew_ws) == 0:
+        yaw_bw_w_ds = self.data.get("yaw_bw_w_ds", [])
+        yaw_bw_ws = self.data.get("yaw_bw_ws", [])
+
+        if len(r_ew_w_ds) == 0 and len(r_ew_ws) == 0 and len(yaw_bw_w_ds) ==0 and len(yaw_bw_ws)==0:
             return
 
         if axes is None:
@@ -640,6 +650,11 @@ class DataPlotter:
         if len(r_ew_ws) > 0:
             axes.plot(ts, r_ew_ws[:, 0], label=legend + "$x$", color="r")
             axes.plot(ts, r_ew_ws[:, 1], label=legend + "$y$", color="g")
+        if len(yaw_bw_w_ds)>0:
+            axes.plot(ts, yaw_bw_w_ds, label=legend + "$Θ_d$", color="b", linestyle="--" )
+        if len(yaw_bw_ws)>0:
+            axes.plot(ts, yaw_bw_ws, label=legend + "$Θ$", color="b" )
+
         axes.grid()
         axes.legend()
         axes.set_xlabel("Time (s)")
@@ -647,6 +662,42 @@ class DataPlotter:
         axes.set_title("Base position")
 
         return axes
+
+    def plot_base_velocity_tracking(self, axes=None, index=0, legend=None):
+        ts = self.data["ts"]
+        v_bw_w_ds = self.data.get("v_bw_w_ds", [])
+        v_bw_ws = self.data.get("v_bw_ws",[])
+        ω_bw_w_ds = self.data.get("ω_bw_w_ds", [])
+        ω_bw_ws = self.data.get("ω_bw_ws", [])
+
+        if len(v_bw_w_ds) == 0 and len(v_bw_ws) == 0 and len(ω_bw_w_ds) ==0 and len(ω_bw_ws)==0:
+            return
+
+        if axes is None:
+            axes = []
+            f, axes = plt.subplots(1, 1, sharex=True)
+
+        if legend is None:
+            legend = self.data["name"]
+        if len(v_bw_w_ds) > 0:
+            axes.plot(ts, v_bw_w_ds[:, 0], label=legend + "${v_x}_d$", color="r", linestyle="--")
+            axes.plot(ts, v_bw_w_ds[:, 1], label=legend + "${v_y}_d$", color="g", linestyle="--")
+        if len(v_bw_ws) > 0:
+            axes.plot(ts, v_bw_ws[:, 0], label=legend + "$v_x$", color="r")
+            axes.plot(ts, v_bw_ws[:, 1], label=legend + "$v_y$", color="g")
+        if len(ω_bw_w_ds)>0:
+            axes.plot(ts, ω_bw_w_ds, label=legend + "$ω_d$", color="b", linestyle="--" )
+        if len(ω_bw_ws)>0:
+            axes.plot(ts, ω_bw_ws, label=legend + "$ω$", color="b" )
+
+        axes.grid()
+        axes.legend()
+        axes.set_xlabel("Time (s)")
+        axes.set_ylabel("Velocity (m/s or rad/s)")
+        axes.set_title("Base velocity tracking")
+
+        return axes
+
 
     def plot_ee_orientation(self, axes=None, index=0, legend=None):
         ts = self.data["ts"]
@@ -672,7 +723,7 @@ class DataPlotter:
         axes.set_ylabel("Orientation")
         axes.set_title("End effector orientation")
 
-    def plot_ee_velocity(self, axes=None, index=0, legend=None):
+    def plot_ee_velocity_tracking(self, axes=None, index=0, legend=None):
         ts = self.data["ts"]
         v_ew_ws = self.data["v_ew_ws"]
         ω_ew_ws = self.data["ω_ew_ws"]
@@ -699,7 +750,7 @@ class DataPlotter:
         axes.legend()
         axes.set_xlabel("Time (s)")
         axes.set_ylabel("Velocity")
-        axes.set_title("End effector velocity")
+        axes.set_title("End effector velocity tracking")
 
         return axes
 
@@ -1405,8 +1456,10 @@ class DataPlotter:
 
     def plot_all(self):
         self.data["name"] = ""
-        self.plot_ee_position()
-        self.plot_base_position()
+        self.plot_ee_tracking()
+        self.plot_ee_velocity_tracking()
+        self.plot_base_tracking()
+        self.plot_base_velocity_tracking()
         self.plot_tracking_err()
         self.plot_cmd_vs_real_vel()
         self.plot_state()
@@ -1456,8 +1509,10 @@ class DataPlotter:
         self.plot_collision()
 
     def plot_tracking(self):
-        self.plot_ee_position()
-        self.plot_base_position()
+        self.plot_ee_tracking()
+        self.plot_ee_velocity_tracking()
+        self.plot_base_tracking()
+        self.plot_base_velocity_tracking()
         axes = self.plot_base_path()
         self.plot_base_ref_path(axes)
         self.plot_tracking_err()
@@ -1700,7 +1755,7 @@ class DataPlotter:
         param_map_bar = [reconstruct_sym_struct_map_from_array(self.controller.p_struct, param_map_array[0]) for param_map_array in self.data["mpc_ocp_params"]]
         print("Param {}".format(param_name))
         for k, param in enumerate(param_map_bar):
-            print("time step {} param:{}".format(k, param[param_name]))
+            print("time: {} param:{}".format(self.data["ts"][k], param[param_name]))
 
 class ROSBagPlotter:
     def __init__(self, bag_file, config_file="/home/ubuntu/Workspace/catkin_ws/src/mm_sequential_tasks/mmseq_run/config/robot/thing.yaml"):

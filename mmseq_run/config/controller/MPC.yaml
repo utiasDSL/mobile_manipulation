@@ -20,6 +20,7 @@ controller:
   static_obstacles_collision_avoidance_enabled: False
   ee_upward_constraint_enabled: False
   cst_tol_schedule_enabled: False
+  base_pose_tracking_enabled: True
   hierarchy_const_tol: 0.001
 
   ee_upward_deviation_angle_max: 0.20    #rad, 0.26 rad ~ 15 degree

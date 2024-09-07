@@ -496,15 +496,17 @@ class ControllerROSNode:
             self.logger.append("ts", t)
             self.log_mpc_info(self.logger, self.controller)
             self.logger.append("controller_run_time", tc2 - tc1)
-            r_ew_wd = []
-            r_bw_wd = []
+            r_ew_wd = None
+            r_bw_wd = None
+            v_ew_wd = None
+            v_bw_wd = None
             for planner in planners:
                 if planner.type == "EE":
                     if planner.name == "PartialPlanner":
                         r_ew_wd, ref_v_ee = planner.getTrackingPoint(t-t0, robot_states)
                         self.logger.append("ref_v_ee", ref_v_ee)
                     else:
-                        r_ew_wd, _ = planner.getTrackingPoint(t-t0, robot_states)
+                        r_ew_wd, v_ew_wd  = planner.getTrackingPoint(t-t0, robot_states)
                 elif planner.type == "base":
                     if planner.name == "PartialPlanner":
                         print("PartialPlanner")
@@ -514,11 +516,25 @@ class ControllerROSNode:
                         self.logger.append("ref_vels", ref_q_dot)
                         self.logger.append("ref_accs", ref_u)
                     else:
-                        r_bw_wd, _ = planner.getTrackingPoint(t-t0, robot_states)
-            if len(r_ew_wd) > 0:
+                        r_bw_wd, v_bw_wd = planner.getTrackingPoint(t-t0, robot_states)
+            if r_ew_wd is not None:
                 self.logger.append("r_ew_w_ds", r_ew_wd)
-            if len(r_bw_wd) > 0:
-                self.logger.append("r_bw_w_ds", r_bw_wd)
+            if v_ew_wd is not None:
+                self.logger.append("v_ew_w_ds", v_ew_wd)
+            if r_bw_wd is not None:
+                if r_bw_wd.shape[0] == 2:
+                    self.logger.append("r_bw_w_ds", r_bw_wd)
+
+                elif r_bw_wd.shape[0] == 3:
+                    self.logger.append("r_bw_w_ds", r_bw_wd[:2])
+                    self.logger.append("yaw_bw_w_ds", r_bw_wd[2])
+            if v_bw_wd is not None:
+                if v_bw_wd.shape[0] == 2:
+                    self.logger.append("v_bw_w_ds", v_bw_wd)
+                elif  v_bw_wd.shape[0] == 3:
+                    self.logger.append("v_bw_w_ds", v_bw_wd[:2])
+                    self.logger.append("ω_bw_w_ds", v_bw_wd[2])
+
             self.logger.append("cmd_vels", u)
             self.logger.append("cmd_accs", acc)
             if self.ctrl_config["sdf_collision_avoidance_enabled"]:
