@@ -427,7 +427,7 @@ class STMPC(MPC):
     def __init__(self, config):
         super().__init__(config)
         num_terminal_cost = 2
-        costs = [self.BasePos3Cost, self.BaseVel3Cost, self.EEPos3Cost, self.EEVel3Cost, self.CtrlEffCost]
+        costs = [self.BasePos2Cost, self.BaseVel2Cost, self.EEPos3Cost, self.EEVel3Cost, self.CtrlEffCost]
         # costs = [self.BasePos3Cost, self.BaseVel3Cost, self.EEPos3Cost, self.EEVel3Cost, self.CtrlEffCost]
         
         constraints = []
