@@ -61,6 +61,20 @@
     <child link="rack_collision_link"/>
   </joint>
 
+  <xacro:collision_link_sphere name="rack_collision_link_sphere_1" radius="0.5"/>
+  <joint name="rack_collision_joint_1" type="fixed">
+    <origin rpy="0 0 0" xyz="-0.45 -0.15 0.75"/>
+    <parent link="base_link"/>
+    <child link="rack_collision_link_sphere_1"/>
+  </joint>
+
+  <xacro:collision_link_sphere name="rack_collision_link_sphere_2" radius="0.5"/>
+  <joint name="rack_collision_joint_2" type="fixed">
+    <origin rpy="0 0 0" xyz="-0.45 0.15 0.75"/>
+    <parent link="base_link"/>
+    <child link="rack_collision_link_sphere_2"/>
+  </joint>
+
 
   <!-- Collision sphere for the upper arm -->
   <xacro:collision_link_sphere name="ur10_arm_upper_arm_collision_link" radius="0.15"/>

@@ -97,7 +97,9 @@ controller:
       base:
         - "base_collision_link"
       rack:
-        - "rack_collision_link"
+        # - "rack_collision_link"
+        - "rack_collision_link_sphere_1"
+        - "rack_collision_link_sphere_2"
       upper_arm:
         - "ur10_arm_upper_arm_collision_link"
         - "ur10_arm_upper_arm_collision_sphere_link1"
