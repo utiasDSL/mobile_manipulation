@@ -121,6 +121,8 @@ class ControllerROSNode:
         casadi_kin_dyn = CasadiModelInterface(self.ctrl_config)
         if self.ctrl_config["self_collision_emergency_stop"]:
             self.self_collision_func = casadi_kin_dyn.signedDistanceSymMdlsPerGroup["self"]
+            self.ground_collision_func = casadi_kin_dyn.signedDistanceSymMdlsPerGroup["static_obstacles"]["ground"]
+
 
         self.controller_visualization_pub = rospy.Publisher("controller_visualization", Marker, queue_size=10)
         self.controller_visualization_array_pub = rospy.Publisher("controller_visualization_array", MarkerArray, queue_size=10)
@@ -448,6 +450,19 @@ class ControllerROSNode:
             self.sot_lock.acquire()
             planners = self.sot.getPlanners(num_planners=sot_num_plans)
             self.sot_lock.release()
+            # check collision
+            q = robot_states[0]
+            if self.ctrl_config["self_collision_emergency_stop"]:
+                signed_dist_self = self.self_collision_func(q).full().flatten()
+                signed_dist_ground = self.ground_collision_func(q).full().flatten()
+
+                if min(signed_dist_self) < 0.05 or min(signed_dist_ground) < 0.05:
+
+                    self.controller_log.warning("Self Collision Detected. Braking!!!!")
+                    self.cmd_vel_timer.shutdown()
+
+                    self.robot_interface.brake()
+                    continue
 
             tc1 = time.perf_counter()
             u, acc, u_bar, v_bar = self.controller.control(t-t0, robot_states, planners, map_latest)
@@ -544,13 +559,6 @@ class ControllerROSNode:
 
             if self.use_joy and self.start_end_button_interface.button == 1:
                 break
-            # check collision
-            q = robot_states[0]
-            if self.ctrl_config["self_collision_emergency_stop"]:
-                signed_dist = self.self_collision_func(q).full().flatten()
-                if min(signed_dist) < 0.05:
-                    print("Self Collision Detected")
-                    break
 
             rate.sleep()
 
