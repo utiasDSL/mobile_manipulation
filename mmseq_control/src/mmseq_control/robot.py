@@ -19,7 +19,6 @@ import mmseq_control.map as map
 from mmseq_utils import parsing
 from mmseq_simulator import simulation
 from mobile_manipulation_central.kinematics import RobotKinematics
-from cbf_mpc.barrier_function2 import CBF, CBFJacobian
 
 # import yappi
 

@@ -1,8 +1,9 @@
 simulation:
   robot:
-    # home: [0, 0, 0, 0.5pi, -0.75pi, -0.5pi, -0.25pi, -0.5pi, 0.5pi]  # upright
-    home: [0, -0, 0, 0.5pi, -0.25pi, 0.5pi, -0.25pi, 0.5pi, 0.417pi]  # standard
-#    home: [1, -1, 0.75pi, 0.35pi, -0.65pi, 0.346pi, -0.233pi, 0.75pi, 0.32pi]  # standard
+    #home: [0, 0, 0, 0.5pi, -0.75pi, -0.5pi, -0.25pi, -0.5pi, 0.5pi]  # upright
+    home: [1.5, 2, -0.3, 0.2pi, -0.25pi, 0.5pi, -0.25pi, 0.6pi, 0.417pi]  # no overlap bw two cams
+    #home: [0, -0, 0, 0.5pi, -0.25pi, 0.5pi, -0.25pi, 0.5pi, 0.417pi]  # standard
+    #home: [1, -1, 0.75pi, 0.35pi, -0.65pi, 0.346pi, -0.233pi, 0.75pi, 0.32pi]  # standard
     dims:
       q: 9  # generalized position
       v: 9  # generalized velocity

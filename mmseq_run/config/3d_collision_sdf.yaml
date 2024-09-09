@@ -29,8 +29,8 @@ planner:
   #   tracking_err_tol: 0.4
 simulation:
   robot:
-    home: [0., -0.2, 0, 0.5pi, -0.75pi, 0.75pi, -0.25pi, 0.5pi, 0.417pi]  # standard
-    # home: [0.0, -0.0, 0, 0.7854, -0.7854, 1.57, -0.7854,  1.5708, 1.31]
+    #home: [0., -0.2, 0, 0.5pi, -0.75pi, 0.75pi, -0.25pi, 0.5pi, 0.417pi]  # standard
+    home: [1.5, 2, -0.3, 0.2pi, -0.25pi, 0.5pi, -0.25pi, 0.6pi, 0.417pi]
 
 controller:
   home: "default"
@@ -70,5 +70,5 @@ include:
     path: "config/map/SDF3D.yaml"
 
 logging:
-  log_dir: "/home/tracy/PhD/data/Aug31"
+  log_dir: "/home/jqian/Downloads/3d_collision"
   log_level: 10 # 0 - not set, 10 - debug, 20 - info
