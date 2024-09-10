@@ -160,6 +160,7 @@ if __name__ == "__main__":
     parser.add_argument("--savefigs", action="store_true", help="export figures to file")
     parser.add_argument("--printparam", action="store_true", help="export figures to file")
     parser.add_argument("--paramname", type=str,help="control timestep to inspect")
+    parser.add_argument("--plottimeoptimal", action="store_true", help="export figures to file")
 
     args = parser.parse_args()
 
@@ -185,12 +186,14 @@ if __name__ == "__main__":
             data_plotter.sdf_failure_debug(args.timestep)
         if args.mpcdebug:
             data_plotter.mpc_constraint_debug(args.timestep)
-        if args.savefigs:
-            data_plotter.save_figs()
         if args.runmpc:
             data_plotter.run_mpc_iter(args.timestep)
         if args.printparam:
             data_plotter.print_mpc_param(args.paramname)
+        if args.plottimeoptimal:
+            data_plotter.plot_time_optimal_plan_tracking_results()
+        if args.savefigs:
+            data_plotter.save_figs()
         plt.show()
 
 

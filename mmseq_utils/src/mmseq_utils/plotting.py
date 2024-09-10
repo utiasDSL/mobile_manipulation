@@ -31,7 +31,7 @@ def multipage(filename, figs=None, dpi=200):
     if figs is None:
         figs = [plt.figure(n) for n in plt.get_fignums()]
     for fig in figs:
-        fig.savefig(pp, dpi=dpi, format='pdf')
+        fig.savefig(pp, format='pdf')
     pp.close()
 
 def construct_logger(path_to_folder):
@@ -67,7 +67,7 @@ class DataPlotter:
         self.data = data
         self.data["name"] = self.data.get('name', 'data')
         self.config = config
-        if config is not None:
+        if config is not None:     
             # controller
             control_class = getattr(MPC, config["controller"]["type"], None)
             if control_class is None:
@@ -111,6 +111,8 @@ class DataPlotter:
         config = parsing.load_config(config_file_path)
         folder_name = folder_path.split("/")[-1]
         data["name"] = folder_name.split("_")[0]
+        data["folder_path"] = folder_path
+
         return cls(data, config)
 
 
@@ -147,6 +149,8 @@ class DataPlotter:
                 data[key] = f_interp(t)
         data["ts"] -= data["ts"][0]
         data["name"] = folder_path.split("/")[-1]
+        data["folder_path"] = folder_path
+
         return cls(data, config)
 
     @classmethod
@@ -201,6 +205,7 @@ class DataPlotter:
 
         data["ts"] -= data["ts"][0]
         data["name"] = folder_path.split("/")[-1]
+        data["folder_path"] = folder_path
         return cls(data, config)
 
     def _get_tracking_err(self, ref_name, robot_traj_name):
@@ -493,9 +498,9 @@ class DataPlotter:
             axes.plot(ts, r_ew_w_ds[:, 1], label=legend + "$y_d$", color="g", linestyle="--")
             axes.plot(ts, r_ew_w_ds[:, 2], label=legend + "$z_d$", color="b", linestyle="--")
         if len(r_ew_ws) > 0:
-            axes.plot(ts, r_ew_ws[:, 0], "-x", label=legend + "$x$", color="r")
-            axes.plot(ts, r_ew_ws[:, 1], "-x", label=legend + "$y$", color="g")
-            axes.plot(ts, r_ew_ws[:, 2], "-x", label=legend + "$z$", color="b")
+            axes.plot(ts, r_ew_ws[:, 0], label=legend + "$x$", color="r")
+            axes.plot(ts, r_ew_ws[:, 1], label=legend + "$y$", color="g")
+            axes.plot(ts, r_ew_ws[:, 2], label=legend + "$z$", color="b")
         axes.grid()
         axes.legend()
         axes.set_xlabel("Time (s)")
@@ -669,8 +674,8 @@ class DataPlotter:
         axes.grid()
         axes.legend()
         axes.set_xlabel("Time (s)")
-        axes.set_ylabel("Position (m)")
-        axes.set_title("Base position")
+        axes.set_ylabel("Position (m)/Heading (rad)")
+        axes.set_title("Base state tracking")
 
         return axes
 
@@ -834,7 +839,7 @@ class DataPlotter:
         ts = self.data["ts"]
         cmd_vels = self.data["cmd_vels"]
         cmd_accs = self.data.get("cmd_accs")
-        cmd_jerks = self.data.get("cmd_jerks")
+        # cmd_jerks = self.data.get("cmd_jerks")
         ref_vels = self.data.get("ref_vels", [])
         ref_accs = self.data.get("ref_accs", [])
         nq = int(self.data["nq"])
@@ -842,7 +847,7 @@ class DataPlotter:
 
         if axes is None:
             axes = []
-            for i in range(3):
+            for i in range(2):
                 f, ax = plt.subplots(nv, 1, sharex=True, figsize=(13, 23))
                 axes.append(ax)
         if legend is None:
@@ -856,16 +861,13 @@ class DataPlotter:
             ax[i].plot(
                 ts,
                 cmd_vels[:, i],
-                '-x',
                 label=legend + f"$v_{{cmd_{i + 1}}}$" + f"max = " + str(max(cmd_vels[:, i])),
-                linestyle="--",
                 color=colors[index],
             )
             if len(ref_vels) > 0:
                 ax[i].plot(
                     ts[:len(ref_vels)],
                     ref_vels[:, i],
-                    '-x',
                     label=legend + f"$v_{{plan_{i + 1}}}$",
                     linestyle="--",
                     color='r',
@@ -882,16 +884,13 @@ class DataPlotter:
                 ax[i].plot(
                     ts,
                     cmd_accs[:, i],
-                    '--',
                     label=legend + f"$a_{{cmd_{i + 1}}}$" + f"max = " + str(max(cmd_accs[:, i])),
-                    linestyle="--",
                     color=colors[index],
                 )
                 if len(ref_accs) > 0:
                     ax[i].plot(
                         ts[:len(ref_accs)],
                         ref_accs[:, i],
-                        '-x',
                         label=legend + f"$a_{{plan_{i + 1}}}$",
                         linestyle="--",
                         color='r',
@@ -902,22 +901,22 @@ class DataPlotter:
             ax[-1].set_xlabel("Time (s)")
             ax[0].set_title("Commanded joint acceleration (rad/s^2)")
 
-        if cmd_jerks is not None:
-            ax = axes[2]
-            for i in range(nv):
-                ax[i].plot(
-                    ts[:-1],
-                    cmd_jerks[:, i],
-                    '-x',
-                    label=legend + f"$j_{{cmd_{i + 1}}}$" + f"max = " + str(self.data["statistics"]["cmd_jerks"]["max"][i]),
-                    linestyle="--",
-                    color=colors[index],
-                )
+        # if cmd_jerks is not None:
+        #     ax = axes[2]
+        #     for i in range(nv):
+        #         ax[i].plot(
+        #             ts[:-1],
+        #             cmd_jerks[:, i],
+        #             '-x',
+        #             label=legend + f"$j_{{cmd_{i + 1}}}$" + f"max = " + str(self.data["statistics"]["cmd_jerks"]["max"][i]),
+        #             linestyle="--",
+        #             color=colors[index],
+        #         )
 
-                ax[i].grid()
-                ax[i].legend()
-            ax[-1].set_xlabel("Time (s)")
-            ax[0].set_title("Commanded joint jerk (rad/s^3)")
+        #         ax[i].grid()
+        #         ax[i].legend()
+        #     ax[-1].set_xlabel("Time (s)")
+        #     ax[0].set_title("Commanded joint jerk (rad/s^3)")
 
         return axes
 
@@ -1486,9 +1485,9 @@ class DataPlotter:
     def save_figs(self):
 
         figs = [plt.figure(n) for n in plt.get_fignums()]
-        print(len(figs))
-        print(self.data["dir_path"])
-        multipage(Path(str(self.data["dir_path"])) / "data.pdf", figs)
+        folder_name = str(self.data["dir_path"]).split("/")[-1]
+
+        multipage(Path(str(self.data["folder_path"]))/Path(folder_name) / "report.pdf", figs)
 
     def plot_mpc(self):
         self.plot_cost_htmpc(block=False)
@@ -1521,19 +1520,29 @@ class DataPlotter:
         self.plot_collision()
 
     def plot_tracking(self):
+        self.plot_tracking_err()
+        # self.plot_cmd_vs_real_vel()
+        self.plot_task_performance()
+        self.plot_task_violation()
+
         self.plot_ee_tracking()
         self.plot_ee_linear_velocity_tracking()
         self.plot_base_tracking()
         self.plot_base_velocity_tracking()
         axes = self.plot_base_path()
         self.plot_base_ref_path(axes)
-        self.plot_tracking_err()
-        # self.plot_cmd_vs_real_vel()
-        self.plot_task_performance()
-        self.plot_task_violation()
+
 
     def plot_quick_check(self):
         self.plot_task_performance()
+        self.plot_collision()
+    
+    def plot_time_optimal_plan_tracking_results(self):
+        self.plot_tracking()
+        self.plot_cmds()
+
+        self.plot_state_normalized()
+        self.plot_cmds_normalized()
         self.plot_collision()
     
     def plot_sdf(self, t, use_iter_snapshot=False, block=True):
