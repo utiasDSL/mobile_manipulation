@@ -476,7 +476,9 @@ class ROSTrajectoryPlanner(TrajectoryPlanner):
 
     def getTrackingPoint(self, t, robot_states):
         # return self.getTrackingPointByStates(robot_states)
-        return self.getTrackingPointByTime(t)
+        #return self.getTrackingPointByTime(t)
+        ps, vs = self.getTrackingPointArray(robot_states, 2, 0.1)
+        return ps[0], vs[0]
     
     def getTrackingPointArray(self, robot_states, num_pts, dt):
         base_curr_pos = robot_states[0][:2]

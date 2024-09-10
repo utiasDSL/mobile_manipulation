@@ -91,6 +91,9 @@ def main():
         logger.append("ω_ew_ws", ω_ew_w)
 
         logger.append("r_bw_ws", q[:2])
+        logger.append("yaw_bw_ws", q[2])
+        logger.append("v_bw_ws", v[:2])
+        logger.append("ω_bw_ws", v[2])
         
         sim.step(render=True)
         sim.publish_ros_topics()

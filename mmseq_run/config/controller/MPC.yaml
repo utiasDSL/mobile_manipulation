@@ -6,6 +6,8 @@ controller:
                   # 1 for a single task, 2 for multi-task MPC or Hierarchical Task MPC 
   # MPC params
   dt: 0.1
+  robot:
+    time_discretization_dt: 0.1
   prediction_horizon: 1.0
   HT_MaxIntvl: 1
   ST_MaxIntvl: 1

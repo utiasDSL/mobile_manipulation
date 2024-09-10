@@ -532,7 +532,7 @@ class ControllerROSNode:
             v_bw_wd = None
             for planner in planners:
                 if planner.type == "EE":
-                        r_ew_wd, v_ew_wd  = planner.getTrackingPoint(t-t0, robot_states)
+                    r_ew_wd, v_ew_wd  = planner.getTrackingPoint(t-t0, robot_states)
                 elif planner.type == "base":
                     r_bw_wd, v_bw_wd = planner.getTrackingPoint(t-t0, robot_states)
 
