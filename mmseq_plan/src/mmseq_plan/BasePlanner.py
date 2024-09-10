@@ -413,12 +413,12 @@ class ROSTrajectoryPlanner(TrajectoryPlanner):
 
         self.path_sub = rospy.Subscriber("/planned_global_path", Path, self._path_callback)
 
-    def _generatePlan(self, start_time, points, headings):
+    def _generatePlan(self, start_time, raw_points, raw_headings):
         # given a set of path points and heading, generate a plan based on cruise speed
         # Compute cumulative distances along the path
         self.start_time = start_time
 
-        distances = np.linalg.norm(np.diff(points, axis=0), axis=1)
+        distances = np.linalg.norm(np.diff(raw_points, axis=0), axis=1)
         cumulative_distances = np.insert(np.cumsum(distances), 0, 0)
 
         # Total distance of the path
@@ -426,17 +426,25 @@ class ROSTrajectoryPlanner(TrajectoryPlanner):
 
         # Resample the path based on constant velocity and dt
         time = np.arange(0, total_distance / self.cruise_speed, self.dt)
-        new_x = np.interp(time * self.cruise_speed, cumulative_distances, points[:, 0]).reshape(-1, 1)
-        new_y = np.interp(time * self.cruise_speed, cumulative_distances, points[:, 1]).reshape(-1, 1)
+
+        traj_length = min(self.traj_length, len(time))
+        time = time[:traj_length]
+        points = raw_points[:traj_length, :]
+        headings = raw_headings[:traj_length]
+
+        new_x = np.interp(time * self.cruise_speed, cumulative_distances, points[:traj_length, 0]).reshape(-1, 1)
+        new_y = np.interp(time * self.cruise_speed, cumulative_distances, points[:traj_length, 1]).reshape(-1, 1)
+
+        print('trajectory length: ', traj_length)
 
         # Interpolate the headings based on the new time samples
         new_desired_headings = np.interp(time * self.cruise_speed, cumulative_distances, headings).reshape(-1, 1)
-        velocities = np.zeros((time.shape[0], 2))
+        velocities = np.zeros((traj_length, 3))
 
         if self.robot_states is not None: # smooth the heading transition
             # Calculate actual headings by capping yaw change per time step
             current_yaw = self.robot_states[0][2]
-            for i in range(new_desired_headings.shape[0]):
+            for i in range(traj_length-1):
                 yaw_diff = wrap_pi_scalar(new_desired_headings[i] - current_yaw)
                 max_yaw_change = self.yaw_speed * self.dt
 
@@ -448,15 +456,12 @@ class ROSTrajectoryPlanner(TrajectoryPlanner):
                 current_yaw += yaw_change
                 current_yaw = wrap_pi_scalar(current_yaw)  # Keep heading in [-pi, pi]
                 new_desired_headings[i] = current_yaw
-                velocities[i,1] = yaw_change / self.dt
 
-        time = time[:self.traj_length] #+ self.start_time
-        poses = np.hstack((new_x, new_y, new_desired_headings))[:self.traj_length, :]
-  
-        for i in range(poses.shape[0] - 1):
-            velocities[i,0] = np.linalg.norm(poses[i+1,:2] - poses[i, :2]) / self.dt
+                velocities[i,0] = (new_x[i+1] - new_x[i]) / self.dt
+                velocities[i,1] = (new_y[i+1] - new_y[i]) / self.dt
+                velocities[i,2] = yaw_change / self.dt
 
-        velocities = velocities[:self.traj_length, :]
+        poses = np.hstack((new_x, new_y, new_desired_headings))
 
         return {'t': time, 'p': poses, 'v': velocities}
 
