@@ -21,12 +21,12 @@ import mmseq_control_new.MPC as MPC
 import mmseq_control_new.HTMPC as HTMPCNew
 
 
-from mmseq_control.robot import MobileManipulator3D
+from mmseq_control.robot import MobileManipulator3D, CasadiModelInterface
 import mmseq_plan.TaskManager as TaskManager
 from mmseq_utils import parsing
 from mmseq_utils.logging import DataLogger
 from mmseq_utils.math import wrap_pi_scalar, wrap_to_2_pi_scalar
-from mobile_manipulation_central.ros_interface import MobileManipulatorROSInterface, ViconObjectInterface, ViconMarkerSwarmInterface, JoystickButtonInterface, MapInterface, MapInterfaceNew, MapGridInterface
+from mobile_manipulation_central.ros_interface import MobileManipulatorROSInterface, ViconObjectInterface, ViconMarkerSwarmInterface, JoystickButtonInterface, MapInterface, MapInterfaceNew
 from mobile_manipulation_central import PointToPointTrajectory, bound_array
 
 class ControllerROSNode:
@@ -63,7 +63,7 @@ class ControllerROSNode:
 
         self.ctrl_config = config["controller"]
         self.planner_config = config["planner"].copy()
-
+        print(self.ctrl_config["type"])
         # controller
         control_class = getattr(HTMPC, self.ctrl_config["type"], None)
         if control_class is None:
@@ -116,7 +116,13 @@ class ControllerROSNode:
         else:
             self.use_joy = False
         
-        self.map_interface = MapGridInterface(config=self.ctrl_config)
+        self.map_interface = MapInterfaceNew(config=self.ctrl_config)
+
+        casadi_kin_dyn = CasadiModelInterface(self.ctrl_config)
+        if self.ctrl_config["self_collision_emergency_stop"]:
+            self.self_collision_func = casadi_kin_dyn.signedDistanceSymMdlsPerGroup["self"]
+            self.ground_collision_func = casadi_kin_dyn.signedDistanceSymMdlsPerGroup["static_obstacles"]["ground"]
+
 
         self.controller_visualization_pub = rospy.Publisher("controller_visualization", Marker, queue_size=10)
         self.controller_visualization_array_pub = rospy.Publisher("controller_visualization_array", MarkerArray, queue_size=10)
@@ -452,6 +458,19 @@ class ControllerROSNode:
             self.sot_lock.acquire()
             planners = self.sot.getPlanners(num_planners=sot_num_plans)
             self.sot_lock.release()
+            # check collision
+            q = robot_states[0]
+            if self.ctrl_config["self_collision_emergency_stop"]:
+                signed_dist_self = self.self_collision_func(q).full().flatten()
+                signed_dist_ground = self.ground_collision_func(q).full().flatten()
+
+                if min(signed_dist_self) < 0.05 or min(signed_dist_ground) < 0.05:
+
+                    self.controller_log.warning("Self Collision Detected. Braking!!!!")
+                    self.cmd_vel_timer.shutdown()
+
+                    self.robot_interface.brake()
+                    continue
 
             for planner in planners:
                 planner.updateRobotStates(robot_states)
@@ -507,20 +526,38 @@ class ControllerROSNode:
             self.logger.append("ts", t)
             self.log_mpc_info(self.logger, self.controller)
             self.logger.append("controller_run_time", tc2 - tc1)
-            r_ew_wd = []
-            r_bw_wd = []
+            r_ew_wd = None
+            r_bw_wd = None
+            v_ew_wd = None
+            v_bw_wd = None
             for planner in planners:
                 if planner.type == "EE":
-                    # r_ew_wd, _ = planner.getTrackingPoint(t-t0, robot_states)
-                    r_ew_wd = self.controller.ree_bar[0]
+                        r_ew_wd, v_ew_wd  = planner.getTrackingPoint(t-t0, robot_states)
                 elif planner.type == "base":
-                    # r_bw_wd, _ = planner.getTrackingPoint(t-t0, robot_states)
-                    r_bw_wd = self.controller.rbase_bar[0]
+                    r_bw_wd, v_bw_wd = planner.getTrackingPoint(t-t0, robot_states)
 
-            if len(r_ew_wd) > 0:
+                    if planner.name == "PartialPlanner":
+                        ref_q_dot, ref_u = planner.getRefVelandAcc(t-t0)
+                        self.logger.append("ref_vels", ref_q_dot)
+                        self.logger.append("ref_accs", ref_u)
+            if r_ew_wd is not None:
                 self.logger.append("r_ew_w_ds", r_ew_wd)
-            if len(r_bw_wd) > 0:
-                self.logger.append("r_bw_w_ds", r_bw_wd)
+            if v_ew_wd is not None:
+                self.logger.append("v_ew_w_ds", v_ew_wd)
+            if r_bw_wd is not None:
+                if r_bw_wd.shape[0] == 2:
+                    self.logger.append("r_bw_w_ds", r_bw_wd)
+
+                elif r_bw_wd.shape[0] == 3:
+                    self.logger.append("r_bw_w_ds", r_bw_wd[:2])
+                    self.logger.append("yaw_bw_w_ds", r_bw_wd[2])
+            if v_bw_wd is not None:
+                if v_bw_wd.shape[0] == 2:
+                    self.logger.append("v_bw_w_ds", v_bw_wd)
+                elif  v_bw_wd.shape[0] == 3:
+                    self.logger.append("v_bw_w_ds", v_bw_wd[:2])
+                    self.logger.append("ω_bw_w_ds", v_bw_wd[2])
+
             self.logger.append("cmd_vels", u)
             self.logger.append("cmd_accs", acc)
             if self.ctrl_config["sdf_collision_avoidance_enabled"]:

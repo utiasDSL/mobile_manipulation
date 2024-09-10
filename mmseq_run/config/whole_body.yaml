@@ -1,0 +1,88 @@
+planner:
+  use_joy: True
+
+  sot_type: "SoTStatic"
+  tasks:
+    - name: "whole_body"
+      planner_type: "SequentialPlanner"
+      N: 100  
+      dt: 0.01
+      home: "default"
+      target_points: [ [1.5, 0, 1.5], [1.5, 1, 0.75] ]
+      prediction_horizon: 2
+      initialization: "Pontryagin" #Pontryagin or InverseKinematics
+      obstacle_avoidance: True
+      motion_class_type: "MobileManipulatorPointMass"
+      tracking_err_tol: 0.01
+      file_path: "/home/ubuntu/Sep7/scenarios/2wpts_arm0.5_ee_for_simulation/"
+      load_save_generate: "load"
+      file_name: "small_base_move"
+      base_acc_sf: 0.1
+      arm_acc_sf: 0.5
+      slowdown_enabled: False
+      base_pose_tracking_enabled: True
+      collision_safety_margin:
+        self: 0.25
+        ground: 0.2
+      motion_class_config_file: 
+          package: "mmseq_run"
+          path: "config/robot/default_thing_whole_body.yaml"
+      # - name: "whole_body"
+      #   planner_type: "CPCPlanner"
+      #   N: 200
+      #   dt: 0.01
+      #   target_points: [[5,5,1], [4,4,1], [5,5,1]]
+      #   prediction_horizon: 5
+      #   initialization: "Pontryagin"
+      #   obstacle_avoidance: True
+      #   cpc_tolerance: 0.0001
+      #   d_tol: 0.01
+      #   motion_class_type: "MobileManipulatorPointMass"
+      #   tracking_err_tol: 0.02
+      #   file_path: "/home/ubuntu/cpc_0.0001/5wpts_arm0.8"
+      #   load_save_generate: "load"
+      #   file_name: "test1"
+      #   slowdown_enabled: True
+      #   collision_safety_margin:
+      #     self: 0.15
+      #   motion_class_config_file: 
+      #       package: "mmseq_run"
+      #       path: "config/robot/default_thing_whole_body.yaml"
+controller:
+  home: "default"
+  self_collision_avoidance_enabled: True
+  sdf_collision_avoidance_enabled: False
+  static_obstacles_collision_avoidance_enabled: True
+  base_pose_tracking_enabled: True
+  acados:
+    ocp_solver_options:
+      nlp_solver_max_iter: 30
+    slack_enabled:
+      x: True
+      x_e: True
+      u: False
+      h_0: True
+      h: True
+      h_e: True  
+
+  type: "STMPC"
+
+
+simulation:
+  duration: 15
+
+include:
+  - package: "mmseq_run"
+    path: "config/robot/thing.yaml"
+  - package: "mmseq_run"
+    path: "config/controller/MPC.yaml"
+  - package: "mmseq_run"
+    path: "config/sim/simulation.yaml"
+  - package: "mmseq_run"
+    path: "config/scene/empty.yaml"
+  - package: "mmseq_run"
+    path: "config/map/SDF3D.yaml"
+
+logging:
+  log_dir: "$MOBILE_MANIPULATION_CENTRAL_BAG_DIR/SEP7"
+  log_level: 4 # 0 - not set, 10 - debug, 20 - info

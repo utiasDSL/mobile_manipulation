@@ -13,6 +13,7 @@ import time
 
 from mmseq_utils.parsing import parse_path, load_config
 from mmseq_utils.casadi_struct import casadi_sym_struct, reconstruct_sym_struct_map_from_array
+from mmseq_utils.math import wrap_pi_array
 
 from mmseq_control.robot import CasadiModelInterface, MobileManipulator3D
 from mmseq_control_new.MPCConstraints import SignedDistanceConstraint,SignedDistanceConstraintCBF
@@ -30,7 +31,7 @@ def multipage(filename, figs=None, dpi=200):
     if figs is None:
         figs = [plt.figure(n) for n in plt.get_fignums()]
     for fig in figs:
-        fig.savefig(pp, dpi=dpi, format='pdf')
+        fig.savefig(pp, format='pdf')
     pp.close()
 
 def construct_logger(path_to_folder):
@@ -66,7 +67,7 @@ class DataPlotter:
         self.data = data
         self.data["name"] = self.data.get('name', 'data')
         self.config = config
-        if config is not None:
+        if config is not None:     
             # controller
             control_class = getattr(MPC, config["controller"]["type"], None)
             if control_class is None:
@@ -105,11 +106,13 @@ class DataPlotter:
         :return:
         """
         npz_file_path = os.path.join(folder_path, "data.npz")
-        data = dict(np.load(npz_file_path))
+        data = dict(np.load(npz_file_path, allow_pickle=True))
         config_file_path = os.path.join(folder_path, "config.yaml")
         config = parsing.load_config(config_file_path)
         folder_name = folder_path.split("/")[-1]
         data["name"] = folder_name.split("_")[0]
+        data["folder_path"] = folder_path
+
         return cls(data, config)
 
 
@@ -146,6 +149,8 @@ class DataPlotter:
                 data[key] = f_interp(t)
         data["ts"] -= data["ts"][0]
         data["name"] = folder_path.split("/")[-1]
+        data["folder_path"] = folder_path
+
         return cls(data, config)
 
     @classmethod
@@ -179,14 +184,19 @@ class DataPlotter:
                         ros_data["ur10"]["joint_states_interpolated"]["vs"],
                         ))
         r_ew_ws = ros_data["model"]["EE"]["pos"]
+        q_ew_ws = ros_data["model"]['EE']["orn"]
+        v_ew_ws = ros_data["model"]["EE"]["vel_lin"]
+        ω_ew_ws = ros_data["model"]["EE"]["vel_ang"]
+
+
         r_bw_ws = ros_data["model"]['base']["pos"]
+        yaw_bw_ws = ros_data["model"]['base']["orn"]
+        v_bw_ws = ros_data["model"]["base"]["vel_lin"]
+        ω_bw_ws = ros_data["model"]["base"]["vel_ang"]
 
-
-        values = [xs, r_ew_ws, r_bw_ws]
-        ts = [ros_data["ridgeback"]["joint_states"]["ts"],
-              ros_data["model"]["EE"]["ts"],
-              ros_data["model"]["base"]["ts"]]
-        keys = ["xs", "r_ew_ws", "r_bw_ws"]
+        values = [xs, r_ew_ws, q_ew_ws,v_ew_ws,ω_ew_ws, r_bw_ws, yaw_bw_ws,v_bw_ws,ω_bw_ws]
+        ts = [ros_data["ridgeback"]["joint_states"]["ts"]] + [ros_data["model"]["EE"]["ts"]] *4 + [ros_data["model"]["base"]["ts"]] * 4
+        keys = ["xs", "r_ew_ws", "q_ew_ws", "v_ew_ws", "ω_ew_ws", "r_bw_ws", "yaw_bw_ws", "v_bw_ws", "ω_bw_ws"]
 
         for t, value, key in zip(ts, values, keys):
             value = np.array(value)
@@ -195,12 +205,19 @@ class DataPlotter:
 
         data["ts"] -= data["ts"][0]
         data["name"] = folder_path.split("/")[-1]
+        data["folder_path"] = folder_path
         return cls(data, config)
 
     def _get_tracking_err(self, ref_name, robot_traj_name):
         N = len(self.data["ts"])
-        rs = self.data.get(robot_traj_name, np.zeros((N,0)))
-        rds = self.data.get(ref_name, rs)
+        rs = self.data.get(robot_traj_name, None)
+        rds = self.data.get(ref_name, None) 
+        
+        if rds is None:
+            return np.zeros(N)
+        if rs is None:
+            rs = np.zeros_like(rds)
+
         if len(rs) == len(rds):
             errs = np.linalg.norm(rds - rs, axis=1)
         else:
@@ -302,6 +319,12 @@ class DataPlotter:
         self.data["r_bw_bs"] = self._transform_w2b_SE2(qb, self.data["r_bw_ws"])
         if "r_bw_w_ds" in self.data.keys():
             self.data["r_bw_b_ds"] = self._transform_w2b_SE2(qb, self.data["r_bw_w_ds"])
+        if "yaw_bw_w_ds" in self.data.keys():
+            self.data["yaw_bw_w_ds"] -= qb[2]
+            self.data["yaw_bw_w_ds"] = wrap_pi_array(self.data["yaw_bw_w_ds"])
+        if  "yaw_bw_ws" in self.data.keys():
+            self.data["yaw_bw_ws"] -= qb[2]
+            self.data["yaw_bw_ws"] = wrap_pi_array(self.data["yaw_bw_ws"])
         
         # mpc constraints with prediction
         N = len(self.data["ts"])
@@ -450,10 +473,12 @@ class DataPlotter:
 
         print("x bar diff {}".format(x_bar_diff))
         print("u bar diff {}".format(u_bar_diff))
+        print("u0 {}".format(u_bar[0]))
         print("run time {}".format(t1-t0))
+        print("u0 {}".format(u_bar[0]))
         
 
-    def plot_ee_position(self, axes=None, index=0, legend=None):
+    def plot_ee_tracking(self, axes=None, index=0, legend=None):
         ts = self.data["ts"]
         r_ew_w_ds = self.data.get("r_ew_w_ds", [])
         r_ew_ws = self.data.get("r_ew_ws", [])
@@ -480,7 +505,7 @@ class DataPlotter:
         axes.legend()
         axes.set_xlabel("Time (s)")
         axes.set_ylabel("Position (m)")
-        axes.set_title("End effector position")
+        axes.set_title("End effector position tracking")
 
         return axes
 
@@ -619,11 +644,14 @@ class DataPlotter:
 
         return axes
 
-    def plot_base_position(self, axes=None, index=0, legend=None):
+    def plot_base_tracking(self, axes=None, index=0, legend=None):
         ts = self.data["ts"]
         r_ew_w_ds = self.data.get("r_bw_w_ds", [])
         r_ew_ws = self.data.get("r_bw_ws",[])
-        if len(r_ew_w_ds) == 0 and len(r_ew_ws) == 0:
+        yaw_bw_w_ds = self.data.get("yaw_bw_w_ds", [])
+        yaw_bw_ws = self.data.get("yaw_bw_ws", [])
+
+        if len(r_ew_w_ds) == 0 and len(r_ew_ws) == 0 and len(yaw_bw_w_ds) ==0 and len(yaw_bw_ws)==0:
             return
 
         if axes is None:
@@ -638,13 +666,54 @@ class DataPlotter:
         if len(r_ew_ws) > 0:
             axes.plot(ts, r_ew_ws[:, 0], label=legend + "$x$", color="r")
             axes.plot(ts, r_ew_ws[:, 1], label=legend + "$y$", color="g")
+        if len(yaw_bw_w_ds)>0:
+            axes.plot(ts, yaw_bw_w_ds, label=legend + "$Θ_d$", color="b", linestyle="--" )
+        if len(yaw_bw_ws)>0:
+            axes.plot(ts, yaw_bw_ws, label=legend + "$Θ$", color="b" )
+
         axes.grid()
         axes.legend()
         axes.set_xlabel("Time (s)")
-        axes.set_ylabel("Position (m)")
-        axes.set_title("Base position")
+        axes.set_ylabel("Position (m)/Heading (rad)")
+        axes.set_title("Base state tracking")
 
         return axes
+
+    def plot_base_velocity_tracking(self, axes=None, index=0, legend=None):
+        ts = self.data["ts"]
+        v_bw_w_ds = self.data.get("v_bw_w_ds", [])
+        v_bw_ws = self.data.get("v_bw_ws",[])
+        ω_bw_w_ds = self.data.get("ω_bw_w_ds", [])
+        ω_bw_ws = self.data.get("ω_bw_ws", [])
+
+        if len(v_bw_w_ds) == 0 and len(v_bw_ws) == 0 and len(ω_bw_w_ds) ==0 and len(ω_bw_ws)==0:
+            return
+
+        if axes is None:
+            axes = []
+            f, axes = plt.subplots(1, 1, sharex=True)
+
+        if legend is None:
+            legend = self.data["name"]
+        if len(v_bw_w_ds) > 0:
+            axes.plot(ts, v_bw_w_ds[:, 0], label=legend + "${v_x}_d$", color="r", linestyle="--")
+            axes.plot(ts, v_bw_w_ds[:, 1], label=legend + "${v_y}_d$", color="g", linestyle="--")
+        if len(v_bw_ws) > 0:
+            axes.plot(ts, v_bw_ws[:, 0], label=legend + "$v_x$", color="r")
+            axes.plot(ts, v_bw_ws[:, 1], label=legend + "$v_y$", color="g")
+        if len(ω_bw_w_ds)>0:
+            axes.plot(ts, ω_bw_w_ds, label=legend + "$ω_d$", color="b", linestyle="--" )
+        if len(ω_bw_ws)>0:
+            axes.plot(ts, ω_bw_ws, label=legend + "$ω$", color="b" )
+
+        axes.grid()
+        axes.legend()
+        axes.set_xlabel("Time (s)")
+        axes.set_ylabel("Velocity (m/s or rad/s)")
+        axes.set_title("Base velocity tracking")
+
+        return axes
+
 
     def plot_ee_orientation(self, axes=None, index=0, legend=None):
         ts = self.data["ts"]
@@ -670,10 +739,12 @@ class DataPlotter:
         axes.set_ylabel("Orientation")
         axes.set_title("End effector orientation")
 
-    def plot_ee_velocity(self, axes=None, index=0, legend=None):
+    def plot_ee_linear_velocity_tracking(self, axes=None, index=0, legend=None):
         ts = self.data["ts"]
         v_ew_ws = self.data["v_ew_ws"]
-        ω_ew_ws = self.data["ω_ew_ws"]
+        # ω_ew_ws = self.data["ω_ew_ws"]
+
+        v_ref = self.data.get("v_ew_w_ds", [])
 
         if axes is None:
             axes = []
@@ -681,17 +752,21 @@ class DataPlotter:
         if legend is None:
             legend = self.data["name"]
 
-        axes.plot(ts, v_ew_ws[:, 0], label=legend + "$v_x$")
-        axes.plot(ts, v_ew_ws[:, 1], label=legend + "$v_y$")
-        axes.plot(ts, v_ew_ws[:, 2], label=legend + "$v_z$")
-        axes.plot(ts, ω_ew_ws[:, 0], label=legend + "$ω_x$")
-        axes.plot(ts, ω_ew_ws[:, 1], label=legend + "$ω_y$")
-        axes.plot(ts, ω_ew_ws[:, 2], label=legend + "$ω_z$")
+        axes.plot(ts, v_ew_ws[:, 0], label=legend + "$v_x$", color="r",)
+        axes.plot(ts, v_ew_ws[:, 1], label=legend + "$v_y$", color="g",)
+        axes.plot(ts, v_ew_ws[:, 2], label=legend + "$v_z$", color="b",)
+        if len(v_ref) > 0:
+            axes.plot(ts, v_ref[:, 0], label=legend + "${v_x}_d}$", color="r", linestyle="--")
+            axes.plot(ts, v_ref[:, 1], label=legend + "${v_y}_d}$", color="g", linestyle="--")
+            axes.plot(ts, v_ref[:, 2], label=legend + "${v_z}_d}$", color="b", linestyle="--")
+        # axes.plot(ts, ω_ew_ws[:, 0], label=legend + "$ω_x$")
+        # axes.plot(ts, ω_ew_ws[:, 1], label=legend + "$ω_y$")
+        # axes.plot(ts, ω_ew_ws[:, 2], label=legend + "$ω_z$")
         axes.grid()
         axes.legend()
         axes.set_xlabel("Time (s)")
         axes.set_ylabel("Velocity")
-        axes.set_title("End effector velocity")
+        axes.set_title("End effector linear velocity tracking")
 
         return axes
 
@@ -764,13 +839,15 @@ class DataPlotter:
         ts = self.data["ts"]
         cmd_vels = self.data["cmd_vels"]
         cmd_accs = self.data.get("cmd_accs")
-        cmd_jerks = self.data.get("cmd_jerks")
+        # cmd_jerks = self.data.get("cmd_jerks")
+        ref_vels = self.data.get("ref_vels", [])
+        ref_accs = self.data.get("ref_accs", [])
         nq = int(self.data["nq"])
         nv = int(self.data["nv"])
 
         if axes is None:
             axes = []
-            for i in range(3):
+            for i in range(2):
                 f, ax = plt.subplots(nv, 1, sharex=True, figsize=(13, 23))
                 axes.append(ax)
         if legend is None:
@@ -784,11 +861,17 @@ class DataPlotter:
             ax[i].plot(
                 ts,
                 cmd_vels[:, i],
-                '-x',
                 label=legend + f"$v_{{cmd_{i + 1}}}$" + f"max = " + str(max(cmd_vels[:, i])),
-                linestyle="--",
                 color=colors[index],
             )
+            if len(ref_vels) > 0:
+                ax[i].plot(
+                    ts[:len(ref_vels)],
+                    ref_vels[:, i],
+                    label=legend + f"$v_{{plan_{i + 1}}}$",
+                    linestyle="--",
+                    color='r',
+                )
 
             ax[i].grid()
             ax[i].legend()
@@ -801,33 +884,39 @@ class DataPlotter:
                 ax[i].plot(
                     ts,
                     cmd_accs[:, i],
-                    '-x',
                     label=legend + f"$a_{{cmd_{i + 1}}}$" + f"max = " + str(max(cmd_accs[:, i])),
-                    linestyle="--",
                     color=colors[index],
                 )
+                if len(ref_accs) > 0:
+                    ax[i].plot(
+                        ts[:len(ref_accs)],
+                        ref_accs[:, i],
+                        label=legend + f"$a_{{plan_{i + 1}}}$",
+                        linestyle="--",
+                        color='r',
+                    )
 
                 ax[i].grid()
                 ax[i].legend()
             ax[-1].set_xlabel("Time (s)")
             ax[0].set_title("Commanded joint acceleration (rad/s^2)")
 
-        if cmd_jerks is not None:
-            ax = axes[2]
-            for i in range(nv):
-                ax[i].plot(
-                    ts[:-1],
-                    cmd_jerks[:, i],
-                    '-x',
-                    label=legend + f"$j_{{cmd_{i + 1}}}$" + f"max = " + str(self.data["statistics"]["cmd_jerks"]["max"][i]),
-                    linestyle="--",
-                    color=colors[index],
-                )
+        # if cmd_jerks is not None:
+        #     ax = axes[2]
+        #     for i in range(nv):
+        #         ax[i].plot(
+        #             ts[:-1],
+        #             cmd_jerks[:, i],
+        #             '-x',
+        #             label=legend + f"$j_{{cmd_{i + 1}}}$" + f"max = " + str(self.data["statistics"]["cmd_jerks"]["max"][i]),
+        #             linestyle="--",
+        #             color=colors[index],
+        #         )
 
-                ax[i].grid()
-                ax[i].legend()
-            ax[-1].set_xlabel("Time (s)")
-            ax[0].set_title("Commanded joint jerk (rad/s^3)")
+        #         ax[i].grid()
+        #         ax[i].legend()
+        #     ax[-1].set_xlabel("Time (s)")
+        #     ax[0].set_title("Commanded joint jerk (rad/s^3)")
 
         return axes
 
@@ -919,6 +1008,7 @@ class DataPlotter:
         ts = self.data["ts"]
         xs = self.data["xs"]
         cmd_vels = self.data["cmd_vels"]
+        ref_vels = self.data.get("ref_vels", [])
         nq = int(self.data["nq"])
         nv = int(self.data["nv"])
 
@@ -938,6 +1028,15 @@ class DataPlotter:
                 # linestyle="-x",
                 color=colors[i],
             )
+            if len(ref_vels) > 0:
+                axes[i].plot(
+                    ts[:len(ref_vels)],
+                    ref_vels[:, i], '-o',
+                    label=f"$v_{{plan_{i + 1}}}$",
+                    linestyle="--",
+                    color=colors[i],
+                )
+
 
             axes[i].grid()
             axes[i].legend()
@@ -1316,7 +1415,8 @@ class DataPlotter:
         print(data_name)
         print(data.shape)
         
-        data = data.squeeze(axis=-1)
+        if len(data.shape) ==4:
+            data = data.squeeze(axis=-1)
 
         print(data.shape)
         if len(data.shape) == 3:
@@ -1358,7 +1458,7 @@ class DataPlotter:
                 axes[i].grid()
             axes[0].set_title(" ".join(data_name.split("_")[1:] + ["figure", str(fi+1)+"/"+str(figs_num)]))
             
-            plt.show(block=block)
+        plt.show(block=block)
     
         return axes
 
@@ -1367,8 +1467,10 @@ class DataPlotter:
 
     def plot_all(self):
         self.data["name"] = ""
-        self.plot_ee_position()
-        self.plot_base_position()
+        self.plot_ee_tracking()
+        self.plot_ee_linear_velocity_tracking()
+        self.plot_base_tracking()
+        self.plot_base_velocity_tracking()
         self.plot_tracking_err()
         self.plot_cmd_vs_real_vel()
         self.plot_state()
@@ -1383,17 +1485,24 @@ class DataPlotter:
     def save_figs(self):
 
         figs = [plt.figure(n) for n in plt.get_fignums()]
-        print(len(figs))
-        print(self.data["dir_path"])
-        multipage(Path(str(self.data["dir_path"])) / "data.pdf", figs)
+        folder_name = str(self.data["dir_path"]).split("/")[-1]
+
+        multipage(Path(str(self.data["folder_path"]))/Path(folder_name) / "report.pdf", figs)
 
     def plot_mpc(self):
         self.plot_cost_htmpc(block=False)
         self.plot_solver_status_htmpc(block=False)
-        # self.plot_solver_iters_htmpc(block=False)
+        self.plot_solver_iters_htmpc(block=False)
         self.plot_time_htmpc(block=False)
         # self.plot_solver_iters()
         self.plot_time_series_data_htmpc("time_get_map", block=False)
+        # self.plot_solver_iters(block=False)
+        # self.plot_mpc_prediction("mpc_obstacle_cylinder_1_link_constraints")
+        self.plot_mpc_prediction("mpc_sdf_constraints", block=False)
+        # self.plot_mpc_prediction("mpc_control_constraints",block=False)
+        # self.plot_mpc_prediction("mpc_state_constraints", block=False)
+        # self.plot_mpc_prediction("mpc_sdf_constraint_gradients", block=False)
+
 
         self.plot_run_time()
 
@@ -1411,17 +1520,29 @@ class DataPlotter:
         self.plot_collision()
 
     def plot_tracking(self):
-        self.plot_ee_position()
-        self.plot_base_position()
-        axes = self.plot_base_path()
-        self.plot_base_ref_path(axes)
         self.plot_tracking_err()
         # self.plot_cmd_vs_real_vel()
         self.plot_task_performance()
         self.plot_task_violation()
 
+        self.plot_ee_tracking()
+        self.plot_ee_linear_velocity_tracking()
+        self.plot_base_tracking()
+        self.plot_base_velocity_tracking()
+        axes = self.plot_base_path()
+        self.plot_base_ref_path(axes)
+
+
     def plot_quick_check(self):
         self.plot_task_performance()
+        self.plot_collision()
+    
+    def plot_time_optimal_plan_tracking_results(self):
+        self.plot_tracking()
+        self.plot_cmds()
+
+        self.plot_state_normalized()
+        self.plot_cmds_normalized()
         self.plot_collision()
     
     def plot_sdf(self, t, use_iter_snapshot=False, block=True):
@@ -1655,10 +1776,10 @@ class DataPlotter:
         param_map_bar = [reconstruct_sym_struct_map_from_array(self.controller.p_struct, param_map_array[0]) for param_map_array in self.data["mpc_ocp_params"]]
         print("Param {}".format(param_name))
         for k, param in enumerate(param_map_bar):
-            print("time step {} param:{}".format(k, param[param_name]))
+            print("time: {} param:{}".format(self.data["ts"][k], param[param_name]))
 
 class ROSBagPlotter:
-    def __init__(self, bag_file, config_file="/home/tracy/Projects/mm_slam/mm_ws/src/mm_sequential_tasks/mmseq_run/config/3d_collision.yaml"):
+    def __init__(self, bag_file, config_file="/home/ubuntu/Workspace/catkin_ws/src/mm_sequential_tasks/mmseq_run/config/robot/thing.yaml"):
         self.data = {"ur10": {}, "ridgeback": {}, "mpc": {}, "vicon": {}, "model":{}}
         self.bag = rosbag.Bag(bag_file)
         self.config = load_config(config_file)
@@ -1748,34 +1869,55 @@ class ROSBagPlotter:
     def compute_values_from_robot_model(self):
         f_base = self.robot.kinSymMdls[self.robot.base_link_name]
         f_ee = self.robot.kinSymMdls[self.robot.tool_link_name]
+        J_ee = self.robot.jacSymMdls[self.robot.tool_link_name]
 
         r_base_s = []
         yaw_base_s = []
+        v_base_s = []
+        ω_base_s = []
+
         r_ee_s = []
         quat_ee_s = []
+        v_ee_s = []
+        ω_ee_s = []
 
 
         for i in range(len(self.data["ur10"]["joint_states_interpolated"]["ts"])):
             qa = self.data["ur10"]["joint_states_interpolated"]["qs"][i]
             qb = self.data["ridgeback"]["joint_states"]["qs"][i]
             q = np.hstack((qb, qa))
+
+            q_dota = self.data["ur10"]["joint_states_interpolated"]["vs"][i]
+            q_dotb = self.data["ridgeback"]["joint_states"]["vs"][i]
+            q_dot = np.hstack((q_dotb, q_dota))
             r_b, theta_b = f_base(q)
             r_ee, rot_ee = f_ee(q)
             quat_ee = r2q(np.array(rot_ee), order="xyzs")
+            v_ee = J_ee(q) @ q_dot
 
             r_base_s.append(r_b)
             yaw_base_s.append(theta_b)
+            v_base_s.append(q_dotb[:2])
+            ω_base_s.append(q_dotb[2])
 
             r_ee_s.append(r_ee)
             quat_ee_s.append(quat_ee)
+            v_ee_s.append(v_ee)
+            # TODO: compute angular velocity from model. Perhaps use a package that gives full jacobian casadi functino
+            # Possible choice: https://pypi.org/project/cmeel-casadi-kin-dyn/
+            ω_ee_s.append(np.zeros(3))
 
         self.data["model"]["EE"] = {"ts": self.data["ur10"]["joint_states_interpolated"]["ts"].copy(),
                                     "pos": np.array(r_ee_s).squeeze(),
-                                    "orn": np.array(quat_ee_s).squeeze()}
+                                    "vel_lin": np.array(v_ee_s).squeeze(),
+                                    "orn": np.array(quat_ee_s).squeeze(),
+                                    "vel_ang":np.array(ω_ee_s).squeeze()}
 
         self.data["model"]["base"] = {"ts": self.data["ur10"]["joint_states_interpolated"]["ts"].copy(),
                                       "pos": np.array(r_base_s).squeeze(),
-                                      "orn": np.array(yaw_base_s).flatten()}
+                                      "vel_lin": np.array(v_base_s).squeeze(),
+                                      "orn": np.array(yaw_base_s).flatten(),
+                                      "vel_ang": np.array(ω_base_s).flatten()}
 
     def _set_zero_time(self):
         if len(self.data["ridgeback"]["cmd_vels"]["ts"]) > 0:
