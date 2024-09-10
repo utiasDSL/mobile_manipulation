@@ -431,6 +431,7 @@ class ROSTrajectoryPlanner(TrajectoryPlanner):
 
         # Interpolate the headings based on the new time samples
         new_desired_headings = np.interp(time * self.cruise_speed, cumulative_distances, headings).reshape(-1, 1)
+        velocities = np.zeros((time.shape[0], 2))
 
         if self.robot_states is not None: # smooth the heading transition
             # Calculate actual headings by capping yaw change per time step
@@ -447,14 +448,15 @@ class ROSTrajectoryPlanner(TrajectoryPlanner):
                 current_yaw += yaw_change
                 current_yaw = wrap_pi_scalar(current_yaw)  # Keep heading in [-pi, pi]
                 new_desired_headings[i] = current_yaw
+                velocities[i,1] = yaw_change / self.dt
 
-        #return new_positions, new_headings
         time = time[:self.traj_length] #+ self.start_time
         poses = np.hstack((new_x, new_y, new_desired_headings))[:self.traj_length, :]
-        velocities = np.zeros((poses.shape[0], 2))
+  
         for i in range(poses.shape[0] - 1):
-            velocities[i,0] = (poses[i+1, 0] - poses[i, 0]) / self.dt
-            velocities[i,1] = (poses[i+1, 1] - poses[i, 1]) / self.dt
+            velocities[i,0] = np.linalg.norm(poses[i+1,:] - poses[i, :]) / self.dt
+
+        velocities = velocities[:self.traj_length, :]
 
         return {'t': time, 'p': poses, 'v': velocities}
 
