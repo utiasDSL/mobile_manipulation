@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <launch>
 
-  <include file="$(find mobile_manipulation_central)/launch/thing_description.launch">
+  <include file="$(find mmseq_run)/launch/thing_description.launch">
     <arg name="visual_params" value="$(find ur_description)/config/ur10/visual_parameters.yaml" />
   </include>
 
