@@ -200,7 +200,7 @@ class CasadiModelInterface:
         self.collision_pairs_detailed = {"self": [],
                                         "static_obstacles": {},
                                         "dynamic_obstacles": {}}
-        self._setupCollisionPair()
+        self._setupCollisionPair(config)
         self._setupCollisionPairDetailed()
 
         self.signedDistanceSymMdls = {}             # keyed by collision pair (tuple)
@@ -228,37 +228,48 @@ class CasadiModelInterface:
 
         return pairs
 
-    def _setupCollisionPair(self):
-        # base
-        self.collision_pairs["self"] = [["ur10_arm_forearm_collision_link", "base_collision_link"]]
-        self.collision_pairs["self"] += self._addCollisionPairFromTwoGroups(self.robot.collision_link_names["base"],
-                                                                            self.robot.collision_link_names["wrist"] +
-                                                                            self.robot.collision_link_names["tool"])
-        # upper arm
-        self.collision_pairs["self"] += self._addCollisionPairFromTwoGroups(self.robot.collision_link_names["upper_arm"][:2],
-                                                                            self.robot.collision_link_names["wrist"] +
-                                                                            self.robot.collision_link_names["tool"])
-        # forearm
-        self.collision_pairs["self"] += self._addCollisionPairFromTwoGroups(self.robot.collision_link_names["forearm"][:2],
-                                                                            self.robot.collision_link_names["tool"] +
-                                                                            self.robot.collision_link_names["rack"])
+    def _setupCollisionPair(self, config):
+        if config["robot"].get("collision_pairs", False) and config["robot"]["collision_pairs"].get("self", False):
+            self.collision_pairs["self"] = config["robot"]["collision_pairs"]["self"]
+        else:
+            # base
+            self.collision_pairs["self"] = [["ur10_arm_forearm_collision_link", "base_collision_link"]]
+            self.collision_pairs["self"] += self._addCollisionPairFromTwoGroups(self.robot.collision_link_names["base"],
+                                                                                self.robot.collision_link_names["wrist"] +
+                                                                                self.robot.collision_link_names["tool"])
+            # upper arm
+            self.collision_pairs["self"] += self._addCollisionPairFromTwoGroups(self.robot.collision_link_names["upper_arm"][:2],
+                                                                                self.robot.collision_link_names["wrist"] +
+                                                                                self.robot.collision_link_names["tool"])
+            # forearm
+            self.collision_pairs["self"] += self._addCollisionPairFromTwoGroups(self.robot.collision_link_names["forearm"][:2],
+                                                                                self.robot.collision_link_names["tool"] +
+                                                                                self.robot.collision_link_names["rack"])
 
         for obstacle in self.scene.collision_link_names.get("static_obstacles", []):
-            if obstacle == "ground":
+            if config["robot"].get("collision_pairs", False) and config["robot"]["collision_pairs"].get("static_obstacles", False) and config["robot"]["collision_pairs"]["static_obstacles"].get(obstacle, False):
                 self.collision_pairs["static_obstacles"][obstacle] = self._addCollisionPairFromTwoGroups([obstacle],
-                                                                                                         self.robot.collision_link_names["tool"])
+                                                                                                         config["robot"]["collision_pairs"]["static_obstacles"][obstacle])
             else:
-                self.collision_pairs["static_obstacles"][obstacle] = self._addCollisionPairFromTwoGroups([obstacle],
-                                                                            self.robot.collision_link_names["base"] +
-                                                                            self.robot.collision_link_names["wrist"] +
-                                                                            self.robot.collision_link_names["forearm"] +
-                                                                            self.robot.collision_link_names["upper_arm"])
+                if obstacle == "ground":
+                    self.collision_pairs["static_obstacles"][obstacle] = self._addCollisionPairFromTwoGroups([obstacle],
+                                                                                                            self.robot.collision_link_names["tool"])
+                else:
+                    self.collision_pairs["static_obstacles"][obstacle] = self._addCollisionPairFromTwoGroups([obstacle],
+                                                                                self.robot.collision_link_names["base"] +
+                                                                                self.robot.collision_link_names["wrist"] +
+                                                                                self.robot.collision_link_names["forearm"] +
+                                                                                self.robot.collision_link_names["upper_arm"])
         
         if self.sdf_map.dim == 2:
             self.collision_pairs["sdf"] = self._addCollisionPairFromTwoGroups(["map"],
                                                                               self.robot.collision_link_names["base"])
         elif self.sdf_map.dim == 3:
-            self.collision_pairs["sdf"] = self._addCollisionPairFromTwoGroups(["map"],
+            if config["robot"].get("collision_pairs", False) and config["robot"]["collision_pairs"].get("sdf", False):
+                self.collision_pairs["sdf"] = self._addCollisionPairFromTwoGroups(["map"],
+                                                                                  config["robot"]["collision_pairs"]["sdf"])
+            else:
+                self.collision_pairs["sdf"] = self._addCollisionPairFromTwoGroups(["map"],
                                                                               self.robot.collision_link_names["base"]+
                                                                               self.robot.collision_link_names["wrist"] +
                                                                               self.robot.collision_link_names["forearm"] +

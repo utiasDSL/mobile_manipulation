@@ -1,0 +1,9 @@
+controller:
+  robot:
+    collision_pairs:
+      self:
+        - ["base_collision_link", "ur10_arm_forearm_collision_link"]
+        - ["base_collision_link", "ur10_arm_wrist3_collision_link"]
+        - ["ur10_arm_wrist3_collision_link", "ur10_arm_upper_arm_collision_link"]
+        - ["ur10_arm_wrist3_collision_link","rack_collision_link_sphere_1"]
+        - ["ur10_arm_wrist3_collision_link","rack_collision_link_sphere_2"]
