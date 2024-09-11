@@ -398,7 +398,7 @@ class ROSTrajectoryPlanner(TrajectoryPlanner):
         self.plan = None
         self.lock = threading.Lock()
 
-        self.path_sub = rospy.Subscriber("/planned_global_path", Path, self._path_callback)
+        self.path_sub = rospy.Subscriber("/planned_global_path", Path, self._path_callback, queue_size=1)
 
     def _generatePlan(self, start_time, raw_points, raw_headings):
         # given a set of path points and heading, generate a plan based on cruise speed

@@ -9,10 +9,12 @@ import threading
 import sys
 import numpy as np
 import rospy
+import tf.transformations as tf
 from spatialmath.base import rotz
 from scipy.interpolate import interp1d
 from visualization_msgs.msg import Marker, MarkerArray
-from geometry_msgs.msg import Point, Transform, Twist
+from geometry_msgs.msg import Point, Transform, Twist, PoseStamped
+from nav_msgs.msg import Path
 from trajectory_msgs.msg import MultiDOFJointTrajectory, MultiDOFJointTrajectoryPoint
 
 import mmseq_control.HTMPC as HTMPC
@@ -128,6 +130,7 @@ class ControllerROSNode:
         self.controller_visualization_array_pub = rospy.Publisher("controller_visualization_array", MarkerArray, queue_size=10)
         self.plan_visualization_pub = rospy.Publisher("plan_visualization", Marker, queue_size=10)
         self.current_plan_visualization_pub = rospy.Publisher("current_plan_visualization", Marker, queue_size=10)
+        self.controller_ref_pub = rospy.Publisher("controller_reference", Path, queue_size=5)
 
         self.tracking_point_pub = rospy.Publisher("controller_tracking_pt", MultiDOFJointTrajectory, queue_size=5)
 
@@ -177,9 +180,6 @@ class ControllerROSNode:
             self.lock.release()
 
             # print("mpc plan start {} pub {}".format(self.mpc_plan[0], self.cmd_vel))
-
-
-
         self.robot_interface.publish_cmd_vel(self.cmd_vel)
 
     def _publish_trajectory_tracking_pt(self, t, robot_states, planners):
@@ -220,6 +220,25 @@ class ControllerROSNode:
             msg.points.append(pt_msg)
 
         self.tracking_point_pub.publish(msg)
+
+    def _publish_controller_reference(self, ref_pose, ref_velocity):
+        # send reference poses as a path
+        path_msg = Path()
+        path_msg.header.stamp = rospy.Time.now()
+        path_msg.header.frame_id = "world"
+        for i in range(len(ref_pose)):
+            pose = PoseStamped()
+            pose.header.stamp = rospy.Time.now()
+            pose.header.frame_id = "world"
+            pose.pose.position.x = ref_pose[i][0]
+            pose.pose.position.y = ref_pose[i][1]
+            quat = tf.quaternion_from_euler(0, 0, ref_pose[i][2])
+            pose.pose.orientation.x = 0
+            pose.pose.orientation.y = 0
+            pose.pose.orientation.z = quat[2]
+            pose.pose.orientation.w = quat[3]
+            path_msg.poses.append(pose)
+        self.controller_ref_pub.publish(path_msg)
 
     def _make_marker(self, marker_type, id, rgba, scale):
         # make a visualization marker array for the occupancy grid
@@ -494,6 +513,8 @@ class ControllerROSNode:
             # publish data
             self._publish_mpc_data(self.controller)
             self._publish_trajectory_tracking_pt(t-t0, robot_states, planners)
+            #if (ref_p is not None) and (ref_v is not None):
+            #    self._publish_controller_reference(ref_p, ref_v)
 
             # Update Task Manager
             if use_vicon_tool_data:
