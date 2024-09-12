@@ -64,6 +64,9 @@ controller:
     EEPos3:
       Qk: 10.0
       P: 1.
+    EEPos3BaseFrame:
+      Qk: 3
+      P: 1
     BasePos2:
       Qk: 10.
       P: 1

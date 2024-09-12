@@ -658,8 +658,9 @@ class ControllerROSNode:
             elif planner.frame_id == "EE":
                 P = ree
 
-            if planner.__class__.__name__ == "EESimplePlanner" or planner.__class__.__name__ == "EESimplePlannerBaseFrame":
+            if planner.__class__.__name__ == "EESimplePlanner":
                 planner.target_pos = R_wb @ planner.target_pos + P
+                print(planner.target_pos)
             elif planner.__class__.__name__ == "EEPosTrajectoryCircle":
                 planner.c = R_wb @ planner.c + P
                 planner.plan['p'] = planner.plan['p'] @ R_wb.T + P

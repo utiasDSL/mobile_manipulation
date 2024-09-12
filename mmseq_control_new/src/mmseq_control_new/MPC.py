@@ -445,7 +445,7 @@ class STMPC(MPC):
         super().__init__(config)
         num_terminal_cost = 2
         if config["base_pose_tracking_enabled"]:
-            costs = [self.BasePoseSE2Cost, self.BaseVel3Cost, self.EEPos3Cost, self.EEVel3Cost, self.CtrlEffCost]
+            costs = [self.BasePoseSE2Cost, self.BaseVel3Cost, self.EEPos3Cost, self.EEVel3Cost, self.EEPos3BaseFrameCost, self.CtrlEffCost]
         else:
             costs = [self.BasePos2Cost, self.BaseVel2Cost, self.EEPos3Cost, self.EEVel3Cost, self.CtrlEffCost]
         
@@ -509,10 +509,13 @@ class STMPC(MPC):
             acceptable_ref = True
             if planner.type == "EE":
                 if planner.ref_data_type == "Vec3":
-                    r_bar_map["EEPos3"] = p_bar
-                    if velocity_ref_available:
-                        # if planner generates velocity reference as well
-                        r_bar_map["EEVel3"] = v_bar
+                    if planner.__class__.__name__ == "EESimplePlannerBaseFrame":
+                        r_bar_map["EEPos3BaseFrame"] = p_bar
+                    else:
+                        r_bar_map["EEPos3"] = p_bar
+                        if velocity_ref_available:
+                            # if planner generates velocity reference as well
+                            r_bar_map["EEVel3"] = v_bar
                 else:
                     acceptable_ref = False
             elif planner.type == "base":

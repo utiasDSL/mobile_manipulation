@@ -88,13 +88,13 @@ class EESimplePlannerBaseFrame(Planner):
 
 
     def getTrackingPoint(self, t, robot_states=None):
-        q,_ = robot_states
-        target_pos = self.target_pos.copy()
-        target_pos[:2] -= q[:2]
-        Rwb = rotz(q[2])
-        target_pos= Rwb.T @ target_pos
+        # q,_ = robot_states
+        # target_pos = self.target_pos.copy()
+        # target_pos[:2] -= q[:2]
+        # Rwb = rotz(q[2])
+        # target_pos= Rwb.T @ target_pos
 
-        return target_pos, np.zeros(3)
+        return self.target_pos, np.zeros(3)
     
     def checkFinished(self, t, ee_curr_pos):
         if np.linalg.norm(ee_curr_pos - self.target_pos) > self.tracking_err_tol:
