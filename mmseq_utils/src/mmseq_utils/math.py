@@ -1,7 +1,7 @@
 import numpy as np
 from scipy.linalg import null_space
 from spatialmath.base import q2r, r2q, qunit, rotx, roty, rotz
-
+import casadi as cs
 
 QUAT_ORDER = "xyzs"
 
@@ -234,3 +234,12 @@ def normalize_wrt_bounds(lower_bound, upper_bound, data):
     data_normalized = (data - mean_bound) / bound_width
 
     return data_normalized
+
+def casadi_SO2(theta):
+    R = cs.MX(2,2)
+    R[0,0] = cs.cos(theta)
+    R[1,1] = cs.cos(theta)
+    R[1,0] = cs.sin(theta)
+    R[0,1] = -cs.sin(theta)
+
+    return R

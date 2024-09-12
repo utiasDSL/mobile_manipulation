@@ -43,6 +43,7 @@ class MPC():
         self.EEPos3BaseFrameCost = EEPos3BaseFrameCostFunction(self.robot, config["cost_params"]["EEPos3"])
         self.BasePos2Cost = BasePos2CostFunction(self.robot, config["cost_params"]["BasePos2"])
         self.BasePos3Cost = BasePos3CostFunction(self.robot, config["cost_params"]["BasePos3"])
+        self.BasePoseSE2Cost = BasePoseSE2CostFunction(self.robot, config["cost_params"]["BasePoseSE2"])
 
         self.EEVel3Cost = EEVel3CostFunction(self.robot, config["cost_params"]["EEVel3"])
         self.BaseVel2Cost = BaseVel2CostFunction(self.robot, config["cost_params"]["BaseVel2"])
@@ -444,7 +445,7 @@ class STMPC(MPC):
         super().__init__(config)
         num_terminal_cost = 2
         if config["base_pose_tracking_enabled"]:
-            costs = [self.BasePos3Cost, self.BaseVel3Cost, self.EEPos3Cost, self.EEVel3Cost, self.CtrlEffCost]
+            costs = [self.BasePoseSE2Cost, self.BaseVel3Cost, self.EEPos3Cost, self.EEVel3Cost, self.CtrlEffCost]
         else:
             costs = [self.BasePos2Cost, self.BaseVel2Cost, self.EEPos3Cost, self.EEVel3Cost, self.CtrlEffCost]
         
@@ -460,7 +461,7 @@ class STMPC(MPC):
             else:
                 constraints.append(self.collisionCsts[name])
         # constraints = [cst for cst in self.collisionCsts.values()]
-        name = self.params["acados"].get("name", name)
+        name = self.params["acados"].get("name", "MM")
         self.ocp, self.ocp_solver, self.p_struct = self._construct(costs, constraints, num_terminal_cost, name)
 
         self.cost = costs
@@ -521,6 +522,10 @@ class STMPC(MPC):
                         r_bar_map["BaseVel2"] = v_bar
                 elif planner.ref_data_type == "Vec3":
                     r_bar_map["BasePos3"] = p_bar
+                    if velocity_ref_available:
+                        r_bar_map["BaseVel3"] = v_bar
+                elif planner.ref_data_type == "SE2":
+                    r_bar_map["BasePoseSE2"] = p_bar
                     if velocity_ref_available:
                         r_bar_map["BaseVel3"] = v_bar
                 else:

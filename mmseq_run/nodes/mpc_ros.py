@@ -13,7 +13,7 @@ import tf.transformations as tf
 from spatialmath.base import rotz
 from scipy.interpolate import interp1d
 from visualization_msgs.msg import Marker, MarkerArray
-from geometry_msgs.msg import Point, Transform, Twist, PoseStamped
+from geometry_msgs.msg import Point, Transform, Twist, PoseStamped, Quaternion
 from nav_msgs.msg import Path
 from trajectory_msgs.msg import MultiDOFJointTrajectory, MultiDOFJointTrajectoryPoint
 
@@ -272,6 +272,11 @@ class ControllerROSNode:
                 if planner.ref_data_type == "Vec3":
                     marker_plan = self._make_marker(Marker.SPHERE, pid, rgba=color + [1], scale=[0.1, 0.1, 0.1])
                     marker_plan.pose.position = Point(*planner.target_pos)
+                elif planner.ref_data_type == "SE2":
+                    marker_plan = self._make_marker(Marker.SPHERE, pid, rgba=color + [1], scale=[0.1, 0.1, 0.1])
+                    marker_plan.pose.position = Point(*planner.target_pose[:2], 0.25)
+                    quat = tf.quaternion_from_euler(0,0,planner.target_pose[2])
+                    marker_plan.pose.orientation = Quaternion(*list(quat))
                 elif planner.ref_data_type == "Vec2":
                     marker_plan = self._make_marker(Marker.CYLINDER, pid, rgba=color + [1], scale=[0.1, 0.1, 0.5])
                     marker_plan.pose.position = Point(*planner.target_pos, 0.25)
@@ -293,6 +298,11 @@ class ControllerROSNode:
                 if planner.ref_data_type == "Vec3":
                     marker_plan = self._make_marker(Marker.SPHERE, pid, rgba=colors[pid]+[1], scale=[0.1, 0.1, 0.1])
                     marker_plan.pose.position = Point(*planner.target_pos)
+                elif planner.ref_data_type == "SE2":
+                    marker_plan = self._make_marker(Marker.SPHERE, pid, rgba=color + [1], scale=[0.1, 0.1, 0.1])
+                    marker_plan.pose.position = Point(*planner.target_pose[:2], 0.25)
+                    quat = tf.quaternion_from_euler(0,0,planner.target_pose[2])
+                    marker_plan.pose.orientation = Quaternion(*list(quat))
                 elif planner.ref_data_type == "Vec2":
                     marker_plan = self._make_marker(Marker.CYLINDER, pid, rgba=colors[pid]+ [1], scale=[0.1, 0.1, 0.5])
                     marker_plan.pose.position = Point(*planner.target_pos, 0.25)

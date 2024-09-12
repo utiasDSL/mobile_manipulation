@@ -52,6 +52,20 @@ def test_BasePos3(config):
 
     return cost_base
 
+def test_BasePoseSE2(config):
+    robot = MobileManipulator3D(config["controller"])
+    cost_base = BasePoseSE2CostFunction(robot, config["controller"]["cost_params"]["BasePos3"])
+    x,u = get_default_xu()
+
+    p_map_base = cost_base.p_struct(0)
+    p_map_base['W'] = config["controller"]["cost_params"]["BasePos3"]["Qk"] * np.eye(cost_base.nr)
+    p_map_base['r'] = np.array([1, 1, -np.pi+-0.01])
+    J_base = cost_base.evaluate(x, u, p_map_base.cat)
+    print("testing BasePoseSE2")
+    print("expected cost: {} evaluated cost: {}".format(1.0, J_base))
+
+    return cost_base
+
 def test_BaseVel3(config):
     robot = MobileManipulator3D(config["controller"])
     cost_base = BaseVel3CostFunction(robot, config["controller"]["cost_params"]["BaseVel3"])

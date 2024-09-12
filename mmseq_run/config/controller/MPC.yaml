@@ -70,6 +70,9 @@ controller:
     BasePos3:
       Qk: 10.
       P: 1
+    BasePoseSE2:
+      Qk: 10.
+      P: 1
     EEVel3:
       Qk: 5.
       P: 1

@@ -8,6 +8,7 @@ from scipy.linalg import block_diag
 
 from mmseq_control.robot import MobileManipulator3D
 from mmseq_utils.casadi_struct import casadi_sym_struct
+from mmseq_utils.math import casadi_SO2
 
 class RBF:
     mu_sym = cs.MX.sym('mu')
@@ -190,6 +191,44 @@ class BasePos3CostFunction(TrajectoryTrackingCostFunction):
         f_fcn = cs.Function("fb", [robot_mdl.x_sym], [cs.vertcat(xy, h)])
 
         super().__init__(nx, nu, nr, f_fcn, "BasePos3")
+
+class BasePoseSE2CostFunction(CostFunctions):
+    def __init__(self, robot_mdl, params):
+        ss_mdl = robot_mdl.ssSymMdl
+        nx = ss_mdl["nx"]
+        nu = ss_mdl["nu"]
+        super().__init__(nx, nu,"BasePoseSE2")
+
+        self.nr = 3
+        self.p_dict = {"r": cs.MX.sym("r_"+self.name, self.nr),
+                       "W": cs.MX.sym("W_"+self.name, self.nr, self.nr)}
+        self.p_struct = casadi_sym_struct(self.p_dict)
+        self.p_sym = self.p_struct.cat
+
+        self.W = self.p_struct["W"]
+        self.r = self.p_struct['r']
+
+        fk_b = robot_mdl.kinSymMdls["base"]
+        # Bug warning
+        xy, h = self.x_sym[:2], self.x_sym[2]
+
+        # position
+        e_pos = xy - self.r[:2]
+        
+        # heading
+        Rinv = casadi_SO2(-h)
+        Rd = casadi_SO2(self.r[2])
+        Rerr = Rinv @ Rd
+        
+        e_h = cs.atan2(Rerr[1,0], Rerr[0, 0])
+
+        self.e_eqn = cs.vertcat(e_pos, e_h)
+        self.J_eqn = 0.5 * self.e_eqn.T @ self.W @ self.e_eqn
+
+        self.J_fcn = cs.Function("J_"+self.name, [self.x_sym, self.u_sym, self.p_sym], [self.J_eqn], ["x", "u", "r"], ["J"]).expand()
+        dedx = cs.jacobian(self.e_eqn, self.x_sym)
+        self.H_approx_eqn = cs.diagcat(cs.MX.zeros(self.nu, self.nu), dedx.T @ self.W @ dedx)
+        self.H_approx_fcn = cs.Function("H_approx_"+self.name, [self.x_sym, self.u_sym, self.p_sym], [self.H_approx_eqn], ["x", "u", "r"], ["H_approx"]).expand()
 
 class BaseVel3CostFunction(TrajectoryTrackingCostFunction):
     def __init__(self, robot_mdl, params):

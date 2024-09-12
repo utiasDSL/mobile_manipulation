@@ -53,6 +53,50 @@ class BaseSingleWaypoint(Planner):
         config["tracking_err_tol"] = 0.02
 
         return config
+    
+class BaseSingleWaypointPose(Planner):
+
+    def __init__(self, planner_params):
+        super().__init__(name=planner_params["name"],
+                         type="base",
+                         ref_type="waypoint",
+                         ref_data_type="SE2",
+                         frame_id=planner_params["frame_id"])
+
+        self.target_pose = np.array(planner_params["target_pose"])
+        self.tracking_err_tol = np.array(planner_params["tracking_err_tol"])
+
+        self.finished = False
+
+
+
+    def getTrackingPoint(self, t, robot_states=None):
+        return self.target_pose, np.zeros(3)
+
+    def checkFinished(self, t, states):
+        base_curr_pos = states[0]
+        err = np.linalg.norm(self.target_pose - base_curr_pos)
+        if err < self.tracking_err_tol and not self.finished:
+            self.py_logger.info(self.name + " planner finished.")
+            self.finished = True
+
+        return self.finished
+
+    def reset(self):
+        self.finished = False
+        self.py_logger.info(self.name + " planner reset.")
+
+
+    @staticmethod
+    def getDefaultParams():
+        config = {}
+        config["name"] = "Base Pose"
+        config["planner_type"] = "BaseSingleWaypointPose"
+        config["frame_id"] = "base"
+        config["target_pos"] = [0, 0, 0]
+        config["tracking_err_tol"] = 0.02
+
+        return config
 
 class BasePosTrajectoryCircle(TrajectoryPlanner):
     def __init__(self, config):
@@ -375,7 +419,7 @@ class ROSTrajectoryPlanner(TrajectoryPlanner):
         super().__init__(name=config["name"],
                         type="base",
                         ref_type="path",
-                        ref_data_type="Vec3",
+                        ref_data_type="SE2",
                         frame_id=config["frame_id"])
         
         print("ROSTrajectoryPlanner")
