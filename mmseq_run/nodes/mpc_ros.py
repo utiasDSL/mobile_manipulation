@@ -287,7 +287,6 @@ class ControllerROSNode:
                     marker_plan.points = [Point(*pt) for pt in planner.plan['p']]
                 elif planner.ref_data_type == "Vec2" or planner.ref_data_type == "SE2":
                     marker_plan.points = [Point(*pt[:2], 0) for pt in planner.plan['p']]
-                    print(marker_plan.points)
             marker_plan.lifetime = rospy.Duration.from_sec(0.1)
             self.plan_visualization_pub.publish(marker_plan)
 
