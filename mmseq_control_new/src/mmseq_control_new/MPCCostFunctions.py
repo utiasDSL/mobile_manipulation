@@ -248,7 +248,12 @@ class ControlEffortCostFunction(CostFunctions):
         self.params = params
         super().__init__(ss_mdl["nx"], ss_mdl["nu"], "ControlEffort")
 
-        self.p_dict = {}
+        self.p_dict = {"Qqb": cs.MX.sym("Qqb_"+self.name, 3),
+                       "Qqa": cs.MX.sym("Qqa_"+self.name, 6),
+                       "Qvb": cs.MX.sym("Qvb_"+self.name, 3),
+                       "Qva": cs.MX.sym("Qva_"+self.name, 6),
+                       "Qub": cs.MX.sym("Qub_"+self.name, 3),
+                       "Qua": cs.MX.sym("Qua_"+self.name, 6),}
         self.p_struct = casadi_sym_struct(self.p_dict)
         self.p_sym = self.p_struct.cat
 
@@ -256,11 +261,11 @@ class ControlEffortCostFunction(CostFunctions):
 
 
     def _setupSymMdl(self):
-        Qq = [self.params["Qqb"]]*3+ [self.params["Qqa"]]*6 + [self.params["Qvb"]]*3 + [self.params["Qva"]]*6
-        Qx = np.diag(Qq)
+        Qq = cs.vertcat(self.p_struct["Qqb"], self.p_struct["Qqa"], self.p_struct["Qvb"], self.p_struct["Qva"])
+        Qx = cs.diag(Qq)
 
-        Qu = [self.params["Qub"]]*3+ [self.params["Qua"]]*6
-        Qu = np.diag(Qu )
+        Qu = cs.vertcat(self.p_struct["Qub"], self.p_struct["Qua"])
+        Qu = cs.diag(Qu)
 
         self.J_eqn = 0.5 * self.x_sym.T @ Qx @ self.x_sym + 0.5 * self.u_sym.T @ Qu @ self.u_sym
         self.J_fcn = cs.Function("J_"+self.name, [self.x_sym, self.u_sym, self.p_sym], [self.J_eqn], ["x", "u", "r"], ["J"]).expand()

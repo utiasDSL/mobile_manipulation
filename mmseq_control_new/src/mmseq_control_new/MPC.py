@@ -616,6 +616,14 @@ class STMPC(MPC):
                         curr_p_map[p_name_W] = self.params["cost_params"][name]["Qk"] * np.eye(r_bar[i].size)
                 else:
                     self.py_logger.warning(f"unknown p name {p_name_r}")
+            
+            curr_p_map["Qqa_ControlEffort"] = self.params["cost_params"]["Effort"]["Qqa"]
+            curr_p_map["Qqb_ControlEffort"] = self.params["cost_params"]["Effort"]["Qqb"]
+            curr_p_map["Qva_ControlEffort"] = self.params["cost_params"]["Effort"]["Qva"]
+            curr_p_map["Qvb_ControlEffort"] = self.params["cost_params"]["Effort"]["Qvb"]
+            curr_p_map["Qua_ControlEffort"] = self.params["cost_params"]["Effort"]["Qua"]
+            curr_p_map["Qub_ControlEffort"] = self.params["cost_params"]["Effort"]["Qub"]
+
             t2 = time.perf_counter()
             self.log["time_ocp_set_params_tracking"] += t2 - t1
 
