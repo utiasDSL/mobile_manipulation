@@ -172,6 +172,7 @@ class ControllerROSNode:
     def _publish_cmd_vel_new(self, event):
         if self.mpc_plan is not None:
             t = rospy.Time.now().to_sec()
+            print("t{}, even{}".format(t, event.current_real.to_sec()))
             # print("cmd vel loopo {}".format(t))
             t_elasped = t - self.mpc_plan_time_stamp
             # print("cmd t elapsed {}".format(t_elasped))
@@ -179,7 +180,9 @@ class ControllerROSNode:
             self.cmd_vel = self.mpc_plan_interp(t_elasped)
             self.lock.release()
 
-            # print("mpc plan start {} pub {}".format(self.mpc_plan[0], self.cmd_vel))
+            print("mpc plan t_elapsed{} start {} pub {}".format(t_elasped, self.mpc_plan, self.cmd_vel))
+            for i in range(20):
+                print(self.mpc_plan_interp(i*0.1))
         self.robot_interface.publish_cmd_vel(self.cmd_vel)
 
     def _publish_trajectory_tracking_pt(self, t, robot_states, planners):

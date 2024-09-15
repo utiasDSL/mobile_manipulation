@@ -20,9 +20,9 @@ def main():
     plotter1.plot_tracking()
     plotter1.plot_base_velocity_estimation()
     plotter1.plot_topic_frequency()
-    plotter1.plot_base_odom_velocity()
+    # plotter1.plot_base_odom_velocity()
     # plotter2.plot_tracking(subscript="_damped")
-    plotter1.plot_base_odom_filter_vs_joint_state()
+    # plotter1.plot_base_odom_filter_vs_joint_state()
 
     plotter1.plot_show()
 

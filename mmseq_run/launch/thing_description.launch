@@ -6,7 +6,7 @@
   <arg name="kinematics_params" default="$(find mobile_manipulation_central)/config/ur10/kinematics_parameters.yaml" />
   <arg name="visual_params" default="$(find mobile_manipulation_central)/config/ur10/visual_parameters.yaml" />
   <arg name="transform_params" default="$(find mobile_manipulation_central)/config/urdf_transform.yaml" />
-  <arg name="file_name" default="$(find mmseq_assets)/thing/urdf/thing_sim.urdf" />
+  <arg name="file_name" default="$(find mmseq_assets)/thing/urdf/thing_ctrl.urdf" />
 
 
   <param name="robot_description" command="$(find xacro)/xacro $(arg file_name)

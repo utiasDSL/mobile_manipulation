@@ -5,7 +5,7 @@ from mmseq_utils.casadi_struct import casadi_sym_struct
 import casadi as cs
 
 def get_default_xu():
-    q = [0.0, 0.0, 0.0] + [0.0, -2.3562, -1.5708, -2.3562, -1.5708, 1.5708]
+    q = [0.0, 0.0, np.pi-0.01] + [0.0, -2.3562, -1.5708, -2.3562, -1.5708, 1.5708]
     v = np.ones(9)
     x = np.hstack((np.array(q), v))
     u = np.zeros(9)
@@ -140,6 +140,7 @@ if __name__ == "__main__":
 
     test_BasePos2(config)
     test_BasePos3(config)
+    test_BasePoseSE2(config)
     test_BaseVel2(config)
     test_BaseVel3(config)
     test_EEPos3(config)

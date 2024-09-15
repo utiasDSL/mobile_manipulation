@@ -79,7 +79,13 @@ class DataPlotter:
         self.data = data
         self.data["name"] = self.data.get('name', 'data')
         self.config = config
-        if config is not None:     
+        if config is not None: 
+            if "kinematics_params" in config["controller"]["robot"]["urdf"]["args"].keys():
+                del config["controller"]["robot"]["urdf"]["args"]["kinematics_params"]
+            if "transform_params" in config["controller"]["robot"]["urdf"]["args"].keys():
+                del config["controller"]["robot"]["urdf"]["args"]["transform_params"]
+            if "visual_params" in config["controller"]["robot"]["urdf"]["args"].keys():
+                del config["controller"]["robot"]["urdf"]["args"]["visual_params"]         
             # controller
             control_class = getattr(MPC, config["controller"]["type"], None)
             if control_class is None:
@@ -1455,7 +1461,7 @@ class DataPlotter:
     def plot_mpc_prediction(self, data_name, t=0, axes=None, index=0, block=True, legend=None):
         t_sim = self.data["ts"]
         t_index = np.argmin(np.abs(t_sim - t))
-        off_set = t_index % 4
+        off_set = t_index % 4 +3
         # Time x prediction step x data dim
         data = self.data.get(data_name)
         if data is None:
@@ -1547,11 +1553,12 @@ class DataPlotter:
         self.plot_time_series_data_htmpc("time_get_map", block=False)
         # self.plot_solver_iters(block=False)
         # self.plot_mpc_prediction("mpc_obstacle_cylinder_1_link_constraints")
-        self.plot_mpc_prediction("mpc_sdf_constraints", block=False)
-        # self.plot_mpc_prediction("mpc_control_constraints",block=False)
-        # self.plot_mpc_prediction("mpc_state_constraints", block=False)
+        # self.plot_mpc_prediction("mpc_sdf_constraint_predictions", block=False)
+        # self.plot_mpc_prediction("mpc_control_constraint_predictions",block=False)
+        # self.plot_mpc_prediction("mpc_state_constraint_predictions", block=False)
         # self.plot_mpc_prediction("mpc_sdf_constraint_gradients", block=False)
-
+        self.plot_mpc_prediction("mpc_x_bars",t=0.1, block=False)
+        self.plot_mpc_prediction("mpc_u_bars",t=0.1, block=False)
 
         self.plot_run_time()
 
@@ -1819,10 +1826,17 @@ class DataPlotter:
             print("time: {} param:{}".format(self.data["ts"][k], param[param_name]))
 
 class ROSBagPlotter:
-    def __init__(self, bag_file, config_file="/home/ubuntu/Workspace/catkin_ws/src/mm_sequential_tasks/mmseq_run/config/robot/thing.yaml"):
+    def __init__(self, bag_file, config_file="$(rospack find mmseq_run)/config/robot/thing.yaml"):
         self.data = {"ur10": {}, "ridgeback": {}, "mpc": {}, "vicon": {}, "model":{}}
-        self.bag = rosbag.Bag(bag_file)
+        self.bag = rosbag.Bag(bag_file)   
         self.config = load_config(config_file)
+        if "kinematics_params" in self.config["controller"]["robot"]["urdf"]["args"].keys():
+            del self.config["controller"]["robot"]["urdf"]["args"]["kinematics_params"]
+        if "transform_params" in self.config["controller"]["robot"]["urdf"]["args"].keys():
+            del self.config["controller"]["robot"]["urdf"]["args"]["transform_params"]
+        if "visual_params" in self.config["controller"]["robot"]["urdf"]["args"].keys():
+            del self.config["controller"]["robot"]["urdf"]["args"]["visual_params"]  
+    
         self.robot = MobileManipulator3D(self.config["controller"])
 
         self.parse_joint_states(self.bag)

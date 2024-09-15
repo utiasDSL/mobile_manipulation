@@ -1,38 +1,27 @@
 planner:
   sot_type: "SoTStatic"
   tasks:
-  # - name: "EE Pos 1"
-  #   planner_type: "EESimplePlanner"
-  #   frame_id: "EE"
-  #   initial_pos: [0.0, -0.0, 0.0]
-  #   target_pos: [0.0, 0.0, 0.0]
-  #   hold_period: 3.
-  #   tracking_err_tol: 0.02
-  #   cruise_speed: 0.5
-  # - name: "EE Pos 1"
-  #   planner_type: "EEPosTrajectoryLine"
-  #   frame_id: "EE"
-  #   initial_pos: [0.0, -0.0, 0.0]
-  #   target_pos: [-0.0, 2.0, 0.0]
-  #   hold_period: 3.
-  #   tracking_err_tol: 0.02
-  #   cruise_speed: 0.75
+  # - frame_id: base
+  #   name: Base Pose
+  #   planner_type: BaseSingleWaypointPose
+  #   target_pose: [0,0,3.13]
+  #   tracking_err_tol: 0.4
+  #   ref_traj_duration: 1.5
+  - frame_id: base
+    name: EE Position BaseFrame
+    planner_type: EESimplePlannerBaseFrame
+    target_pos: [1.458, 0.17, 0.7]
+    hold_period: 4
+    tracking_err_tol: 0.4
   # - frame_id: base
   #   name: Base Position
-  #   planner_type: BaseSingleWaypoint
+  #   planner_type: BasePosTrajectoryLine
+  #   initial_pos: [0,0]
   #   target_pos:
-  #   - -1.5
-  #   - 0.
-  #   tracking_err_tol: 0.02
-  - frame_id: base
-    name: Base Position
-    planner_type: BasePosTrajectoryLine
-    initial_pos: [0,0]
-    target_pos:
-    - 2.5
-    - 0.4
-    cruise_speed: 1.0
-    tracking_err_tol: 0.2
+  #   - 2.5
+  #   - 0.4
+  #   cruise_speed: 1.0
+  #   tracking_err_tol: 0.2
   # - frame_id: base
   #   name: Base Position
   #   planner_type: BasePosTrajectoryLine
@@ -73,6 +62,11 @@ planner:
   #   cruise_speed: 1.0
   #   yaw_speed: 0.5
   #   tracking_err_tol: 0.2
+simulation:
+  robot:
+    #home: [0., -0.2, 0, 0.5pi, -0.75pi, 0.75pi, -0.25pi, 0.5pi, 0.417pi]  # standard
+    home: [0.0, 0.0, 0.5pi, 0.2pi, -0.25pi, 0.5pi, -0.25pi, 0.6pi, 0.417pi]
+
 include:
   - package: "mmseq_run"
     path: "config/robot/thing.yaml"
@@ -86,5 +80,5 @@ include:
     path: "config/map/SDF3D.yaml"
 
 logging:
-  log_dir: "/home/tracy/PhD/data/run_time"
+  log_dir: "/home/tracy/PhD/data/Sep12/"
   log_level: 10 # 0 - not set, 10 - debug, 20 - info

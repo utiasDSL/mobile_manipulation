@@ -16,6 +16,7 @@ planner:
       - 0.0
       cruise_speed: 1.0
       tracking_err_tol: 0.2
+      yaw_speed: 1
     # - name: "Base Pos 1"
     #   planner_type: "BaseSingleWaypoint"
     #   frame_id: "base"
@@ -30,7 +31,7 @@ controller:
 
 
 simulation:
-  duration: 5
+  duration: 10
 
 include:
   - package: "mmseq_run"
@@ -43,7 +44,8 @@ include:
     path: "config/scene/empty.yaml"
   - package: "mmseq_run"
     path: "config/map/SDF3D.yaml"
-
+  - package: "mmseq_run"
+    path: "config/robot/thing_collision_pairs.yaml"
 logging:
-  log_dir: "/home/ubuntu/"
+  log_dir: "$MOBILE_MANIPULATION_CENTRAL_BAG_DIR/self_collision/Sep11/"
   log_level: 4 # 0 - not set, 10 - debug, 20 - info
