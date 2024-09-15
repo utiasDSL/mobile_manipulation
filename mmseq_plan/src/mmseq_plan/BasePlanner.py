@@ -449,6 +449,15 @@ class ROSTrajectoryPlanner(TrajectoryPlanner):
         # Compute cumulative distances along the path
         self.start_time = start_time
 
+        # find the closest point on the path and truncate the path
+        if self.robot_states is not None:
+            base_curr_pos = self.robot_states[0][:2]
+            dists_to_robot = np.linalg.norm(raw_points - base_curr_pos, axis=1)
+            min_idx = np.argmin(dists_to_robot)
+            print('min dist to robot: ', np.min(dists_to_robot))
+            raw_points = raw_points[min_idx:, :]
+            raw_headings = raw_headings[min_idx:]
+
         distances = np.linalg.norm(np.diff(raw_points, axis=0), axis=1)
         cumulative_distances = np.insert(np.cumsum(distances), 0, 0)
 
