@@ -28,7 +28,7 @@ controller:
   static_obstacles_collision_avoidance_enabled: True
   base_pose_tracking_enabled: True
 
-  collision_constraint_type: "SignedDistanceConstraintCBF" # SignedDistanceConstraint or SignedDistanceConstraintCBF 
+  collision_constraint_type: "SignedDistanceConstraint" # SignedDistanceConstraint or SignedDistanceConstraintCBF 
   type: "STMPC"
   collision_constraints_softend:
     self: False
