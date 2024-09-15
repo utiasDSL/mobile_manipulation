@@ -88,16 +88,16 @@ controller:
     Effort:
       Qqa: 0.
       Qqb: 0.
-      Qva: 0.5
-      Qvb: 0.5
-      Qua: 0.1
-      Qub: 0.1
+      Qva: 0.01
+      Qvb: 0.01
+      Qua: 0.005
+      Qub: 0.005
       Qdua: 0.
       Qdub: 0.1
     Regularization:
       eps: 1.0e-06
     slack:
-      z: 500  # linear term
+      z: 100  # linear term
       Z: 1    # quadratic term
 
   # line search parameters
@@ -132,7 +132,7 @@ controller:
     slack_enabled:
       x: True
       x_e: True
-      u: True
+      u: False
       h_0: True
       h: True
-      h_e: False
+      h_e: True

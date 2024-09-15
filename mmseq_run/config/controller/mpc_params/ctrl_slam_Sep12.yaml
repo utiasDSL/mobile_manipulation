@@ -1,0 +1,14 @@
+controller:
+  cost_params:
+    Effort:
+      Qqa: 0.
+      Qqb: 0.
+      Qva: 0.5
+      Qvb: 0.5
+      Qua: 0.1
+      Qub: 0.1
+      Qdua: 0.
+      Qdub: 0.1
+    slack:
+      z: 500  # linear term
+      Z: 1    # quadratic term

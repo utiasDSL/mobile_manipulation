@@ -1,42 +1,32 @@
 planner:
   sot_type: "SoTStatic"
   tasks:
-  # - name: "EE Pos 1"
-  #   planner_type: "EEPosTrajectoryLine"
-  #   frame_id: "EE"
-  #   initial_pos: [0.0, -0.0, 0.0]
-  #   target_pos: [-0.0, 2.0, 0.0]
-  #   hold_period: 3.
-  #   tracking_err_tol: 0.02
-  #   cruise_speed: 0.75
   - frame_id: base
     name: Base Position
-    planner_type: BasePosTrajectoryLine
-    initial_pos: [0,0]
-    target_pos:
-    - 3.0
-    - 0.0
-    cruise_speed: 0.2
+    planner_type: ROSTrajectoryPlanner
+    cruise_speed: 0.35
+    yaw_speed: 0.5
+    yaw_accel: 0.9
     tracking_err_tol: 0.4
-  # - frame_id: base
-  #   name: Base Position
-  #   planner_type: BasePosTrajectoryLine
-  #   initial_pos: [1,0.]
-  #   target_pos:
-  #   - 2.5
-  #   - 0.
-  #   cruise_speed: 1.0
-  #   tracking_err_tol: 0.4
+    ref_traj_duration: 1.5
+  - frame_id: base
+    name: EE Position BaseFrame
+    planner_type: EESimplePlannerBaseFrame
+    target_pos: [1.458, 0.17, 0.7] # in base frame
+    hold_period: 4
+    tracking_err_tol: 0.4
 simulation:
+  duration: 100
   robot:
     #home: [0., -0.2, 0, 0.5pi, -0.75pi, 0.75pi, -0.25pi, 0.5pi, 0.417pi]  # standard
-    home: [1.5, 2, -0.3, 0.2pi, -0.25pi, 0.5pi, -0.25pi, 0.6pi, 0.417pi]
+    home: [-0, 0, -0., 0.25pi, -0.3pi, 0.5pi, -0.25pi, 0.6pi, 0.417pi]
 
 controller:
   home: "default"
   sdf_collision_avoidance_enabled: True
-  self_collision_avoidance_enabled: False
-  static_obstacles_collision_avoidance_enabled: False
+  self_collision_avoidance_enabled: True
+  static_obstacles_collision_avoidance_enabled: True
+  base_pose_tracking_enabled: True
 
   collision_constraint_type: "SignedDistanceConstraintCBF" # SignedDistanceConstraint or SignedDistanceConstraintCBF 
   type: "STMPC"
@@ -47,21 +37,18 @@ controller:
   collision_cbf_gamma: 0.9
   
   acados:
+    name: MMCtrlSLAM
     ocp_solver_options:
       nlp_solver_max_iter: 100
       qp_solver_warm_start: 2
-    slack_enabled:
-      x: True
-      x_e: True
-      u: False
-      h_0: True
-      h: True
-      h_e: False
+
 include:
   - package: "mmseq_run"
     path: "config/robot/thing.yaml"
   - package: "mmseq_run"
     path: "config/controller/MPC.yaml"
+  # - package: "mmseq_run"
+  #   path: "config/controller/mpc_params/ctrl_slam_Sep12.yaml"
   - package: "mmseq_run"
     path: "config/sim/isaac_sim.yaml"
   - package: "mmseq_run"
@@ -70,5 +57,5 @@ include:
     path: "config/map/SDF3D.yaml"
 
 logging:
-  log_dir: "/home/jqian/Downloads/3d_collision"
+  log_dir: "$MOBILE_MANIPULATION_CENTRAL_BAG_DIR/3d_collision/"
   log_level: 10 # 0 - not set, 10 - debug, 20 - info
