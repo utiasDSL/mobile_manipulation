@@ -12,7 +12,7 @@ controller:
   HT_MaxIntvl: 1
   ST_MaxIntvl: 1
   hierarchy_constraint_type: "HierarchicalTrackingConstraint"    # error, cost_value, cost_value_sum
-  collision_constraint_type: "SignedDistanceConstraint" # SignedDistanceConstraint or SignedDistanceConstraintCBF 
+  collision_constraint_type: "SignedDistanceConstraintCBF" # SignedDistanceConstraint or SignedDistanceConstraintCBF 
   ctrl_rate: 20 #hz
   cmd_vel_pub_rate: 100 # hz
   soft_cst: True
@@ -106,6 +106,7 @@ controller:
 
   # ACADOS solver option
   acados:
+    name: "MM"
     cython:
       enabled: True
       action: "load"      # load or generate
@@ -132,7 +133,7 @@ controller:
     slack_enabled:
       x: True
       x_e: True
-      u: True
+      u: False
       h_0: True
       h: True
       h_e: False
