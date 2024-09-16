@@ -39,7 +39,7 @@ controller:
   
   collision_safety_margin:
     self: 0.25
-    sdf: 0.25
+    sdf: 0.15
     static_obstacles: 0.15
 
   # soft constraints parameters
@@ -58,7 +58,7 @@ controller:
       zeta: 0.005 
   
   collision_cbf_gamma:
-    sdf: 0.9
+    sdf: 0.3
     self: 0.9
     static_obstacles: 0.9
 
@@ -69,42 +69,42 @@ controller:
   # weights for each cost function
   cost_params:
     EEPos3:
-      Qk: 10.0
-      P: 1.
+      Qk: [3, 3, 3]
+      P: [1, 1, 1]
     EEPos3BaseFrame:
-      Qk: 3
-      P: 1
+      Qk: [1, 1, 1]
+      P: [1, 1, 1]
     BasePos2:
-      Qk: 10.
-      P: 1
+      Qk: [3, 3]
+      P: [1, 1]
     BasePos3:
-      Qk: 10.
-      P: 1
+      Qk: [3, 3, 3]
+      P: [1, 1, 1]
     BasePoseSE2:
-      Qk: 10.
-      P: 1
+      Qk: [3, 3, 3]
+      P: [1, 1, 1]
     EEVel3:
-      Qk: 5.
-      P: 1
+      Qk: [1, 1, 1]
+      P: [1, 1, 1]
     BaseVel2:
-      Qk: 5.
-      P: 1
+      Qk: [1, 1]
+      P: [1, 1]
     BaseVel3:
-      Qk: 5.
-      P: 1
+      Qk: [1, 1, 1]
+      P: [1, 1, 1]
     Effort:
       Qqa: [0, 0, 0, 0, 0, 0]
       Qqb: [0, 0, 0]
       Qva: [0.01, 0.01, 0.01, 0.01, 0.01, 0.01]
       Qvb: [0.01, 0.01, 0.01]
-      Qua: [0.005, 0.005, 0.005, 0.005, 0.005, 0.005]
-      Qub: [0.005, 0.005, 0.005]
+      Qua: [0.01, 0.01, 0.01, 0.01, 0.01, 0.01]
+      Qub: [0.01, 0.01, 0.01]
       Qdua: [0, 0, 0, 0, 0, 0]
       Qdub: [0.1, 0.1, 0.1]
     Regularization:
       eps: 1.0e-06
     slack:
-      z: 100  # linear term
+      z: 10  # linear term
       Z: 1    # quadratic term
 
   # line search parameters

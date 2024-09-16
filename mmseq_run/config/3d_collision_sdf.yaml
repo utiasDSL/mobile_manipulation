@@ -33,13 +33,16 @@ controller:
     sdf: "SignedDistanceConstraintCBF" # SignedDistanceConstraint or SignedDistanceConstraintCBF 
   type: "STMPC"
   collision_cbf_gamma:
-    sdf: 0.9
+    sdf: 2
   
   acados:
-    name: MMCtrlSLAM_FOREARM
+    name: MMCtrlSLAM
     ocp_solver_options:
-      nlp_solver_max_iter: 100
+      nlp_solver_max_iter: 30
       qp_solver_warm_start: 2
+      nlp_solver_tol_stat: 1.0e-03
+      nlp_solver_tol_eq: 1.0e-02
+      nlp_solver_tol_ineq: 1.0e-02
 
 include:
   - package: "mmseq_run"

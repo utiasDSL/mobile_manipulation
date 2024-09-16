@@ -611,9 +611,9 @@ class STMPC(MPC):
 
                     # Set weight matricies, assuming identity matrix with identical diagonal terms
                     if i == self.N:
-                        curr_p_map[p_name_W] = self.params["cost_params"][name]["P"] * np.eye(r_bar[i].size)
+                        curr_p_map[p_name_W] = np.diag(self.params["cost_params"][name]["P"])
                     else:
-                        curr_p_map[p_name_W] = self.params["cost_params"][name]["Qk"] * np.eye(r_bar[i].size)
+                        curr_p_map[p_name_W] = np.diag(self.params["cost_params"][name]["Qk"])
                 else:
                     self.py_logger.warning(f"unknown p name {p_name_r}")
             
