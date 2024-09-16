@@ -95,6 +95,7 @@ class MPC():
         self.x_bar[:, :self.DoF] = self.home
         self.u_bar = np.zeros((self.N, self.nu))  # current best guess u0,...,uN-1
         self.t_bar = None
+        self.lam_bar = None                       # inequality mulitipliers
         self.zopt = np.zeros(self.QPsize)  # current lineaization point
         self.u_prev = np.zeros(self.nu)
         self.xu_bar_init = False
@@ -592,6 +593,8 @@ class STMPC(MPC):
             self.ocp_solver.set(i, 'x', x_bar_initial[i])
             if i < self.N:
                 self.ocp_solver.set(i, 'u', u_bar_initial[i])
+            if self.lam_bar is not None:
+                self.ocp_solver.set(i, 'lam', self.lam_bar[i])
 
             t2 = time.perf_counter()
             self.log["time_ocp_set_params_set_x"] += t2 - t1
@@ -712,10 +715,14 @@ class STMPC(MPC):
 
         # get solution
         self.u_prev = self.u_bar[0].copy()
+        self.lam_bar = []
         for i in range(self.N):
             self.x_bar[i,:] = self.ocp_solver.get(i, "x")
             self.u_bar[i,:] = self.ocp_solver.get(i, "u")
+            self.lam_bar.append(self.ocp_solver.get(i, "lam"))
+
         self.x_bar[self.N,:] = self.ocp_solver.get(self.N, "x")
+        self.lam_bar.append(self.ocp_solver.get(self.N, "lam"))
         self.t_bar = t + np.arange(self.N) * self.dt
 
         self.v_cmd = self.x_bar[0][self.robot.DoF:].copy()
@@ -767,6 +774,7 @@ class STMPC(MPC):
                "control_constraint": 0,
                "x_bar": 0,
                "u_bar": 0,
+               "lam_bar": 0,
                "ee_pos":0,
                "base_pos":0,
                "ocp_param":{},
