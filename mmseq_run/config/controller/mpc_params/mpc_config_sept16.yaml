@@ -1,0 +1,40 @@
+controller:
+  cost_params:
+    EEPos3:
+      Qk: [3, 3, 3]
+      P: [1, 1, 1]
+    EEPos3BaseFrame:
+      Qk: [0.3, 0.3, 0.3]
+      P: [1, 1, 1]
+    BasePos2:
+      Qk: [3, 3]
+      P: [1, 1]
+    BasePos3:
+      Qk: [3, 3, 3]
+      P: [1, 1, 1]
+    BasePoseSE2:
+      Qk: [3, 3, 3]
+      P: [1, 1, 1]
+    EEVel3:
+      Qk: [1, 1, 1]
+      P: [1, 1, 1]
+    BaseVel2:
+      Qk: [1, 1]
+      P: [1, 1]
+    BaseVel3:
+      Qk: [1, 1, 1]
+      P: [1, 1, 1]
+    Effort:
+      Qqa: [0, 0, 0, 0, 0, 0]
+      Qqb: [0, 0, 0]
+      Qva: [0.01, 0.01, 0.01, 0.01, 0.01, 0.01]
+      Qvb: [0.01, 0.01, 0.01]
+      Qua: [0.01, 0.01, 0.01, 0.01, 0.01, 0.01]
+      Qub: [0.01, 0.01, 0.01]
+      Qdua: [0, 0, 0, 0, 0, 0]
+      Qdub: [0.1, 0.1, 0.1]
+    Regularization:
+      eps: 1.0e-06
+    slack:
+      z: 50  # linear term
+      Z: 1    # quadratic term
