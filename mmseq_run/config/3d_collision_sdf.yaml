@@ -33,7 +33,7 @@ controller:
     sdf: "SignedDistanceConstraintCBF" # SignedDistanceConstraint or SignedDistanceConstraintCBF 
   type: "STMPC"
   collision_cbf_gamma:
-    sdf: 2
+    sdf: 1
   
   acados:
     name: MMCtrlSLAM

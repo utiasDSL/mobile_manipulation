@@ -272,6 +272,7 @@ class CasadiModelInterface:
                 self.collision_pairs["sdf"] = self._addCollisionPairFromTwoGroups(["map"],
                                                                               self.robot.collision_link_names["base"]+
                                                                               [self.robot.collision_link_names["forearm"][1]] +
+                                                                              [self.robot.collision_link_names["wrist"][0]] +
                                                                               self.robot.collision_link_names["tool"])
     def _setupCollisionPairDetailed(self):
         # base
