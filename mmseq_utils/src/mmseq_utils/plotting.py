@@ -10,6 +10,7 @@ import rosbag
 import os
 from spatialmath.base import rotz, r2q
 import time
+from tf.transformations import euler_from_quaternion
 
 from mmseq_utils.parsing import parse_path, load_config
 from mmseq_utils.casadi_struct import casadi_sym_struct, reconstruct_sym_struct_map_from_array
@@ -79,7 +80,7 @@ class DataPlotter:
         self.data = data
         self.data["name"] = self.data.get('name', 'data')
         self.config = config
-        if config is not None:     
+        if config is not None:
             # controller
             control_class = getattr(MPC, config["controller"]["type"], None)
             if control_class is None:
@@ -341,17 +342,7 @@ class DataPlotter:
             self.data["yaw_bw_ws"] -= qb[2]
             self.data["yaw_bw_ws"] = wrap_pi_array(self.data["yaw_bw_ws"])
         
-        # mpc constraints with prediction
         N = len(self.data["ts"])
-        for constraint in self.controller.constraints:
-            name = "_".join(["mpc", constraint.name,"constraint", "predictions"])
-            self.data[name] = []
-            for t_index in range(N):
-                param_map_bar = [reconstruct_sym_struct_map_from_array(self.controller.p_struct, param_map_array) for param_map_array in self.data["mpc_ocp_params"][t_index]]
-                x_bar = self.data["mpc_x_bars"][t_index]
-                u_bar = self.data["mpc_u_bars"][t_index]
-                self.data[name].append(self.controller.evaluate_constraints(constraint, x_bar, u_bar, param_map_bar))
-            self.data[name] = np.array(self.data[name])
 
         self.data["mpc_ee_predictions"] = []
         self.data["mpc_base_predictions"] = []
@@ -1457,11 +1448,27 @@ class DataPlotter:
         t_index = np.argmin(np.abs(t_sim - t))
         off_set = t_index % 4
         # Time x prediction step x data dim
-        data = self.data.get(data_name)
-        if data is None:
-            print(f"Did not find {data_name}. Stop plotting.")
-            return
+        data = self.data.get(data_name, None)
+        if data is None and "constraint" in data_name.split("_"):
+            # mpc constraints with prediction
+            N = len(self.data["ts"])
+            constraint_name = data_name.split("_")[1]
+            for constraint in self.controller.constraints:
+                print("checking {}".format(constraint.name))
+
+                if constraint.name !=constraint_name:
+                    continue
+                self.data[data_name] = []
+                for t_index in range(N):
+                    param_map_bar = [reconstruct_sym_struct_map_from_array(self.controller.p_struct, param_map_array) for param_map_array in self.data["mpc_ocp_params"][t_index]]
+                    x_bar = self.data["mpc_x_bars"][t_index]
+                    u_bar = self.data["mpc_u_bars"][t_index]
+                    self.data[data_name].append(self.controller.evaluate_constraints(constraint, x_bar, u_bar, param_map_bar))
+                self.data[data_name] = np.array(self.data[data_name])
+            if self.data.get(data_name, None) is None:
+                return
         print(data_name)
+        data = self.data.get(data_name, None)
         print(data.shape)
         
         if len(data.shape) ==4:
@@ -1545,13 +1552,14 @@ class DataPlotter:
         self.plot_time_htmpc(block=False)
         # self.plot_solver_iters()
         self.plot_time_series_data_htmpc("time_get_map", block=False)
+        self.plot_mpc_prediction("mpc_sdf_constraint_predictions", block=False)
+
         # self.plot_solver_iters(block=False)
         # self.plot_mpc_prediction("mpc_obstacle_cylinder_1_link_constraints")
-        self.plot_mpc_prediction("mpc_sdf_constraints", block=False)
-        # self.plot_mpc_prediction("mpc_control_constraints",block=False)
-        # self.plot_mpc_prediction("mpc_state_constraints", block=False)
-        # self.plot_mpc_prediction("mpc_sdf_constraint_gradients", block=False)
-
+        # self.plot_mpc_prediction("mpc_control_constraint_predictions",block=False)
+        # self.plot_mpc_prediction("mpc_state_constraint_predictions", block=False)
+        self.plot_mpc_prediction("mpc_x_bars",t=0.1, block=False)
+        self.plot_mpc_prediction("mpc_u_bars",t=0.1, block=False)
 
         self.plot_run_time()
 
@@ -1819,9 +1827,9 @@ class DataPlotter:
             print("time: {} param:{}".format(self.data["ts"][k], param[param_name]))
 
 class ROSBagPlotter:
-    def __init__(self, bag_file, config_file="/home/ubuntu/Workspace/catkin_ws/src/mm_sequential_tasks/mmseq_run/config/robot/thing.yaml"):
+    def __init__(self, bag_file, config_file="$(rospack find mmseq_run)/config/robot/thing.yaml"):
         self.data = {"ur10": {}, "ridgeback": {}, "mpc": {}, "vicon": {}, "model":{}}
-        self.bag = rosbag.Bag(bag_file)
+        self.bag = rosbag.Bag(bag_file)   
         self.config = load_config(config_file)
         self.robot = MobileManipulator3D(self.config["controller"])
 
@@ -1832,6 +1840,44 @@ class ROSBagPlotter:
         self.parse_odom(self.bag)
         self.compute_values_from_robot_model()
         # self._set_zero_time()
+        self.parse_base_tf_msgs(self.bag)
+
+    def parse_base_tf_msgs(self, bag):
+        tf_msgs = [msg for _, msg, _ in bag.read_messages("/tf")]
+        ts, p_bws, orn_bws = ros_utils.parse_tf_messages(tf_msgs, "base_link", "my_world")
+        orn_wbs = np.array([math.quat_inverse(q) for q in orn_bws])
+        p_wbs = np.array([math.quat_rotate(q, -p) for p, q in zip(p_bws, orn_wbs)])
+        rpys = np.array([euler_from_quaternion(q) for q in orn_wbs])
+
+        if len(ts) > 0:
+            valid_indx = [0]
+            t_new = [ts[0]]
+            for i, t in enumerate(ts):
+                if t > t_new[-1]:
+                    t_new.append(t)
+                    valid_indx.append(i)
+            valid_indx = np.array(valid_indx)
+            t_new = np.array(t_new)
+            self.data["tf"] = {"base_link": {"ts": t_new,
+                                            "pos": p_wbs[valid_indx],
+                                            "orn": orn_wbs[valid_indx],
+                                            "rpy": rpys[valid_indx]}}
+            dts = t_new[1:] - t_new[:-1]
+            pos = self.data["tf"]["base_link"]["pos"]
+            print(ts)
+            pos_diff = (pos[1:, :] - pos[:-1, :]) / np.expand_dims(dts, axis=-1)
+            self.data["tf"]["base_link"]["pos_diff"] = pos_diff
+
+            rpy = self.data["tf"]["base_link"]["rpy"]
+            rpy_diff = (rpy[1:, :] - rpy[:-1, :]) / np.expand_dims(dts, axis=-1)
+            self.data["tf"]["base_link"]["rpy_diff"] = rpy_diff
+        else:
+            self.data["tf"] = {"base_link": {"ts": np.zeros(0),
+                                            "pos": np.zeros((0, 3)),
+                                            "orn": np.zeros((0, 4)),
+                                            "rpy": np.zeros((0, 3)),
+                                            "pos_diff": np.zeros((0, 3)),
+                                            "rpy_diff": np.zeros((0,3))}}
 
     def parse_joint_states(self, bag):
 
@@ -1842,16 +1888,25 @@ class ROSBagPlotter:
         tbs, qbs, vbs = ros_utils.parse_ridgeback_joint_state_msgs(ridgeback_msgs, False)
         self.data["ur10"]["joint_states"] = {"ts": tas, "qs": qas, "vs": vas}           # 125hz
         self.data["ridgeback"]["joint_states"] = {"ts": tbs, "qs": qbs, "vs": vbs}      # 50hz
+        
+        dts = tbs[1:] - tbs[:-1]
+        vel = (qbs[1:, :] - qbs[:-1, :]) / np.expand_dims(dts, axis=-1)
+        self.data["ridgeback"]["joint_states"]["q_diffs"] = vel
 
         # Reconstruct body-frame ridgeback velocity
         vb_bs = [rotz(qbs[i, 2]).T @  vbs[i, :] for i in range(len(tbs))]
         self.data["ridgeback"]["joint_states"]["vbs"] = np.array(vb_bs)
 
-        fqa_interp = interp1d(tas, qas, axis=0, fill_value="extrapolate")
-        fva_interp = interp1d(tas, vas, axis=0, fill_value="extrapolate")
-        qas_interp = fqa_interp(tbs)
-        vas_interp = fva_interp(tbs)
-        self.data["ur10"]["joint_states_interpolated"] = {"ts": tbs, "qs": qas_interp, "vs": vas_interp}
+        if qas.shape[0] != 0:
+            fqa_interp = interp1d(tas, qas, axis=0, fill_value="extrapolate")
+            fva_interp = interp1d(tas, vas, axis=0, fill_value="extrapolate")
+            qas_interp = fqa_interp(tbs)
+            vas_interp = fva_interp(tbs)
+            self.data["ur10"]["joint_states_interpolated"] = {"ts": tbs, "qs": qas_interp, "vs": vas_interp}
+
+        else:
+            self.data["ur10"]["joint_states"] = {"ts": tas, "qs": np.zeros((0, 6)), "vs": np.zeros((0, 6))}
+            self.data["ur10"]["joint_states_interpolated"] = {"ts": tas, "qs": np.zeros((0, 6)), "vs": np.zeros((0, 6))}
 
     def parse_odom(self, bag):
         odom_msgs = [msg for _, msg, _ in bag.read_messages("/odometry/filtered")]
@@ -1901,7 +1956,12 @@ class ROSBagPlotter:
 
                 dts = ts[1:] - ts[:-1]
                 vel = (qs[1:, :2] - qs[:-1, :2]) / np.expand_dims(dts, axis=-1)
-                self.data["vicon"]["ThingBase"]["vel"] = vel  
+                self.data["vicon"]["ThingBase"]["pos_diff"] = vel
+
+                yaw = self.data["vicon"]["ThingBase"]["orn"]
+                yaw_diff = (yaw[1:] - yaw[:-1]) / dts
+                self.data["vicon"]["ThingBase"]["yaw_diff"] = yaw_diff
+
             else:
                 ts, qs = ros_utils.parse_transform_stamped_msgs(msgs, False)    # q is a 7-element vector x, y, z for position followed by a unit quaternion
                 self.data["vicon"][name] = {"ts": ts, "pos": qs[:, :3], "orn": qs[:, 3:]}
@@ -1992,34 +2052,102 @@ class ROSBagPlotter:
             ax.grid()
             ax.legend()
 
-    def plot_base_odom_filter_vs_joint_state(self):
+    def plot_base_velocity_estimation_odom(self):
         f, axes = plt.subplots(3,1,sharex=True)
 
-        axes[0].plot(self.data["ridgeback"]["odom"]["ts"], self.data["ridgeback"]["odom"]["vs"][:, 0], 'r',label="odom-filtered-vx")
-        axes[1].plot(self.data["ridgeback"]["odom"]["ts"], self.data["ridgeback"]["odom"]["vs"][:, 1], 'r', label="odom-filtered-vy")
-        axes[2].plot(self.data["ridgeback"]["odom"]["ts"], self.data["ridgeback"]["odom"]["omegas"][:, 2], 'r', label="odom-filtered-omega")
+        axes[0].plot(self.data["ridgeback"]["odom"]["ts"], self.data["ridgeback"]["odom"]["vs"][:, 0], 'r',label="v_x_odom")
+        axes[1].plot(self.data["ridgeback"]["odom"]["ts"], self.data["ridgeback"]["odom"]["vs"][:, 1], 'r', label="v_y_odom")
+        axes[2].plot(self.data["ridgeback"]["odom"]["ts"], self.data["ridgeback"]["odom"]["omegas"][:, 2], 'r', label="ω_odom")
 
-        axes[0].plot(self.data["ridgeback"]["joint_states"]["ts"], self.data["ridgeback"]["joint_states"]["vbs"][:, 0], 'b', label="vicon-filtered-vx")
-        axes[1].plot(self.data["ridgeback"]["joint_states"]["ts"], self.data["ridgeback"]["joint_states"]["vbs"][:, 1], 'b', label="vicon-filtered-vy")
-        axes[2].plot(self.data["ridgeback"]["joint_states"]["ts"], self.data["ridgeback"]["joint_states"]["vbs"][:, 2], 'b', label="vicon-filtered-omega")
+        axes[0].plot(self.data["ridgeback"]["joint_states"]["ts"], self.data["ridgeback"]["joint_states"]["vbs"][:, 0], 'b', label="v_x_est")
+        axes[1].plot(self.data["ridgeback"]["joint_states"]["ts"], self.data["ridgeback"]["joint_states"]["vbs"][:, 1], 'b', label="v_y_est")
+        axes[2].plot(self.data["ridgeback"]["joint_states"]["ts"], self.data["ridgeback"]["joint_states"]["vbs"][:, 2], 'b', label="ω_est")
 
-        axes[0].set_title("Ridgeback Velocity Odom vs Vicon")
+        axes[0].set_title("Ridgeback Velocity Estimation vs Odom (Base Frame)")
 
 
         for ax in axes:
             ax.grid()
             ax.legend()
-
-    def plot_base_velocity_estimation(self, axes=None, legend=""):
-        f = plt.figure()
-        axes = f.gca()
-        axes.plot(self.data["vicon"]["ThingBase"]["ts"][:-1], self.data["vicon"]["ThingBase"]["vel"][:, 0], '--', label="v_x_vicon")
-        axes.plot(self.data["vicon"]["ThingBase"]["ts"][:-1], self.data["vicon"]["ThingBase"]["vel"][:, 1], '--', label="v_y_vicon")
-        axes.plot(self.data["ridgeback"]["joint_states"]["ts"], self.data["ridgeback"]["joint_states"]["vs"][:, 0], '-', label="v_x_filtered")
-        axes.plot(self.data["ridgeback"]["joint_states"]["ts"], self.data["ridgeback"]["joint_states"]["vs"][:, 1], '--', label="v_y_filtered")
         
-        axes.legend()
-        axes.grid()
+        return axes
+
+    def plot_base_velocity_estimation_vicon(self, axes=None, legend=""):
+        f, axes = plt.subplots(3,1,sharex=True)
+
+        axes[0].plot(self.data["vicon"]["ThingBase"]["ts"][:-1], self.data["vicon"]["ThingBase"]["pos_diff"][:, 0], 'r', label="v_x_vicon")
+        axes[1].plot(self.data["vicon"]["ThingBase"]["ts"][:-1], self.data["vicon"]["ThingBase"]["pos_diff"][:, 1], 'r', label="v_y_vicon")
+        axes[2].plot(self.data["vicon"]["ThingBase"]["ts"][:-1], self.data["vicon"]["ThingBase"]["yaw_diff"][:], 'r', label="ω_vicon")
+
+
+        axes[0].plot(self.data["ridgeback"]["joint_states"]["ts"], self.data["ridgeback"]["joint_states"]["vs"][:, 0], 'b', label="v_x_est")
+        axes[1].plot(self.data["ridgeback"]["joint_states"]["ts"], self.data["ridgeback"]["joint_states"]["vs"][:, 1], 'b', label="v_y_est")
+        axes[2].plot(self.data["ridgeback"]["joint_states"]["ts"], self.data["ridgeback"]["joint_states"]["vs"][:, 2], 'b', label="ω_est")
+        
+        axes[0].set_title("Base Velocity Estimation vs Vicon")
+        
+        for i in range(3):
+            axes[i].legend()
+            axes[i].grid()
+
+        return axes
+
+    def plot_base_velocity_estimation_tf(self, axes=None, legend=""):
+        f, axes = plt.subplots(3,1,sharex=True)
+
+        axes[0].plot(self.data["tf"]["base_link"]["ts"][:-1], self.data["tf"]["base_link"]["pos_diff"][:, 0], 'r', label="v_x_tf")
+        axes[1].plot(self.data["tf"]["base_link"]["ts"][:-1], self.data["tf"]["base_link"]["pos_diff"][:, 1], 'r', label="v_y_tf")
+        axes[2].plot(self.data["tf"]["base_link"]["ts"][:-1], self.data["tf"]["base_link"]["rpy_diff"][:, 2], 'r', label="ω_tf")
+
+
+        axes[0].plot(self.data["ridgeback"]["joint_states"]["ts"], self.data["ridgeback"]["joint_states"]["vs"][:, 0], 'b', label="v_x_est")
+        axes[1].plot(self.data["ridgeback"]["joint_states"]["ts"], self.data["ridgeback"]["joint_states"]["vs"][:, 1], 'b', label="v_y_est")
+        axes[2].plot(self.data["ridgeback"]["joint_states"]["ts"], self.data["ridgeback"]["joint_states"]["vs"][:, 2], 'b', label="ω_est")
+        
+        axes[0].set_title("Base Velocity Estimation vs TF")
+        for i in range(3):
+            axes[i].legend()
+            axes[i].grid()
+        
+        return axes
+
+
+    def plot_base_state_estimation_vicon(self, axes=None, legend=""):
+        f, axes = plt.subplots(3,1,sharex=True)
+
+        axes[0].plot(self.data["vicon"]["ThingBase"]["ts"], self.data["vicon"]["ThingBase"]["pos"][:, 0]-self.data["vicon"]["ThingBase"]["pos"][0, 0] + self.data["ridgeback"]["joint_states"]["qs"][0, 0], 'r', label="x_vicon")
+        axes[1].plot(self.data["vicon"]["ThingBase"]["ts"], self.data["vicon"]["ThingBase"]["pos"][:, 1]-self.data["vicon"]["ThingBase"]["pos"][0, 1] + self.data["ridgeback"]["joint_states"]["qs"][0, 1], 'r', label="y_vicon")
+        axes[2].plot(self.data["vicon"]["ThingBase"]["ts"], self.data["vicon"]["ThingBase"]["orn"]-self.data["vicon"]["ThingBase"]["orn"][0] + self.data["ridgeback"]["joint_states"]["qs"][0, 2], 'r', label="θ_vicon")
+        
+        axes[0].plot(self.data["ridgeback"]["joint_states"]["ts"], self.data["ridgeback"]["joint_states"]["qs"][:, 0], 'b', label="x_est")
+        axes[1].plot(self.data["ridgeback"]["joint_states"]["ts"], self.data["ridgeback"]["joint_states"]["qs"][:, 1], 'b', label="y_est")
+        axes[2].plot(self.data["ridgeback"]["joint_states"]["ts"], self.data["ridgeback"]["joint_states"]["qs"][:, 2], 'b', label="θ_est")
+        
+        for i in range(3):
+            axes[i].legend()
+            axes[i].grid()
+        axes[0].set_title("Base Pose Estimation vs Vicon")
+
+        return axes
+    
+    def plot_base_state_estimation_tf(self, axes=None, legend=""):
+        f, axes = plt.subplots(3,1,sharex=True)
+
+        axes[0].plot(self.data["tf"]["base_link"]["ts"], self.data["tf"]["base_link"]["pos"][:, 0], 'r', label="x_tf")
+        axes[1].plot(self.data["tf"]["base_link"]["ts"], self.data["tf"]["base_link"]["pos"][:, 1], 'r', label="y_tf")
+        axes[2].plot(self.data["tf"]["base_link"]["ts"], self.data["tf"]["base_link"]["rpy"][:, 2], 'r', label="θ_tf")
+        
+        axes[0].plot(self.data["ridgeback"]["joint_states"]["ts"], self.data["ridgeback"]["joint_states"]["qs"][:, 0], 'b', label="x_est")
+        axes[1].plot(self.data["ridgeback"]["joint_states"]["ts"], self.data["ridgeback"]["joint_states"]["qs"][:, 1], 'b', label="y_est")
+        axes[2].plot(self.data["ridgeback"]["joint_states"]["ts"], self.data["ridgeback"]["joint_states"]["qs"][:, 2], 'b', label="θ_est")
+        
+        
+        for i in range(3):
+            axes[i].legend()
+            axes[i].grid()
+        axes[0].set_title("Base Pose Estimation vs TF")
+
+        return axes
 
     def plot_joint_states(self, axes=None, legend=""):
         if axes is None:
@@ -2073,10 +2201,10 @@ class ROSBagPlotter:
         ax = axes[0]
         for i in range(6):
             ax[i].plot(self.data["ur10"]["joint_states"]["ts"],
-                    self.data["ur10"]["joint_states"]["vs"][:, i], '-',
+                    self.data["ur10"]["joint_states"]["vs"][:, i], '-',linewidth=1.5,
                     label=r"$\dot\theta_{}$".format(i + 1))
             ax[i].plot(self.data["ur10"]["cmd_vels"]["ts"],
-                    self.data["ur10"]["cmd_vels"]["vcs"][:, i], '-x',
+                    self.data["ur10"]["cmd_vels"]["vcs"][:, i], '-x',linewidth=1.5,
                     label=r"${\dot\theta_d}" + "_{}$".format(i + 1))
             ax[i].legend()
             ax[i].grid()
@@ -2088,11 +2216,11 @@ class ROSBagPlotter:
         labels_vc = [r"$v_{c,x}$", r"$v_{c, y}$", r"$\omega_c$"]
         for i in range(3):
             ax[i].plot(self.data["ridgeback"]["joint_states"]["ts"],
-                   self.data["ridgeback"]["joint_states"]["vbs"][:, i], '-x',
+                   self.data["ridgeback"]["joint_states"]["vbs"][:, i], '-',linewidth=1.5,
                    label=labels_v[i])
 
             ax[i].plot(self.data["ridgeback"]["cmd_vels"]["ts"],
-                   self.data["ridgeback"]["cmd_vels"]["vc_bs"][:, i], '-x',
+                   self.data["ridgeback"]["cmd_vels"]["vc_bs"][:, i], '-x',linewidth=1.5,
                    label=labels_vc[i])
         for i in range(3):
             ax[i].legend()
@@ -2204,11 +2332,28 @@ class ROSBagPlotter:
     def plot_topic_frequency(self):
         self.plot_frequency(self.data["ridgeback"]["joint_states"], "joint states")
         self.plot_frequency(self.data["ridgeback"]["cmd_vels"], "cmd")
+        self.plot_frequency(self.data["vicon"]["ThingBase"], "pos")
+        # self.plot_frequency(self.data["tf"]["base_link"], "pos")
 
-    
     def plot_frequency(self, data, name):
         f1 = plt.figure()
         dts = data["ts"][1:] - data["ts"][:-1]
 
         plt.plot(data["ts"][:-1], dts)
         plt.title(name + " time difference")
+        
+    def save_figs(self):
+
+        figs = [plt.figure(n) for n in plt.get_fignums()]
+        folder_name = str(self.data["dir_path"]).split("/")[-1]
+
+        multipage(Path(str(self.data["folder_path"]))/Path(folder_name) / "report.pdf", figs)
+    
+    def plot_estimation(self):
+        self.plot_base_state_estimation_tf()
+        self.plot_base_state_estimation_vicon()
+        
+        self.plot_base_velocity_estimation_odom()
+        self.plot_base_velocity_estimation_tf()
+        self.plot_base_velocity_estimation_vicon()
+        
