@@ -131,6 +131,7 @@ controller:
       nlp_solver_type: "SQP"  #SQP_RTI, SQP
       globalization: "MERIT_BACKTRACKING"
       qp_solver_iter_max: 100
+      nlp_solver_tol_comp: 1.e-06
       nlp_solver_tol_stat: 1.0e-03
       nlp_solver_tol_eq: 1.0e-02
       nlp_solver_tol_ineq: 1.0e-02

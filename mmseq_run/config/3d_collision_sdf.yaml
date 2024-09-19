@@ -43,6 +43,7 @@ controller:
       nlp_solver_tol_stat: 5.0e-02
       nlp_solver_tol_eq: 1.0e-02
       nlp_solver_tol_ineq: 1.0e-02
+      nlp_solver_tol_comp: 1.0e-06
 
 include:
   - package: "mmseq_run"
@@ -50,7 +51,7 @@ include:
   - package: "mmseq_run"
     path: "config/controller/MPC.yaml"
   - package: "mmseq_run"
-    path: "config/controller/mpc_params/mpc_config_sept16.yaml"
+    path: "config/controller/mpc_params/ctrl_slam_Sep19.yaml"
   - package: "mmseq_run"
     path: "config/sim/isaac_sim.yaml"
   - package: "mmseq_run"
