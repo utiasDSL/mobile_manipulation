@@ -508,6 +508,14 @@ class ControllerROSNode:
             tc2 = time.perf_counter()
             self.controller_log.log(20, "Controller Run Time: {}".format(tc2 - tc1))
 
+            # if the robot is very close to the goal, stop the robot
+            close_to_goal = False
+            for planner in planners:
+                close_to_goal = close_to_goal or planner.closeToFinish()
+            if close_to_goal:
+                print("Close to goal. Braking")
+                v_bar[:, :3] = 0
+
             mpc_plan = v_bar
             N = mpc_plan.shape[0]
             t_mpc = np.arange(N) * self.mpc_dt

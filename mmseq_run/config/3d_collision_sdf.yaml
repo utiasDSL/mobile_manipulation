@@ -5,7 +5,7 @@ planner:
     name: Base Position
     planner_type: ROSTrajectoryPlanner
     cruise_speed: 0.35
-    yaw_speed: 0.5
+    yaw_speed: 0.4
     yaw_accel: 100
     tracking_err_tol: 0.4
     ref_traj_duration: 1.5
@@ -60,5 +60,5 @@ include:
     path: "config/map/SDF3D.yaml"
 
 logging:
-  log_dir: "$MOBILE_MANIPULATION_CENTRAL_BAG_DIR/"
+  log_dir: "$MOBILE_MANIPULATION_CENTRAL_BAG_DIR/Sept24"
   log_level: 10 # 0 - not set, 10 - debug, 20 - info

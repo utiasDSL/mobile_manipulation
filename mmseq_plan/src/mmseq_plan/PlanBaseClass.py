@@ -23,6 +23,7 @@ class Planner(ABC):
         self.ref_data_type = ref_data_type      # Vec2 vs Vec3
         self.frame_id = frame_id                # base or EE
         self.robot_states = None
+        self.close_to_finish = False
 
 
     @abstractmethod
@@ -70,6 +71,14 @@ class Planner(ABC):
         :rtype: boolean
         """
         return True
+    
+    def closeToFinish(self):
+        """_summary_
+
+        :return: true if the planner is close to finish
+        :rtype: boolean
+        """
+        return self.close_to_finish
 
 class TrajectoryPlanner(Planner):
     def __init__(self, name, type, ref_type, ref_data_type, frame_id):
