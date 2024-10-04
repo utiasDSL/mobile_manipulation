@@ -5,10 +5,11 @@ import rospkg
 from pathlib import Path
 import numpy as np
 from scipy.linalg import block_diag
+from liecasadi import SO3
 
 from mmseq_control.robot import MobileManipulator3D
 from mmseq_utils.casadi_struct import casadi_sym_struct
-from mmseq_utils.math import casadi_SO2
+from mmseq_utils.math import casadi_SO2, casadi_SO3_log
 
 class RBF:
     mu_sym = cs.MX.sym('mu')
@@ -144,6 +145,67 @@ class EEPos3BaseFrameCostFunction(TrajectoryTrackingCostFunction):
         fk_ee = robot_mdl._getFk(robot_mdl.tool_link_name, base_frame=True)
         f_fcn = cs.Function("fee", [robot_mdl.x_sym], [fk_ee(robot_mdl.q_sym)[0]])
         super().__init__(nx, nu, nr, f_fcn, "EEPos3BaseFrame")
+
+class PoseSE3CostFunction(CostFunctions):
+    def __init__(self, nx, nu, f_fcn, name="PoseSE3"):
+        super().__init__(nx, nu, name)
+
+        self.nr = 6
+        self.p_dict = {"r": cs.MX.sym("r_"+self.name, self.nr),
+                       "W": cs.MX.sym("W_"+self.name, self.nr, self.nr)}
+        self.p_struct = casadi_sym_struct(self.p_dict)
+        self.p_sym = self.p_struct.cat
+
+        self.W = self.p_struct["W"]
+        self.r = self.p_struct['r']
+        r_pos = self.r[:3]
+        r_rot_euler = self.r[3:]
+
+        # position: 3d vector, rot: rotational matrix
+        pos, rot = f_fcn(self.x_sym)
+
+        e_pos = pos - r_pos
+        orn = SO3.from_matrix(rot)      # conversion from rotation matrix to quaternion
+        rot_inv = SO3(cs.vertcat(-orn.xyzw[:3], orn.xyzw[3])).as_matrix()
+        r_rot = SO3.from_euler(r_rot_euler).as_matrix()
+
+        e_rot = casadi_SO3_log(rot_inv @ r_rot)
+
+        self.e_eqn = cs.vertcat(e_pos, e_rot)
+        self.J_eqn = 0.5 * self.e_eqn.T @ self.W @ self.e_eqn
+        self.J_fcn = cs.Function("J_"+self.name, [self.x_sym, self.u_sym, self.p_sym], [self.J_eqn], ["x", "u", "r"], ["J"]).expand()
+        
+        self.e_fcn = cs.Function("e_"+self.name, [self.x_sym, self.u_sym, self.p_sym], [self.e_eqn], ["x", "u", "r"], ["e"]).expand()
+        dedx = cs.jacobian(self.e_eqn, self.x_sym)
+        self.H_approx_eqn = cs.diagcat(cs.MX.zeros(self.nu, self.nu), dedx.T @ self.W @ dedx)
+        self.H_approx_fcn = cs.Function("H_approx_"+self.name, [self.x_sym, self.u_sym, self.p_sym], [self.H_approx_eqn], ["x", "u", "r"], ["H_approx"]).expand()
+        
+        self.orn_fcn = cs.Function("e_"+self.name, [self.x_sym, self.u_sym, self.p_sym], [orn.xyzw], ["x", "u", "r"], ["e"]).expand()
+        self.rot_inv_fcn = cs.Function("e_"+self.name, [self.x_sym, self.u_sym, self.p_sym], [rot_inv], ["x", "u", "r"], ["e"]).expand()
+        self.r_rot_fcn = cs.Function("e_"+self.name, [self.x_sym, self.u_sym, self.p_sym], [r_rot], ["x", "u", "r"], ["e"]).expand()
+        self.rot_err_fcn = cs.Function("e_"+self.name, [self.x_sym, self.u_sym, self.p_sym], [rot_inv @ r_rot], ["x", "u", "r"], ["e"]).expand()
+
+class EEPoseSE3CostFunction(PoseSE3CostFunction):
+    def __init__(self, robot_mdl, params):
+        ss_mdl = robot_mdl.ssSymMdl
+        nx = ss_mdl["nx"]
+        nu = ss_mdl["nu"]
+
+        fk_ee = robot_mdl._getFk(robot_mdl.tool_link_name)
+        p_ee, rot_ee = fk_ee(robot_mdl.q_sym)
+        f_fcn = cs.Function("fee", [robot_mdl.x_sym], [p_ee, rot_ee])
+        super().__init__(nx, nu, f_fcn,"EEPose")
+
+class EEPoseSE3BaseFrameCostFunction(PoseSE3CostFunction):
+    def __init__(self, robot_mdl, params):
+        ss_mdl = robot_mdl.ssSymMdl
+        nx = ss_mdl["nx"]
+        nu = ss_mdl["nu"]
+
+        fk_ee = robot_mdl._getFk(robot_mdl.tool_link_name, True)
+        p_ee, rot_ee = fk_ee(robot_mdl.q_sym)
+        f_fcn = cs.Function("fee", [robot_mdl.x_sym], [p_ee, rot_ee])
+        super().__init__(nx, nu, f_fcn,"EEPoseBaseFrame")
 
 class ArmJointCostFunction(TrajectoryTrackingCostFunction):
     def __init__(self, robot_mdl, params):

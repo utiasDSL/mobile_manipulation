@@ -71,9 +71,15 @@ controller:
     EEPos3:
       Qk: [3, 3, 3]
       P: [1, 1, 1]
+    EEPose:
+      Qk: [3, 3, 3, 3, 3, 3]
+      P: [1, 1, 1, 1, 1, 1]
     EEPos3BaseFrame:
       Qk: [1, 1, 1]
       P: [1, 1, 1]
+    EEPoseBaseFrame:
+      Qk: [3, 3, 3, 3, 3, 3]
+      P: [1, 1, 1, 1, 1, 1]
     BasePos2:
       Qk: [3, 3]
       P: [1, 1]

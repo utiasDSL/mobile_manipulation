@@ -88,6 +88,9 @@ class TrajectoryPlanner(Planner):
         :rtype: boolean
         """
         return True
+    
+    def getTrackingPointArray(self):
+        return np.zeros(0), np.zeros(0)
 
 class WholeBodyPlanner(Planner):
     def __init__(self):

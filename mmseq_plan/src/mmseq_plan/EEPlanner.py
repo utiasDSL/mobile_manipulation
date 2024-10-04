@@ -3,7 +3,7 @@
 import numpy as np
 from numpy import linalg
 # from liegroups import SE3, SO3
-from spatialmath.base import rotz
+from spatialmath.base import rotz, rpy2r, q2r,trnorm
 from spatialmath import SE3
 
 from mmseq_plan.PlanBaseClass import Planner
@@ -33,7 +33,8 @@ class EESimplePlanner(Planner):
     def getTrackingPoint(self, t, robot_states=None):
         return self.target_pos, np.zeros(3)
     
-    def checkFinished(self, t, ee_curr_pos):
+    def checkFinished(self, t, ee_states):
+        ee_curr_pos = ee_states[0]
         if np.linalg.norm(ee_curr_pos - self.target_pos) > self.tracking_err_tol:
             if self.reached_target:
                 self.reset()
@@ -96,7 +97,8 @@ class EESimplePlannerBaseFrame(Planner):
 
         return self.target_pos, np.zeros(3)
     
-    def checkFinished(self, t, ee_curr_pos):
+    def checkFinished(self, t, ee_states):
+        ee_curr_pos = ee_states[0]
         if np.linalg.norm(ee_curr_pos - self.target_pos) > self.tracking_err_tol:
             if self.reached_target:
                 self.reset()
@@ -211,7 +213,8 @@ class EEPosTrajectoryCircle(Planner):
 
         return p, v
 
-    def checkFinished(self, t, ee_curr_pos):
+    def checkFinished(self, t, ee_states):
+        ee_curr_pos = ee_states[0]
         if t - self.start_time > self.T * (self.round - 1):
             if np.linalg.norm(ee_curr_pos - self.plan[0]) < self.tracking_err_tol:
                 self.finished = True
@@ -271,7 +274,8 @@ class EEPosTrajectoryLine(TrajectoryPlanner):
 
         return p, v
 
-    def checkFinished(self, t, ee_curr_pos):
+    def checkFinished(self, t, ee_states):
+        ee_curr_pos = ee_states[0]
         if np.linalg.norm(ee_curr_pos - self.target_pos) < self.tracking_err_tol:
             return True
         else:
@@ -296,50 +300,60 @@ class EEPosTrajectoryLine(TrajectoryPlanner):
 
         return config
 
-# class EESixDofWaypoint(Planner):
-#     def __init__(self, planner_params):
-#         self.target_pose = np.array(planner_params["target_pose"])
-#         self.type = "EE"
-#         self.finished = False
-#         self.reached_target = False
-#         self.stamp = 0
-#         self.hold_period = planner_params["hold_period"]
-#         self.ref_type = "pose"
+class EEPoseSE3Waypoint(Planner):
+    def __init__(self, config):
+        super().__init__(name=config["name"],
+                         type="EE", 
+                         ref_type="waypoint", 
+                         ref_data_type="SE3",
+                         frame_id=config["frame_id"])
+        self.finished = False
+        self.reached_target = False
+        self.stamp = 0
+        self.hold_period = config["hold_period"]
+        self.target_pose = np.array(config["target_pose"])
 
-#         super().__init__()
         
-#     def getTrackingPoint(self, t, robot_states=None):
-#         if not self.finished:
-#             return self.target_pose, np.zeros(6)
-#         else:
-#             return self.target_pose, np.zeros(6)
-    
-#     def checkFinished(self, t, state_ee):
-#         # state_ee a Homogeneous Transformation matrix
-#         Terr = np.matmul(linalg.inv(state_ee), self.target_pose)
-#         # Terr = SE3(SO3(Terr[:3,:3]), Terr[:3, 3])
-#         Terr = SE3(Terr)
-#         # twist = Terr.log()
-#         twist = Terr.twist()
+    def getTrackingPoint(self, t, robot_states=None):
 
-#         if not self.finished and np.linalg.norm(twist) > 0.2:
-#             self.reset()
-#         if not self.reached_target and np.linalg.norm(twist) < 0.1:
-#             self.reached_target = True
-#             self.stamp=t
-#             self.py_logger.info("Reached")
-#         elif self.reached_target and not self.finished:
-#             if t - self.stamp > self.hold_period:
-#                 self.finished = True
-#                 self.py_logger.info("Finished")
-        
-#         # print("Target {}".format(self.target_pose))
-#         # print("Curret {}".format(state_ee))
+        return self.target_pose, np.zeros(6)
     
-#     def reset(self):
-#         self.reached_target = False
-#         self.stamp = 0
-#         self.finished = False
+    def checkFinished(self, t, ee_states):
+        # state_ee a Homogeneous Transformation matrix
+        ee_pos = ee_states[0]
+        ee_rot = q2r(ee_states[1], order="xyzs")
+        T = np.eye(4)
+        T[:3, :3] = ee_rot
+        T[:3, 3] = ee_pos
+
+        Td = np.eye(4)
+        Td[:3, :3] = rpy2r(self.target_pose[3:])
+        Td[:3, 3] = self.target_pose[:3]
+
+        Terr = np.matmul(linalg.inv(T), Td)
+        print(Terr)
+        # Terr = SE3(SO3(Terr[:3,:3]), Terr[:3, 3])
+        Terr = SE3(trnorm(Terr))
+        # twist = Terr.log()
+        twist = Terr.twist()
+
+        if not self.finished and np.linalg.norm(twist) > 0.2:
+            self.reset()
+        if not self.reached_target and np.linalg.norm(twist) < 0.1:
+            self.reached_target = True
+            self.stamp=t
+            self.py_logger.info("Reached")
+        elif self.reached_target and not self.finished:
+            if t - self.stamp > self.hold_period:
+                self.finished = True
+                self.py_logger.info("Finished")
+        
+        return self.finished
+    
+    def reset(self):
+        self.reached_target = False
+        self.stamp = 0
+        self.finished = False
 
 
 if __name__ == '__main__':

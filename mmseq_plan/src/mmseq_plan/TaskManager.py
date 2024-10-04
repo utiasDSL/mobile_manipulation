@@ -76,9 +76,9 @@ class SoTStatic(SoTBase):
         planner = self.planners[self.curr_task_id]
         finished = False
         if planner.type == "EE":
-            finished = planner.checkFinished(t, Pee)
+            finished = planner.checkFinished(t, states["EE"])
         elif planner.type == "base":
-            finished = planner.checkFinished(t, Pb)
+            finished = planner.checkFinished(t, states["base"])
 
         # current task is finished move on to next task, unless it's the last task in the stack
         if finished:

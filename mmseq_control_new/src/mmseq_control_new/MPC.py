@@ -4,6 +4,8 @@ from abc import ABC, abstractmethod
 import time
 import logging
 from pathlib import Path
+from typing import Optional, List, Dict, Tuple, Union
+from numpy.typing import NDArray
 
 import numpy as np
 import casadi as cs
@@ -13,6 +15,8 @@ from scipy.interpolate import interp1d
 
 from mmseq_control.robot import MobileManipulator3D as MM
 from mmseq_control.robot import CasadiModelInterface as ModelInterface
+from mmseq_plan.PlanBaseClass import Planner,TrajectoryPlanner
+
 from mmseq_utils.math import wrap_pi_array
 from mmseq_utils.casadi_struct import casadi_sym_struct
 from mmseq_utils.parsing import parse_ros_path, parse_path
@@ -41,6 +45,10 @@ class MPC():
 
         self.EEPos3Cost = EEPos3CostFunction(self.robot, config["cost_params"]["EEPos3"])
         self.EEPos3BaseFrameCost = EEPos3BaseFrameCostFunction(self.robot, config["cost_params"]["EEPos3"])
+
+        self.EEPoseSE3Cost = EEPoseSE3CostFunction(self.robot, config["cost_params"]["EEPose"])
+        self.EEPoseBaseFrameSE3Cost = EEPoseSE3BaseFrameCostFunction(self.robot, config["cost_params"]["EEPose"])
+
         self.BasePos2Cost = BasePos2CostFunction(self.robot, config["cost_params"]["BasePos2"])
         self.BasePos3Cost = BasePos3CostFunction(self.robot, config["cost_params"]["BasePos3"])
         self.BasePoseSE2Cost = BasePoseSE2CostFunction(self.robot, config["cost_params"]["BasePoseSE2"])
@@ -119,7 +127,11 @@ class MPC():
             self.output_dir.mkdir()
 
     @abstractmethod
-    def control(self, t, robot_states, planners, map=None):
+    def control(self, 
+                t: float, 
+                robot_states: Tuple[NDArray[np.float64], NDArray[np.float64]], 
+                planners: List[Union[Planner, TrajectoryPlanner]], 
+                map=None):
         """
 
         :param t: current control time
@@ -448,7 +460,7 @@ class STMPC(MPC):
         super().__init__(config)
         num_terminal_cost = 2
         if config["base_pose_tracking_enabled"]:
-            costs = [self.BasePoseSE2Cost, self.BaseVel3Cost, self.EEPos3Cost, self.EEVel3Cost, self.EEPos3BaseFrameCost, self.CtrlEffCost]
+            costs = [self.BasePoseSE2Cost, self.BaseVel3Cost, self.EEPoseSE3Cost, self.EEVel3Cost, self.EEPoseBaseFrameSE3Cost, self.CtrlEffCost]
         else:
             costs = [self.BasePos2Cost, self.BaseVel2Cost, self.EEPos3Cost, self.EEVel3Cost, self.CtrlEffCost]
         
@@ -470,7 +482,11 @@ class STMPC(MPC):
         self.cost = costs
         self.constraints = constraints + [self.controlCst, self.stateCst]
 
-    def control(self, t, robot_states, planners, map=None):
+    def control(self, 
+                t: float, 
+                robot_states: Tuple[NDArray[np.float64], NDArray[np.float64]], 
+                planners: List[Union[Planner, TrajectoryPlanner]], 
+                map=None):
 
         self.py_logger.debug("control time {}".format(t))
         self.curr_control_time = t
@@ -512,13 +528,19 @@ class STMPC(MPC):
             acceptable_ref = True
             if planner.type == "EE":
                 if planner.ref_data_type == "Vec3":
-                    if planner.__class__.__name__ == "EESimplePlannerBaseFrame":
+                    if planner.frame_id == "base_link":
                         r_bar_map["EEPos3BaseFrame"] = p_bar
                     else:
                         r_bar_map["EEPos3"] = p_bar
                         if velocity_ref_available:
                             # if planner generates velocity reference as well
                             r_bar_map["EEVel3"] = v_bar
+                elif planner.ref_data_type == "SE3":
+                    if planner.frame_id == "base_link":
+                        r_bar_map["EEPoseBaseFrame"] = p_bar
+                    else:
+                        # assuming world frame
+                        r_bar_map["EEPose"] = p_bar
                 else:
                     acceptable_ref = False
             elif planner.type == "base":

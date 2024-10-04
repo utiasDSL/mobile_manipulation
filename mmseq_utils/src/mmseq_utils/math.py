@@ -243,3 +243,31 @@ def casadi_SO2(theta):
     R[0,1] = -cs.sin(theta)
 
     return R
+
+def casadi_SO3_Rx(theta):
+    R = cs.MX(3,3)
+    R[0,0] = cs.cos(theta)
+    R[1,1] = cs.cos(theta)
+    R[1,0] = cs.sin(theta)
+    R[0,1] = -cs.sin(theta)
+    R[2,2] = 1
+
+    return R
+
+def casadi_SO3_log(R):
+    theta = cs.acos((cs.trace(R) - 1)/2)
+    coeff_large_angle = theta/(2*cs.sin(theta))
+    coeff_small_angle = theta/(2*(theta - theta**3/6 + theta**5/120))
+    omega_cross_large_angle =  coeff_large_angle* (R - R.T)
+    omega_cross_small_angle = coeff_small_angle * (R - R.T)
+    omega_large_angle = cs.vertcat(omega_cross_large_angle[2,1], 
+                                   omega_cross_large_angle[0,2], 
+                                   omega_cross_large_angle[1,0])
+    omega_small_angle = cs.vertcat(omega_cross_small_angle[2,1], 
+                                   omega_cross_small_angle[0,2], 
+                                   omega_cross_small_angle[1,0])
+    
+    omega_list = [omega_small_angle, omega_large_angle]
+    omega = cs.conditional(theta > 1e-2, omega_list, 0, False)
+
+    return omega

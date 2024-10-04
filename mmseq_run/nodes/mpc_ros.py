@@ -13,7 +13,7 @@ import tf.transformations as tf
 from spatialmath.base import rotz
 from scipy.interpolate import interp1d
 from visualization_msgs.msg import Marker, MarkerArray
-from geometry_msgs.msg import Point, Transform, Twist, PoseStamped, Quaternion
+from geometry_msgs.msg import Point, Transform, Twist, PoseStamped, Quaternion, PoseArray
 from nav_msgs.msg import Path
 from trajectory_msgs.msg import MultiDOFJointTrajectory, MultiDOFJointTrajectoryPoint
 
@@ -129,6 +129,8 @@ class ControllerROSNode:
         self.controller_visualization_pub = rospy.Publisher("controller_visualization", Marker, queue_size=10)
         self.controller_visualization_array_pub = rospy.Publisher("controller_visualization_array", MarkerArray, queue_size=10)
         self.plan_visualization_pub = rospy.Publisher("plan_visualization", Marker, queue_size=10)
+        self.pose_plan_visualization_pub = rospy.Publisher("pose_plan_visualization", PoseStamped, queue_size=10)
+
         self.current_plan_visualization_pub = rospy.Publisher("current_plan_visualization", Marker, queue_size=10)
         self.controller_ref_pub = rospy.Publisher("controller_reference", Path, queue_size=5)
 
@@ -268,18 +270,33 @@ class ControllerROSNode:
         for pid, planner in enumerate(self.sot.planners):
             color = [0] * 3
             color[pid % 3] = 1
+            marker_plan = None
             if planner.ref_type == "waypoint":
                 if planner.ref_data_type == "Vec3":
                     marker_plan = self._make_marker(Marker.SPHERE, pid, rgba=color + [1], scale=[0.1, 0.1, 0.1])
                     marker_plan.pose.position = Point(*planner.target_pos)
                 elif planner.ref_data_type == "SE2":
-                    marker_plan = self._make_marker(Marker.ARROW, pid, rgba=color + [1], scale=[0.1, 0.1, 0.1])
-                    marker_plan.pose.position = Point(*planner.target_pose[:2], 0.25)
                     quat = tf.quaternion_from_euler(0,0,planner.target_pose[2])
-                    marker_plan.pose.orientation = Quaternion(*list(quat))
+                    pose_msg = PoseStamped()
+                    pose_msg.header.stamp = rospy.Time()
+                    pose_msg.pose.position = Point(*planner.target_pose[:2], 0.25)
+                    pose_msg.pose.orientation = Quaternion(*list(quat))
+
+                    self.pose_plan_visualization_pub.publish(pose_msg)
+
                 elif planner.ref_data_type == "Vec2":
                     marker_plan = self._make_marker(Marker.CYLINDER, pid, rgba=color + [1], scale=[0.1, 0.1, 0.5])
                     marker_plan.pose.position = Point(*planner.target_pos, 0.25)
+                elif planner.ref_data_type == "SE3":
+                    quat = tf.quaternion_from_euler(*planner.target_pose[3:])
+                    pose_msg = PoseStamped()
+                    pose_msg.header.stamp = rospy.Time()
+                    pose_msg.header.frame_id = "world"
+
+                    pose_msg.pose.position = Point(*planner.target_pose[:3])
+                    pose_msg.pose.orientation = Quaternion(*list(quat))
+                    self.pose_plan_visualization_pub.publish(pose_msg)
+
             elif planner.ref_type == "trajectory" or planner.ref_type == "path":
                 marker_plan = self._make_marker(Marker.POINTS, pid, rgba=color + [1], scale=[0.1, 0.1, 0.1])
 
@@ -287,24 +304,41 @@ class ControllerROSNode:
                     marker_plan.points = [Point(*pt) for pt in planner.plan['p']]
                 elif planner.ref_data_type == "Vec2" or planner.ref_data_type == "SE2":
                     marker_plan.points = [Point(*pt[:2], 0) for pt in planner.plan['p']]
-            marker_plan.lifetime = rospy.Duration.from_sec(0.1)
-            self.plan_visualization_pub.publish(marker_plan)
 
+            if marker_plan is not None:
+                marker_plan.lifetime = rospy.Duration.from_sec(0.1)
+                self.plan_visualization_pub.publish(marker_plan)
+                
         curr_planners = self.sot.getPlanners(2)
         colors = [[1,0,0],[0,1,0]]
         for pid, planner in enumerate(curr_planners):
+            marker_plan = None
+
             if planner.ref_type == "waypoint":
                 if planner.ref_data_type == "Vec3":
                     marker_plan = self._make_marker(Marker.SPHERE, pid, rgba=colors[pid]+[1], scale=[0.1, 0.1, 0.1])
                     marker_plan.pose.position = Point(*planner.target_pos)
                 elif planner.ref_data_type == "SE2":
-                    marker_plan = self._make_marker(Marker.ARROW, pid, rgba=color + [1], scale=[0.1, 0.1, 0.1])
-                    marker_plan.pose.position = Point(*planner.target_pose[:2], 0.25)
                     quat = tf.quaternion_from_euler(0,0,planner.target_pose[2])
-                    marker_plan.pose.orientation = Quaternion(*list(quat))
+                    pose_msg = PoseStamped()
+                    pose_msg.header.stamp = rospy.Time()
+                    pose_msg.pose.position = Point(*planner.target_pose[:2], 0.25)
+                    pose_msg.pose.orientation = Quaternion(*list(quat))
+
+                    self.pose_plan_visualization_pub.publish(pose_msg)
                 elif planner.ref_data_type == "Vec2":
                     marker_plan = self._make_marker(Marker.CYLINDER, pid, rgba=colors[pid]+ [1], scale=[0.1, 0.1, 0.5])
                     marker_plan.pose.position = Point(*planner.target_pos, 0.25)
+                elif planner.ref_data_type == "SE3":
+                    quat = tf.quaternion_from_euler(*planner.target_pose[3:])
+                    pose_msg = PoseStamped()
+                    pose_msg.header.frame_id = "world"
+
+                    pose_msg.header.stamp = rospy.Time()
+                    pose_msg.pose.position = Point(*planner.target_pose[:3])
+                    pose_msg.pose.orientation = Quaternion(*list(quat))
+                    self.pose_plan_visualization_pub.publish(pose_msg)
+
             elif planner.ref_type == "trajectory" or planner.ref_type == "path":
                 marker_plan = self._make_marker(Marker.POINTS, pid, rgba=colors[pid]+ [1], scale=[0.1, 0.1, 0.1])
 
@@ -313,8 +347,9 @@ class ControllerROSNode:
                 elif planner.ref_data_type == "Vec2":
                     marker_plan.points = [Point(*pt, 0) for pt in planner.plan['p']]
 
-            marker_plan.lifetime = rospy.Duration.from_sec(0.1)
-            self.current_plan_visualization_pub.publish(marker_plan)
+            if marker_plan is not None:
+                marker_plan.lifetime = rospy.Duration.from_sec(0.1)
+                self.current_plan_visualization_pub.publish(marker_plan)
 
 
         self.sot_lock.release()
@@ -331,9 +366,10 @@ class ControllerROSNode:
         self.controller_visualization_pub.publish(marker_base)
 
         # ee tracking points
-        marker_ree = self._make_marker(Marker.POINTS, 2, rgba=[0.0, 1.0, 1.0, 1], scale=[0.1, 0.1, 0.1])
-        marker_ree.points = [Point(*pt) for pt in controller.ree_bar]
-        self.controller_visualization_pub.publish(marker_ree)
+        if controller.ree_bar[0].shape[0] == 3:
+            marker_ree = self._make_marker(Marker.POINTS, 2, rgba=[0.0, 1.0, 1.0, 1], scale=[0.1, 0.1, 0.1])
+            marker_ree.points = [Point(*pt) for pt[:3] in controller.ree_bar]
+            self.controller_visualization_pub.publish(marker_ree)
 
         # base tracking points
         marker_rbase = self._make_marker(Marker.POINTS, 3, rgba=[0.0, 0.0, 1, 1], scale=[0.1]*3)

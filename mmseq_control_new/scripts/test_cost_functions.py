@@ -94,6 +94,26 @@ def test_EEPos3(config):
 
     return cost_ee
 
+def test_EEPoseSE3(config):
+    robot = MobileManipulator3D(config["controller"])
+    cost_ee = EEPoseSE3CostFunction(robot, config["controller"]["cost_params"]["EEPos3"])
+    p_map_ee = cost_ee.p_struct(0)
+    p_map_ee['W'] = config["controller"]["cost_params"]["EEPos3"]["Qk"] * np.eye(cost_ee.nr)
+    p_map_ee['r'] = np.array([1.194, 0.374, 1.596, -2.86771, -1.55934, -0.176389])
+
+    x,u = get_default_xu()
+    J_ee = cost_ee.evaluate(x, u, p_map_ee.cat)
+    e_ee = cost_ee.e_fcn(x, u, p_map_ee.cat)
+    rot_ee_inv = cost_ee.rot_ee_inv_fcn(x, u, p_map_ee.cat)
+    r_rot = cost_ee.r_rot_fcn(x, u, p_map_ee.cat)
+    rot_err = cost_ee.rot_err_fcn(x, u, p_map_ee.cat)
+    orn_ee = cost_ee.orn_ee_fcn(x, u, p_map_ee.cat)
+
+    print("testing EEPoseSE3")
+    print("expected cost: {} evaluated cost: {}".format(0, J_ee))
+
+    return cost_ee
+
 def test_EEVel3(config):
     robot = MobileManipulator3D(config["controller"])
     cost_ee = EEVel3CostFunction(robot, config["controller"]["cost_params"]["EEVel3"])
@@ -140,8 +160,10 @@ if __name__ == "__main__":
 
     test_BasePos2(config)
     test_BasePos3(config)
+    test_BasePoseSE2(config)
     test_BaseVel2(config)
     test_BaseVel3(config)
     test_EEPos3(config)
+    test_EEPoseSE3(config)
     test_EEVel3(config)
     test_HessApprox(config)
