@@ -23,12 +23,21 @@ class HTMPC(MPC):
         common_csts = []
         common_cost_fcns = []
         for name in self.collision_link_names:
-            if self.params["collision_constraints_softend"][name]:
+            if name in self.model_interface.scene.collision_link_names["static_obstacles"]:
+                softened = self.params["collision_constraints_softend"]["static_obstacles"]
+            else:
+                softened = self.params["collision_constraints_softend"][name]
+
+            if softened:
                 common_cost_fcns.append(self.collisionSoftCsts[name])
             else:
                 common_csts.append(self.collisionCsts[name])
-        ocp1, ocp_solver1, p_struct1 = self._construct([self.EEPos3Cost, self.RegularizationCost, self.CtrlEffCost] + common_cost_fcns, [] + common_csts, 1, "EEPos3")
-        ocp2, ocp_solver2, p_struct2 = self._construct([self.BasePos2Cost, self.CtrlEffCost] + common_cost_fcns, [self.EEPos3LexConstraint] + common_csts, 1, "BasePos2")
+        self.stmpc_cost_fcns = []
+        self.stmpc_cost_fcns.append([self.EEPos3Cost, self.RegularizationCost, self.CtrlEffCost] + common_cost_fcns)
+        self.stmpc_cost_fcns.append([self.BasePoseSE2Cost, self.BaseVel3Cost, self.CtrlEffCost] + common_cost_fcns)
+
+        ocp1, ocp_solver1, p_struct1 = self._construct(self.stmpc_cost_fcns[0], [] + common_csts, 1, "EEPos3")
+        ocp2, ocp_solver2, p_struct2 = self._construct(self.stmpc_cost_fcns[1], [self.EEPos3LexConstraint] + common_csts, 1, "BasePoseSE2")
         
         self.stmpcs = [ocp1, ocp2]
         self.stmpc_solvers = [ocp_solver1, ocp_solver2]
@@ -137,9 +146,9 @@ class HTMPC(MPC):
         curr_p_map_bars = []
         map_params = self.model_interface.sdf_map.get_params()
 
-        for task_id, (stmpc, stmpc_solver, p_struct) in enumerate(zip(self.stmpcs, self.stmpc_solvers, self.stmpc_p_structs)):
+        for task_id, (stmpc, stmpc_solver, p_struct, stmpc_cost_fcns) in enumerate(zip(self.stmpcs, self.stmpc_solvers, self.stmpc_p_structs, self.stmpc_cost_fcns)):
             tracking_cost_fcn_name = stmpc.name
-            tracking_cost_fcn = self.EEPos3Cost if tracking_cost_fcn_name == "EEPos3" else self.BasePos2Cost
+            tracking_cost_fcn = stmpc_cost_fcns[0]
             tracking_cost_fcns.append(tracking_cost_fcn)
 
 

@@ -251,7 +251,7 @@ class BasePoseTrajectoryLine(TrajectoryPlanner):
         super().__init__(name=config["name"],
                         type="base",
                         ref_type="trajectory",
-                        ref_data_type="Vec3",
+                        ref_data_type="SE2",
                         frame_id=config["frame_id"])
         self.tracking_err_tol = config["tracking_err_tol"]
         self.end_stop = config.get("end_stop", False)
