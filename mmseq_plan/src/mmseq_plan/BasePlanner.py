@@ -672,3 +672,10 @@ class ROSTrajectoryPlannerOnDemand(ROSTrajectoryPlanner):
         while not self.ready():
             self.publish_intermediate_waypoints()
             self.rate.sleep()
+
+    def checkFinished(self, t, states):
+        base_curr_pos = states[0]
+
+        if np.linalg.norm(base_curr_pos - self.intermediate_waypoints[self.curr_waypoint_idx][-1]) < self.tracking_err_tol:
+            self.finished = True
+        return self.finished
