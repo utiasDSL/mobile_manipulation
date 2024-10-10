@@ -8,7 +8,3 @@ controller:
     - key: "HTMPC"
       package: "mmseq_run"
       path: "config/controller/HTMPC_EEBase.yaml"
-
-include:
-  - package: "mmseq_run"
-    path: "config/controller/MPC.yaml"

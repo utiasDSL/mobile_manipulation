@@ -505,6 +505,29 @@ class SoTRal25(SoTBase):
     def print(self):
         self.logger.log("Currently at Task {} with Task num {}".format(self.curr_task_id, self.curr_task_num))
 
+class SoTRal25NavOnly(SoTBase):
+
+    def __init__(self, config):
+        super().__init__(config)
+
+    def getPlanners(self, num_planners=1):
+
+        return self.planners
+    
+    def update(self, t, states):
+        # check if current task is finished
+        planner = self.planners[0]
+        finished = False
+        if planner.type == "EE":
+            finished = planner.checkFinished(t, states["EE"])
+        elif planner.type == "base":
+            finished = planner.checkFinished(t, states["base"])
+
+        if finished:
+            self.planners[0].regeneratePlan(states["base"])
+    
+        return finished, 0
+    
 if __name__ == "__main__":
     config_path = "$PROJECTMM3D_HOME/experiments/config/sim/simulation.yaml"
     config = parsing.load_config(config_path)

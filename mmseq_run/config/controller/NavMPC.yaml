@@ -12,7 +12,7 @@ controller:
     sdf: 1.2
   
   acados:
-    name: MMSLAMCtrlCBF_PredHorz2
+    name: MMSLAMCtrl
     ocp_solver_options:
       nlp_solver_max_iter: 30
       qp_solver_warm_start: 2

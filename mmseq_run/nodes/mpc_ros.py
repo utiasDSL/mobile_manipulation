@@ -9,6 +9,7 @@ import threading
 import sys
 import numpy as np
 import rospy
+import copy
 import tf.transformations as tf
 from spatialmath.base import rotz, rpy2r, r2q
 from scipy.interpolate import interp1d
@@ -96,7 +97,7 @@ class ControllerROSNode:
 
         # TODO: How to organize logger for decentralized settings
         # init logger
-        self.logger = DataLogger(config.copy())
+        self.logger = DataLogger(copy.deepcopy(config))
 
         self.logger.add("sim_timestep", config["simulation"]["timestep"])
         self.logger.add("duration", config["simulation"]["duration"])

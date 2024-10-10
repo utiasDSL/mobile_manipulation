@@ -1,5 +1,5 @@
 planner:
-  sot_type: "SoTRal25"
+  sot_type: "SoTRal25NavOnly"
   tasks:
   - frame_id: base
     name: base_local_planner
@@ -26,13 +26,13 @@ planner:
     target_pose: [1.458, 0.17, 0.7, -2.86771, -1.55934, -0.276389 ]
     hold_period: 4
     tracking_err_tol: 0.1
-  - frame_id: base
-    name: ee_global_planner
-    planner_type: EEPos3WaypointOnDemand
-    target_waypoints: [[5., 0.4, 1.2],
-                       [0.2, 1.6, 1.2]] # in base frame
-    hold_period: 2
-    tracking_err_tol: 0.4
+  # - frame_id: base
+  #   name: ee_global_planner
+  #   planner_type: EEPos3WaypointOnDemand
+  #   target_waypoints: [[5., 0.4, 1.2],
+  #                      [0.2, 1.6, 1.2]] # in base frame
+  #   hold_period: 2
+  #   tracking_err_tol: 0.4
 
 simulation:
   duration: 100
@@ -44,7 +44,9 @@ include:
   - package: "mmseq_run"
     path: "config/robot/thing.yaml"
   - package: "mmseq_run"
-    path: "config/ral25/controller.yaml"
+    path: "config/controller/MPC.yaml"
+  - package: "mmseq_run"
+    path: "config/controller/NavMPC.yaml"
   - package: "mmseq_run"
     path: "config/sim/isaac_sim.yaml"
   - package: "mmseq_run"

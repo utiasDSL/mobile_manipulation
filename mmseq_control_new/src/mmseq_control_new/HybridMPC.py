@@ -27,9 +27,10 @@ import mobile_manipulation_central as mm
 
 class HybridMPC():
 
-    def __init__(self, config) -> None:
+    def __init__(self, config_in) -> None:
         self.controllers = {}
         self.logs = {}
+        config = copy.deepcopy(config_in)
         config.pop("type")
         control_modes = config.pop("control_modes")
 
@@ -153,7 +154,7 @@ class RAL25(HybridMPC):
         self.sdf_bar = copy.deepcopy(controller.sdf_bar)
         self.sdf_grad_bar = copy.deepcopy(controller.sdf_grad_bar)
 
-        self.ee_bar, self.base_bar = controller.ee_bar, controller.base_bar
+        self.ee_bar, self.base_bar = controller.ee_bar.copy(), controller.base_bar.copy()
     
     def _log(self, controller, controller_name):
         self.log["curr_controller"] = controller_name
