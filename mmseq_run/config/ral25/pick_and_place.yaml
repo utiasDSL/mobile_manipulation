@@ -7,23 +7,23 @@ planner:
     cruise_speed: 0.35
     yaw_speed: 0.35
     yaw_accel: 100
-    tracking_err_tol: 0.2
+    tracking_err_tol: 0.6
     ref_traj_duration: 1.5
     intermediate_waypoints: [[[1.23, -0.45, -0.53],
                               [2.35, -1.05, 0],
                               [3.1, -0.65, 1.06],
                               [3.9, 0.26, 1.65]],
                              [[3.9, 2.35, 1.78],
-                              [3.2, 3.0, 2.8],
+                              [3.3, 3.7, 2.8],
                               [2.44, 3.45, -3.11],
-                              [1.21, 3.18, -2.2],
+                              [1.21, 3.3, -2.2],
                               [1.2, 1.61, -1.51]]
                              ]
     plan_on_start: True
   - frame_id: base_link
     name: ee_pose_baseframe
     planner_type: EEPoseSE3Waypoint
-    target_pose: [1.458, 0.17, 0.7, -2.86771, -1.55934, -0.276389 ]
+    target_pose: [1.35, 0.17, 0.7, 1.57, 0, 1.57]
     hold_period: 4
     tracking_err_tol: 0.1
   # - frame_id: base
@@ -56,5 +56,5 @@ include:
   - package: "mmseq_run"
     path: "config/scene/ral25.yaml"
 logging:
-  log_dir: "$MOBILE_MANIPULATION_CENTRAL_BAG_DIR/ral25/"
+  log_dir: "$MOBILE_MANIPULATION_CENTRAL_BAG_DIR/Oct10/"
   log_level: 10 # 0 - not set, 10 - debug, 20 - info

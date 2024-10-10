@@ -18,7 +18,7 @@ planner:
   - frame_id: base_link
     name: EE_Pose_Baseframe
     planner_type: EEPoseSE3Waypoint
-    target_pose: [1.458, 0.17, 0.7, -2.86771, -1.55934, -0.276389 ]
+    target_pose: [1.35, 0.17, 0.7, 1.57, 0, 1.57]
     hold_period: 4
     tracking_err_tol: 0.1
 simulation:

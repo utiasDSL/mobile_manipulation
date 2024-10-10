@@ -19,7 +19,7 @@ controller:
       Qk: [3, 3, 3, 3, 3, 3]
       P: [1, 1, 1, 1, 1, 1]
     BasePoseSE2:
-      Qk: [3, 3, 3]
+      Qk: [3, 3, 0.5]
       P: [1, 1, 1]
 
   acados:
