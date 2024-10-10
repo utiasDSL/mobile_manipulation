@@ -290,7 +290,7 @@ class HTMPC(MPC):
                                                     }
 
                 # get iterate:
-                solution = self.log["iter_snapshot"]
+                solution = self.log["iter_snapshot"][task_id]
 
                 lN = len(str(self.N+1))
                 for i in range(self.N+1):
@@ -353,6 +353,14 @@ class HTMPC(MPC):
         self.u_prev = self.u_bar[0].copy()
         self.x_bar = x_bar_initial.copy()
         self.u_bar = u_bar_initial.copy()
+
+        self.ee_bar, self.base_bar = self._getEEBaseTrajectories(self.x_bar)
+        self.sdf_bar["EE"] = self.model_interface.sdf_map.query_val(self.ee_bar[:, 0],self.ee_bar[:, 1],self.ee_bar[:, 2]).flatten()
+        self.sdf_grad_bar["EE"] = self.model_interface.sdf_map.query_grad(self.ee_bar[:, 0],self.ee_bar[:, 1],self.ee_bar[:, 2]).reshape((3,-1))
+        
+        self.sdf_bar["base"] = self.model_interface.sdf_map.query_val(self.base_bar[:, 0], self.base_bar[:, 1], np.ones(self.N+1)*0.2)
+        self.sdf_grad_bar["base"] = self.model_interface.sdf_map.query_grad(self.base_bar[:, 0], self.base_bar[:, 1], np.ones(self.N+1)*0.2).reshape((3,-1))
+
         # Log: final cost for each task after all stmpcs have been solved
         for i, tracking_cost_fcn in enumerate(tracking_cost_fcns):
             self.log["cost_final"][i] = self.evaluate_cost_function(tracking_cost_fcn, 
@@ -361,7 +369,6 @@ class HTMPC(MPC):
                                                              curr_p_map_bars[i])
 
         self.v_cmd = self.x_bar[0][self.robot.DoF:].copy()
-        self.ee_bar, self.base_bar = self._getEEBaseTrajectories(self.x_bar)
 
         return self.v_cmd, self.u_prev, self.u_bar.copy(), self.x_bar[:, 9:].copy()
     

@@ -1,0 +1,22 @@
+controller:
+  home: "default"
+  sdf_collision_avoidance_enabled: False
+  self_collision_avoidance_enabled: True
+  static_obstacles_collision_avoidance_enabled: True
+  base_pose_tracking_enabled: True
+
+  collision_constraint_type: 
+    sdf: "SignedDistanceConstraint" # SignedDistanceConstraint or SignedDistanceConstraintCBF 
+  type: "HTMPC"
+  collision_cbf_gamma:
+    sdf: 1.2
+  
+  acados:
+    name: MMSLAMCtrl_HTMPC
+    ocp_solver_options:
+      nlp_solver_max_iter: 30
+      qp_solver_warm_start: 2
+      nlp_solver_tol_stat: 5.0e-02
+      nlp_solver_tol_eq: 1.0e-02
+      nlp_solver_tol_ineq: 1.0e-02
+      nlp_solver_tol_comp: 1.0e-04

@@ -21,7 +21,7 @@ import mmseq_control.HTMPC as HTMPC
 import mmseq_control.STMPC as STMPC
 import mmseq_control_new.MPC as MPC
 import mmseq_control_new.HTMPC as HTMPCNew
-
+import mmseq_control_new.HybridMPC as HybridMPC
 
 from mmseq_control.robot import MobileManipulator3D, CasadiModelInterface
 import mmseq_plan.TaskManager as TaskManager
@@ -74,6 +74,8 @@ class ControllerROSNode:
             control_class = getattr(MPC, self.ctrl_config["type"], None)
         if control_class is None:
             control_class = getattr(HTMPCNew, self.ctrl_config["type"], None)
+        if control_class is None:
+            control_class = getattr(HybridMPC, self.ctrl_config["type"], None)
 
         self.controller = control_class(self.ctrl_config)
 
@@ -420,15 +422,6 @@ class ControllerROSNode:
         print("robot coord: {}".format(self.robot_interface.q))
         task_manager_class = getattr(TaskManager, self.planner_config["sot_type"])
         self.sot = task_manager_class(self.planner_config.copy())
-        print("-----Checking Planners----- ")
-        for planner in self.sot.planners:
-            while not planner.ready():
-                self.robot_interface.brake()
-                rate.sleep()
-
-                if rospy.is_shutdown():
-                    return
-            print("planner {} target:{}".format(planner.name, planner.getTrackingPoint(0, states)))
 
         if self.ctrl_config["sdf_collision_avoidance_enabled"]:
             print("-----Checking Map Interface----- ")
@@ -444,6 +437,17 @@ class ControllerROSNode:
             print("Received Map. Proceed ...")
         else:
             map_latest = None
+
+        print("-----Checking Planners----- ")
+        for planner in self.sot.planners:
+            while not planner.ready():
+                self.robot_interface.brake()
+                rate.sleep()
+
+                if rospy.is_shutdown():
+                    return
+            print("planner {} target:{}".format(planner.name, planner.getTrackingPoint(0, states)))
+
 
         print("-----Checking Vicon Tool messages----- ")
         use_vicon_tool_data = True
