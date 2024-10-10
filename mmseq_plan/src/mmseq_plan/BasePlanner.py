@@ -540,7 +540,7 @@ class ROSTrajectoryPlanner(TrajectoryPlanner):
 
         poses = np.hstack((new_x, new_y, new_desired_headings))
 
-        self.close_to_finish = (poses[-1,:] == poses[-2,:]).all() and np.linalg.norm(self.robot_states[0][:2] - poses[-1,:2]) < 0.1 and np.abs(wrap_pi_scalar(self.robot_states[0][2] - poses[-1,2])) < 0.1
+        self.close_to_finish = self.robot_states and (poses[-1,:] == poses[-2,:]).all() and np.linalg.norm(self.robot_states[0][:2] - poses[-1,:2]) < 0.1 and np.abs(wrap_pi_scalar(self.robot_states[0][2] - poses[-1,2])) < 0.1
 
         return {'t': time,'s': time * self.cruise_speed, 'p': poses, 'v': velocities}
 

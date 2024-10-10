@@ -75,7 +75,7 @@ controller:
       state:
         lower: [ -10, -10, -2.pi, -0.pi, -1pi, -1pi, -1pi, -1pi, -1pi,
                  -0.4, -0.4, -0.4, -2, -2, -3, -3, -3, -3 ]
-        upper: [ 10, 10, 2pi, 1.pi, 0.2pi, 1pi, 1pi, 1pi, 1pi,
+        upper: [ 10, 10, 2pi, 1.pi, 0.2, 1pi, 1pi, 1pi, 1pi,
                  0.4, 0.4, 0.4, 2, 2, 3, 3, 3, 3 ]
     time_discretization_dt: 0.1
     link_names:
