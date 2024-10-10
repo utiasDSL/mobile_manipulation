@@ -9,14 +9,23 @@ planner:
     yaw_accel: 100
     tracking_err_tol: 0.4
     ref_traj_duration: 1.5
-    intermediate_waypoints: [[1, 0, 0],
-                             [2, 1, 1.57]
+    intermediate_waypoints: [[[1, 0, 0],
+                              [2, 1, 1.57]],
+                             [[2, 2, 1.57],
+                              [1, 3, 3.14]]
                              ]
     plan_on_start: True
+  - frame_id: base_link
+    name: ee_pose_baseframe
+    planner_type: EEPoseSE3Waypoint
+    target_pose: [1.458, 0.17, 0.7, -2.86771, -1.55934, -0.276389 ]
+    hold_period: 4
+    tracking_err_tol: 0.1
   - frame_id: base
-    name: EE Position BaseFrame
-    planner_type: EESimplePlanner
-    target_pos: [3, 1, 0.7] # in base frame
+    name: ee_global_planner
+    planner_type: EEPos3WaypointOnDemand
+    target_waypoints: [[3, 1, 0.7],
+                       [1, 4, 0.7]] # in base frame
     hold_period: 4
     tracking_err_tol: 0.4
 
@@ -26,36 +35,11 @@ simulation:
     #home: [0., -0.2, 0, 0.5pi, -0.75pi, 0.75pi, -0.25pi, 0.5pi, 0.417pi]  # standard
     home: [-0, 0, -0., 0.25pi, -0.3pi, 0.5pi, -0.25pi, 0.6pi, 0.417pi]
 
-controller:
-  home: "default"
-  sdf_collision_avoidance_enabled: True
-  self_collision_avoidance_enabled: True
-  static_obstacles_collision_avoidance_enabled: True
-  base_pose_tracking_enabled: True
-
-  collision_constraint_type: 
-    sdf: "SignedDistanceConstraintCBF" # SignedDistanceConstraint or SignedDistanceConstraintCBF 
-  type: "STMPC"
-  collision_cbf_gamma:
-    sdf: 1.2
-  
-  acados:
-    name: MMSLAMCtrlCBF_PredHorz2
-    ocp_solver_options:
-      nlp_solver_max_iter: 30
-      qp_solver_warm_start: 2
-      nlp_solver_tol_stat: 5.0e-02
-      nlp_solver_tol_eq: 1.0e-02
-      nlp_solver_tol_ineq: 1.0e-02
-      nlp_solver_tol_comp: 1.0e-04
-
 include:
   - package: "mmseq_run"
     path: "config/robot/thing.yaml"
   - package: "mmseq_run"
-    path: "config/controller/MPC.yaml"
-  - package: "mmseq_run"
-    path: "config/controller/mpc_params/ctrl_slam_Sep19.yaml"
+    path: "config/ral25/controller.yaml"
   - package: "mmseq_run"
     path: "config/sim/isaac_sim.yaml"
   - package: "mmseq_run"

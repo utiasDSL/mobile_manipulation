@@ -1,0 +1,14 @@
+controller:
+  type: "RAL25"
+
+  control_modes:
+    - key: "NavMPC"
+      package: "mmseq_run"
+      path: "config/controller/NavMPC.yaml"
+    - key: "HTMPC"
+      package: "mmseq_run"
+      path: "config/controller/HTMPC_EEBase.yaml"
+
+include:
+  - package: "mmseq_run"
+    path: "config/controller/MPC.yaml"

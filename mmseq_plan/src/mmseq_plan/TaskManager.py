@@ -471,13 +471,15 @@ class SoTRal25(SoTBase):
     def __init__(self, config):
         super().__init__(config)
         self.curr_task_id = 0
-        self.curr_task_num = 1
+        self.curr_task_num = 2
+        self.total_task_num = len(config["tasks"])
 
     def getPlanners(self, num_planners=2):
         # get the top #num_planners in the stack
-        end_id = min(self.curr_task_id + self.curr_task_num, self.planner_num)
-        start_id = max(0, end_id - self.curr_task_num)
-        return self.planners[start_id:end_id]
+        ids = np.arange(self.curr_task_id, self.curr_task_id+self.curr_task_num)
+        ids %= self.total_task_num
+
+        return [self.planners[id] for id in ids]
     
     def update(self, t, states):
         # check if current task is finished
@@ -490,18 +492,13 @@ class SoTRal25(SoTBase):
 
         if finished:
             # if current task finished increment self.curr_task_id by 1
-            self.curr_task_id += 1
-            if self.curr_task_id%2 == 1:
+            if self.curr_task_id == 0:
+                self.curr_task_id = 2
                 # two tasks for odd number task id (EE task)
-                self.curr_task_num = 2
-                if self.curr_task_id != self.planner_num -1:
-                    self.planners[self.curr_task_id].regneratePlan(states["base"])
-                # if it comes to the last task
-                else:
-                    self.curr_task_num = 1
+                self.planners[self.curr_task_id].regeneratePlan(states["EE"])
+                self.planners[(self.curr_task_id+1)%self.total_task_num].regeneratePlan(states["base"])
             else:
-                # one task for even number task id (base task)
-                self.curr_task_num = 1
+                self.curr_task_id = 0
         
         return finished, 0
     

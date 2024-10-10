@@ -356,6 +356,23 @@ class EEPoseSE3Waypoint(Planner):
         self.finished = False
 
 
+class EEPos3WaypointOnDemand(EESimplePlanner):
+
+    def __init__(self, config):
+        self.target_waypoints = np.array(config["target_waypoints"])
+        self.num_waypoint = len(self.target_waypoints)
+        self.curr_waypoint_idx = self.num_waypoint-1
+
+        config["target_pos"] = self.target_waypoints[0]
+        super().__init__(config)
+    
+    def regeneratePlan(self, states):
+        self.curr_waypoint_idx += 1
+        self.curr_waypoint_idx %= self.num_waypoint
+
+        self.target_pos = self.target_waypoints[self.curr_waypoint_idx]
+        self.reset()
+
 if __name__ == '__main__':
     planner_params = {"target_pose": [0., 1.,], 'hold_period':1}
     

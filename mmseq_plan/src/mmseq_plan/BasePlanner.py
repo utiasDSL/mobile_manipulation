@@ -615,21 +615,34 @@ class ROSTrajectoryPlanner(TrajectoryPlanner):
 
     def ready(self):
         return self.plan_available
+
+
+    def reset(self):
+        self.finished = False
+        self.started = False
+        self.start_time = -1
+        self.plan_available = False
+
+        self.plan = {'t': np.zeros(1),
+                     's': np.zeros(1),
+                     'p': np.zeros((1, 3)),
+                     'v': np.zeros((1, 3))}
     
 class ROSTrajectoryPlannerOnDemand(ROSTrajectoryPlanner):
     def __init__(self, config):
         super().__init__(config)
         self.intermediate_waypoints = config["intermediate_waypoints"]
+        self.num_seq = len(self.intermediate_waypoints)
+        self.curr_waypoint_idx = self.num_seq-1
+
         self.wpts_pub = rospy.Publisher("/target_waypoints_global_path", PoseArray, queue_size=1)
-        self.plan_on_start = config["plan_on_start"]
         self.rate = rospy.Rate(10)
-        if self.plan_on_start:
-            self.regneratePlan()
+        self.regeneratePlan()
     
     def publish_intermediate_waypoints(self):
         msg = PoseArray()
-        for (i, wpts) in enumerate(self.intermediate_waypoints):
-            wpt = self.intermediate_waypoints[i]
+        waypoints = self.intermediate_waypoints[self.curr_waypoint_idx]
+        for (i, wpt) in enumerate(waypoints):
             pose_msg = Pose()
             pose_msg.position.x = wpt[0]
             pose_msg.position.y = wpt[1]
@@ -646,15 +659,16 @@ class ROSTrajectoryPlannerOnDemand(ROSTrajectoryPlanner):
         print("Publishing")
         self.wpts_pub.publish(msg)
     
-    def regneratePlan(self):
-        if self.plan_on_start:
-            for i in range(10):
+    def regeneratePlan(self, states=None):
+        # if initializing, wait until publish
+        if not self.ready:
+            for i in range(50):
                 self.rate.sleep()
-        self.publish_intermediate_waypoints()
+        
+        self.curr_waypoint_idx += 1
+        self.curr_waypoint_idx %= self.num_seq
+        self.reset()
 
-        # while not self.ready():
-        #     self.rate.sleep()
-
-    def ready(self):
-        # return (self.plan_on_start and self.plan_available) or (not self.plan_on_start)
-        return True
+        while not self.ready():
+            self.publish_intermediate_waypoints()
+            self.rate.sleep()
