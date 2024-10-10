@@ -36,7 +36,7 @@ class HybridMPC():
         for path in control_modes:
             config_mode = load_config(parse_ros_path(path))
             name = path["key"]
-            config_mode["controller"] = recursive_dict_update(config_mode["controller"], config)
+            config_mode["controller"] = recursive_dict_update(copy.deepcopy(config), config_mode["controller"])
 
             ctrl_config = config_mode["controller"]
             control_class = getattr(HTMPC_Mod, ctrl_config["type"], None)
