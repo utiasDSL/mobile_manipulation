@@ -1,5 +1,6 @@
 controller:
   type: "RAL25"
+  sdf_collision_avoidance_enabled: True
 
   control_modes:
     - key: "NavMPC"

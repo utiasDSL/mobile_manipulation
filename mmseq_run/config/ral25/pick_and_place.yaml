@@ -1,5 +1,5 @@
 planner:
-  sot_type: "SoTRal25NavOnly"
+  sot_type: "SoTRal25"
   tasks:
   - frame_id: base
     name: base_local_planner
@@ -9,15 +9,15 @@ planner:
     yaw_accel: 100
     tracking_err_tol: 0.6
     ref_traj_duration: 3.5
-    intermediate_waypoints: [[[1.23, -0.8, -0.3],
+    intermediate_waypoints: [[[1.2, -0.8, -0.3],
                               [2.35, -1.25, 0],
                               [3.5, -1.1, 1.4],
-                              [4.2, 0.35, 1.65]],
+                              [4.2, 0.2, 1.65]],
                              [[4.2, 2.35, 1.78],
                               [3.6, 3.7, 2.8],
                               [2.44, 3.45, -3.11],
                               [1.21, 3.3, -2.2],
-                              [1.2, 1.61, -1.51]]
+                              [1.0, 1.3, -1.51]]
                              ]
     plan_on_start: True
   - frame_id: base_link
@@ -26,13 +26,13 @@ planner:
     target_pose: [1.35, 0.17, 0.7, 1.57, 0, 1.57]
     hold_period: 4
     tracking_err_tol: 0.1
-  # - frame_id: base
-  #   name: ee_global_planner
-  #   planner_type: EEPos3WaypointOnDemand
-  #   target_waypoints: [[5., 0.4, 1.2],
-  #                      [0.2, 1.6, 1.2]] # in base frame
-  #   hold_period: 2
-  #   tracking_err_tol: 0.4
+  - frame_id: base
+    name: ee_global_planner
+    planner_type: EEPos3WaypointOnDemand
+    target_waypoints: [[5., 0.4, 0.9],
+                       [0.2, 1.1, 0.9]] # in base frame
+    hold_period: 2
+    tracking_err_tol: 0.3
 
 simulation:
   duration: 100
@@ -46,7 +46,7 @@ include:
   - package: "mmseq_run"
     path: "config/controller/MPC.yaml"
   - package: "mmseq_run"
-    path: "config/controller/NavMPC.yaml"
+    path: "config/ral25/controller.yaml"
   - package: "mmseq_run"
     path: "config/sim/isaac_sim.yaml"
   - package: "mmseq_run"

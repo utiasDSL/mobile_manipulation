@@ -661,7 +661,7 @@ class ROSTrajectoryPlannerOnDemand(ROSTrajectoryPlanner):
     
     def regeneratePlan(self, states=None):
         # if initializing, wait until publish
-        if not self.ready:
+        if not self.ready():
             for i in range(50):
                 self.rate.sleep()
         
@@ -675,7 +675,11 @@ class ROSTrajectoryPlannerOnDemand(ROSTrajectoryPlanner):
 
     def checkFinished(self, t, states):
         base_curr_pos = states[0]
-
-        if np.linalg.norm(base_curr_pos[:2] - self.intermediate_waypoints[self.curr_waypoint_idx][-1][:2]) < self.tracking_err_tol:
+        position_error = np.linalg.norm(base_curr_pos[:2] - self.intermediate_waypoints[self.curr_waypoint_idx][-1][:2])
+        print("Position error: ", position_error)
+        if position_error < self.tracking_err_tol:
+            print("Finished waypoint {} with error {} at base pose {}".format(self.intermediate_waypoints[self.curr_waypoint_idx][-1], 
+                                                                              position_error,
+                                                                              base_curr_pos))
             self.finished = True
         return self.finished

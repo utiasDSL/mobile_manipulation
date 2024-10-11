@@ -129,11 +129,12 @@ class RAL25(HybridMPC):
         controller = self.controllers[curr_controller_name] 
 
         if self.prev_controller_name is not None and self.prev_controller_name != curr_controller_name:
+            controller.reset()
             # pass in xu bar 
-            controller.u_bar = self.u_bar.copy()
-            controller.x_bar = self.x_bar.copy()
-            controller.t_bar = self.t_bar.copy()
-            controller.lam_bar = None
+            # controller.u_bar = np.zerso_like(controller.u_bar)
+            # controller.x_bar = self.x_bar.copy()
+            # controller.t_bar = self.t_bar.copy()
+            # controller.lam_bar = None
 
 
         results = controller.control(t, robot_states, planners, map)

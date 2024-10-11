@@ -159,6 +159,8 @@ class MPC():
     def reset(self):
         self.x_bar = np.zeros((self.N + 1, self.nx))  # current best guess x0,...,xN
         self.u_bar = np.zeros((self.N, self.nu))  # current best guess u0,...,uN-1
+        self.t_bar = None
+        self.lam_bar = None
         self.zopt = np.zeros(self.QPsize)  # current lineaization point
         self.xu_bar_init = False
 
@@ -504,6 +506,9 @@ class STMPC(MPC):
             t_bar_new = t + np.arange(self.N)* self.dt
             self.u_bar = self.u_t(t_bar_new)
             self.x_bar = self._predictTrajectories(xo, self.u_bar)
+        else:
+            self.u_bar = np.zeros_like(self.u_bar)
+            self.x_bar = self._predictTrajectories(xo, self.u_bar)
 
         x_bar_initial = self.x_bar.copy()
         u_bar_initial = self.u_bar.copy()
@@ -817,6 +822,10 @@ class STMPC(MPC):
         for i in range(self.model_interface.sdf_map.dim+1):
             log["_".join(["sdf", "param", str(i)])] = 0
         return log
+    
+    def reset(self):
+        super().reset()
+        self.ocp_solver.reset()
 
 
 if __name__ == "__main__":

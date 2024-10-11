@@ -69,7 +69,9 @@ class HTMPC(MPC):
             t_bar_new = t + np.arange(self.N)* self.dt
             self.u_bar = self.u_t(t_bar_new)
             self.x_bar = self._predictTrajectories(xo, self.u_bar)
-
+        else:
+            self.u_bar = np.zeros_like(self.u_bar)
+            self.x_bar = self._predictTrajectories(xo, self.u_bar)
 
         x_bar_initial = self.x_bar.copy()
         u_bar_initial = self.u_bar.copy()
@@ -395,6 +397,11 @@ class HTMPC(MPC):
             log["_".join(["ocp_param", str(i)])] = []
 
         return log
+    
+    def reset(self):
+        super().reset()
+        for solver in self.stmpc_solvers:
+            solver.reset()
 
 if __name__ == "__main__":
     # robot mdl
