@@ -56,7 +56,7 @@ include:
   - package: "mmseq_run"
     path: "config/controller/MPC.yaml"
   - package: "mmseq_run"
-    path: "config/controller/mpc_params/ctrl_slam_Sep19.yaml"
+    path: "config/controller/NavMPC.yaml"
   - package: "mmseq_run"
     path: "config/sim/isaac_sim.yaml"
   - package: "mmseq_run"
@@ -65,5 +65,5 @@ include:
     path: "config/map/SDF3D.yaml"
 
 logging:
-  log_dir: "$MOBILE_MANIPULATION_CENTRAL_BAG_DIR/Sept24"
+  log_dir: "$MOBILE_MANIPULATION_CENTRAL_BAG_DIR/Oct12"
   log_level: 10 # 0 - not set, 10 - debug, 20 - info

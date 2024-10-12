@@ -22,7 +22,7 @@ controller:
       Qk: [3, 3, 3]
       P: [1, 1, 1]
     BasePoseSE2:
-      Qk: [3, 3, 0.25]
+      Qk: [1, 1, 0.25]
       P: [1, 1, 1]
     EEVel3:
       Qk: [1, 1, 1]
