@@ -55,13 +55,13 @@ def load_config(path, depth=0, max_depth=5):
 
     # now add in the info from this file
     d = recursive_dict_update(includes_dict, d)
-    if d.get("controller", False) and d["controller"].get("robot", False) and d["controller"]["robot"].get("urdf", False):
-        if "kinematics_params" in d["controller"]["robot"]["urdf"]["args"].keys():
-            del d["controller"]["robot"]["urdf"]["args"]["kinematics_params"]
-        if "transform_params" in d["controller"]["robot"]["urdf"]["args"].keys():
-            del d["controller"]["robot"]["urdf"]["args"]["transform_params"]
-        if "visual_params" in d["controller"]["robot"]["urdf"]["args"].keys():
-            del d["controller"]["robot"]["urdf"]["args"]["visual_params"]     
+    # if d.get("controller", False) and d["controller"].get("robot", False) and d["controller"]["robot"].get("urdf", False):
+    #     if "kinematics_params" in d["controller"]["robot"]["urdf"]["args"].keys():
+    #         del d["controller"]["robot"]["urdf"]["args"]["kinematics_params"]
+    #     if "transform_params" in d["controller"]["robot"]["urdf"]["args"].keys():
+    #         del d["controller"]["robot"]["urdf"]["args"]["transform_params"]
+    #     if "visual_params" in d["controller"]["robot"]["urdf"]["args"].keys():
+    #         del d["controller"]["robot"]["urdf"]["args"]["visual_params"]     
     return d
 
 
