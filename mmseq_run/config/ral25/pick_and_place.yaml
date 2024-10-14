@@ -8,7 +8,7 @@ planner:
     yaw_speed: 0.35
     yaw_accel: 100
     tracking_err_tol: 0.6
-    ref_traj_duration: 3.5
+    ref_traj_duration: 12
     intermediate_waypoints: [[[1.2, -0.8, -0.3],
                               [2.35, -1.25, 0],
                               [3.5, -1.1, 1.4],
@@ -30,13 +30,13 @@ planner:
     name: ee_pose_baseframe
     planner_type: EELookAhead
     default_pose: [1.35, 0.17, 0.7, 1.57, 0, 1.57]
-    look_ahead_time: 10
+    look_ahead_time: 8
     max_angle: 1.06 # rad
   - frame_id: base
     name: ee_global_planner
     planner_type: EEPos3WaypointOnDemand
-    target_waypoints: [[5., 0.4, 0.9],
-                       [0.2, 1.1, 0.9]] # in base frame
+    target_waypoints: [[5., 1.5, 0.9],
+                       [0.2, 0.6, 0.9]] # in base frame
     hold_period: 2
     tracking_err_tol: 0.3
 
@@ -62,5 +62,5 @@ include:
   - package: "mmseq_run"
     path: "config/scene/ral25.yaml"
 logging:
-  log_dir: "$MOBILE_MANIPULATION_CENTRAL_BAG_DIR/Oct12/"
+  log_dir: "$MOBILE_MANIPULATION_CENTRAL_BAG_DIR/Oct14/"
   log_level: 10 # 0 - not set, 10 - debug, 20 - info

@@ -35,13 +35,13 @@ controller:
   base_pose_tracking_enabled: True
 
   collision_constraint_type: 
-    sdf: "SignedDistanceConstraint" # SignedDistanceConstraint or SignedDistanceConstraintCBF 
+    sdf: "SignedDistanceConstraintCBF" # SignedDistanceConstraint or SignedDistanceConstraintCBF 
   type: "STMPC"
   collision_cbf_gamma:
     sdf: 1.2
   
   acados:
-    name: MMCtrlSLAMNOCBF
+    name: MMSLAMCtrlCBF
     ocp_solver_options:
       nlp_solver_max_iter: 30
       qp_solver_warm_start: 2

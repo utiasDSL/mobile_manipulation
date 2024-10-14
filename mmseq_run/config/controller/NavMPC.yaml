@@ -19,13 +19,13 @@ controller:
         upper: [ 10, 10, 2pi, 1.pi, 0.2, 1pi, 1pi, 1pi, 1pi,
                  0.4, 0.4, 0.4, 2, 2, 3, 3, 3, 3 ]
   collision_constraint_type: 
-    sdf: "SignedDistanceConstraint" # SignedDistanceConstraint or SignedDistanceConstraintCBF 
+    sdf: "SignedDistanceConstraintCBF" # SignedDistanceConstraint or SignedDistanceConstraintCBF 
   type: "STMPC"
   collision_cbf_gamma:
     sdf: 1.2
   
   acados:
-    name: MMSLAMCtrl
+    name: MMSLAMCtrlCBF
     ocp_solver_options:
       nlp_solver_max_iter: 50
       qp_solver_warm_start: 2
