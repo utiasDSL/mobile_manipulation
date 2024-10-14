@@ -172,7 +172,7 @@ class PoseSE3CostFunction(CostFunctions):
         e_rot = casadi_SO3_log(rot_inv @ r_rot)
 
         self.e_eqn = cs.vertcat(e_pos, e_rot)
-        self.J_eqn = self.e_eqn.T @ self.W @ self.e_eqn
+        self.J_eqn = 0.5 * self.e_eqn.T @ self.W @ self.e_eqn
         # sigma = 2
         # self.J_eqn = 0.5 * cs.log(1 + (self.J_eqn**2) / (sigma**2)) * 20
 
@@ -390,7 +390,7 @@ class RegularizationCostFunction(CostFunctions):
         self.p_dict = {"eps": cs.MX.sym("eps_reg", 1)}
         self.p_struct = casadi_sym_struct(self.p_dict)
         self.p_sym = self.p_struct.cat
-        self.J_eqn = (self.x_sym.T @ self.x_sym + self.u_sym.T @ self.u_sym) * self.p_struct["eps"]
+        self.J_eqn = 0.5 * (self.x_sym.T @ self.x_sym + self.u_sym.T @ self.u_sym) * self.p_struct["eps"]
         self.J_fcn = cs.Function('J_' + self.name, [self.x_sym, self.u_sym, self.p_sym], [self.J_eqn])
         self.H_approx_eqn = cs.MX.eye(self.nx+self.nu) * self.p_struct["eps"]
         self.H_approx_fcn = cs.Function("H_approx_"+self.name, [self.x_sym, self.u_sym, self.p_sym], [self.H_approx_eqn], ["x", "u", "eps"], ["H_approx"])
