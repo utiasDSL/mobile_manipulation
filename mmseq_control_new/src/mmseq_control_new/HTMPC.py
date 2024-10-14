@@ -18,7 +18,9 @@ class HTMPC(MPC):
 
     def __init__(self, config):
         super().__init__(config)
+            
         self.EEPos3LexConstraint = HierarchicalTrackingConstraint(self.EEPos3Cost, "_".join([self.EEPos3Cost.name, "Lex"]))
+        self.EEPoseSE3LexConstraint = HierarchicalTrackingConstraint(self.EEPoseSE3Cost, "_".join([self.EEPoseSE3Cost.name, "Lex"]))
         self.BasePos2LexConstraint = HierarchicalTrackingConstraint(self.BasePos2Cost, "_".join([self.BasePos2Cost.name, "Lex"]))
         common_csts = []
         common_cost_fcns = []
@@ -33,13 +35,19 @@ class HTMPC(MPC):
             else:
                 common_csts.append(self.collisionCsts[name])
         self.stmpc_cost_fcns = []
-        self.stmpc_cost_fcns.append([self.EEPos3Cost, self.RegularizationCost, self.CtrlEffCost] + common_cost_fcns)
+        if config["ee_pose_tracking_enabled"]:
+            self.stmpc_cost_fcns.append([self.EEPoseSE3Cost, self.RegularizationCost, self.CtrlEffCost] + common_cost_fcns)
+        else:
+            self.stmpc_cost_fcns.append([self.EEPos3Cost, self.RegularizationCost, self.CtrlEffCost] + common_cost_fcns)
         self.stmpc_cost_fcns.append([self.BasePoseSE2Cost, self.BaseVel3Cost, self.CtrlEffCost] + common_cost_fcns)
 
         name = self.params["acados"].get("name", "MM")
         self.stmpc_names = ["_".join([name, cost_fcns[0].name]) for cost_fcns in self.stmpc_cost_fcns]
         ocp1, ocp_solver1, p_struct1 = self._construct(self.stmpc_cost_fcns[0], [] + common_csts, 1, self.stmpc_names[0])
-        ocp2, ocp_solver2, p_struct2 = self._construct(self.stmpc_cost_fcns[1], [self.EEPos3LexConstraint] + common_csts, 1, self.stmpc_names[1])
+        if config["ee_pose_tracking_enabled"]:
+            ocp2, ocp_solver2, p_struct2 = self._construct(self.stmpc_cost_fcns[1], [self.EEPoseSE3LexConstraint] + common_csts, 1, self.stmpc_names[1])
+        else:
+            ocp2, ocp_solver2, p_struct2 = self._construct(self.stmpc_cost_fcns[1], [self.EEPos3LexConstraint] + common_csts, 1, self.stmpc_names[1])
         
         self.stmpcs = [ocp1, ocp2]
         self.stmpc_solvers = [ocp_solver1, ocp_solver2]

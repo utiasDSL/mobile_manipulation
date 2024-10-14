@@ -172,10 +172,13 @@ class PoseSE3CostFunction(CostFunctions):
         e_rot = casadi_SO3_log(rot_inv @ r_rot)
 
         self.e_eqn = cs.vertcat(e_pos, e_rot)
-        self.J_eqn = 0.5 * self.e_eqn.T @ self.W @ self.e_eqn
+        self.J_eqn = self.e_eqn.T @ self.W @ self.e_eqn
+        # sigma = 2
+        # self.J_eqn = 0.5 * cs.log(1 + (self.J_eqn**2) / (sigma**2)) * 20
+
         self.J_fcn = cs.Function("J_"+self.name, [self.x_sym, self.u_sym, self.p_sym], [self.J_eqn], ["x", "u", "r"], ["J"]).expand()
         
-        self.e_fcn = cs.Function("e_"+self.name, [self.x_sym, self.u_sym, self.p_sym], [self.e_eqn], ["x", "u", "r"], ["e"]).expand()
+        self.e_fcn = cs.Function("e_"+self.name, [self.x_sym, self.u_sym, self.r], [self.e_eqn], ["x", "u", "r"], ["e"]).expand()
         dedx = cs.jacobian(self.e_eqn, self.x_sym)
         self.H_approx_eqn = cs.diagcat(cs.MX.zeros(self.nu, self.nu), dedx.T @ self.W @ dedx)
         self.H_approx_fcn = cs.Function("H_approx_"+self.name, [self.x_sym, self.u_sym, self.p_sym], [self.H_approx_eqn], ["x", "u", "r"], ["H_approx"]).expand()
@@ -185,6 +188,9 @@ class PoseSE3CostFunction(CostFunctions):
         self.r_rot_fcn = cs.Function("e_"+self.name, [self.x_sym, self.u_sym, self.p_sym], [r_rot], ["x", "u", "r"], ["e"]).expand()
         self.rot_err_fcn = cs.Function("e_"+self.name, [self.x_sym, self.u_sym, self.p_sym], [rot_inv @ r_rot], ["x", "u", "r"], ["e"]).expand()
 
+    def get_e(self, x, u, r):
+        return self.e_fcn(x, u ,r).toarray().flatten()
+    
 class EEPoseSE3CostFunction(PoseSE3CostFunction):
     def __init__(self, robot_mdl, params):
         ss_mdl = robot_mdl.ssSymMdl
@@ -388,3 +394,18 @@ class RegularizationCostFunction(CostFunctions):
         self.J_fcn = cs.Function('J_' + self.name, [self.x_sym, self.u_sym, self.p_sym], [self.J_eqn])
         self.H_approx_eqn = cs.MX.eye(self.nx+self.nu) * self.p_struct["eps"]
         self.H_approx_fcn = cs.Function("H_approx_"+self.name, [self.x_sym, self.u_sym, self.p_sym], [self.H_approx_eqn], ["x", "u", "eps"], ["H_approx"])
+
+class ManipulabilityCostFunction(CostFunctions):
+    def __init__(self, robot_mdl: MobileManipulator3D, name: str = "Manipulability"):
+        ss_mdl = robot_mdl.ssSymMdl
+        nx = ss_mdl["nx"]
+        nu = ss_mdl["nu"]
+        super().__init__(nx, nu, name)
+
+        self.p_dict = {"w": cs.Mx.sym('w', 1)}
+        self.p_struct = casadi_sym_struct(self.p_dict)
+        self.p_sym = self.p_struct.cat
+
+        manipulability_fcn = robot_mdl.manipulability_fcn
+        self.J_eqn = robot_mdl.arm_manipulability_fcn(robot_mdl.q_sym) **2 * self.p_dict["w"] * 0.5
+        self.J_fcn = cs.Function("fee", [robot_mdl.x_sym], [self.J_eqn])
