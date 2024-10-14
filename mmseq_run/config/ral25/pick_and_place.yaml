@@ -12,12 +12,12 @@ planner:
     intermediate_waypoints: [[[1.2, -0.8, -0.3],
                               [2.35, -1.25, 0],
                               [3.5, -1.1, 1.4],
-                              [4.2, 0.2, 1.65]],
-                             [[4.2, 2.35, 1.78],
+                              [4.1, -0.3, 1.65]],
+                             [[4.1, 2.35, 1.78],
                               [3.6, 3.7, 2.8],
                               [2.44, 3.45, -3.11],
                               [1.21, 3.3, -2.2],
-                              [1.0, 1.3, -1.51]]
+                              [1.1, 2.0, -1.51]]
                              ]
     plan_on_start: True
   # - frame_id: base_link
@@ -43,7 +43,7 @@ planner:
     name: ee_global_planner
     planner_type: EEPoseSE3WaypointOnDemand
     target_waypoints: [[5., 0.4, 0.9, 1.57, 0, 1.57],
-                       [0.2, 1.1, 0.9, 1.57, 0, -1.57]] # in base frame
+                       [0.2, 1.1, 0.8, 1.57, 0, -1.57]] # in base frame
     hold_period: 2
     tracking_err_tol: 0.3
 simulation:
