@@ -1,0 +1,43 @@
+planner:
+  use_joy: False
+  sot_type: "SoTStatic"
+  tasks:
+  - frame_id: base
+    name: Base Position
+    planner_type: BasePoseTrajectoryLine
+    initial_pose: [0,0,0]
+    target_pose:
+    - 10
+    - 0.0
+    - 0.0
+    cruise_speed: 0.35
+    yaw_speed: 0.5
+    tracking_err_tol: 0.2
+simulation:
+  duration: 100
+  robot:
+    #home: [0., -0.2, 0, 0.5pi, -0.75pi, 0.75pi, -0.25pi, 0.5pi, 0.417pi]  # standard
+    home: [-0, 0, -0., 0.75pi, -0.5pi, 0.5pi, -0.25pi, 0.6pi, 0.417pi]     # upright
+
+controller:
+  # local map params
+  map:
+    default_val: 1.8
+    map_coverage: [8, 8, 0.4]
+    
+include:
+  - package: "mmseq_run"
+    path: "config/robot/thing.yaml"
+  - package: "mmseq_run"
+    path: "config/controller/MPC.yaml"
+  - package: "mmseq_run"
+    path: "config/controller/NavMPC.yaml"
+  - package: "mmseq_run"
+    path: "config/sim/isaac_sim.yaml"
+  - package: "mmseq_run"
+    path: "config/map/SDF3D.yaml"im
+  - package: "mmseq_run"
+    path: "config/scene/single_object.yaml"
+logging:
+  log_dir: "$MOBILE_MANIPULATION_CENTRAL_BAG_DIR/ral25/semi_static_reactive/"
+  log_level: 10 # 0 - not set, 10 - debug, 20 - info
