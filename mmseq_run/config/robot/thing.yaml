@@ -96,8 +96,8 @@ controller:
 
     collision_link_names:
       base:
-        # - "base_collision_link"
-        - "base_collision_link_front"
+        - "base_collision_link"
+        # - "base_collision_link_front"
         #- "base_collision_link_back"
 
       rack:
