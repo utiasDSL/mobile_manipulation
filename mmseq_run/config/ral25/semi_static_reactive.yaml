@@ -1,5 +1,5 @@
 planner:
-  use_joy: False
+  use_joy: True
   sot_type: "SoTStatic"
   tasks:
   - frame_id: base
@@ -34,13 +34,19 @@ controller:
                  -1, -1, -0.4, -2, -2, -3, -3, -3, -3 ]
         upper: [ 10, 10, 2pi, 1.pi, 0.2, 1pi, 1pi, 1pi, 1pi,
                  1, 1, 0.4, 2, 2, 3, 3, 3, 3 ]
+  collision_constraint_type: 
+    sdf: "SignedDistanceConstraintCBF" # SignedDistanceConstraint or SignedDistanceConstraintCBF 
+  collision_cbf_gamma:
+    sdf: 0.9
   acados:
-    name: MMSLAMCtrl_SemiStatic
+    name: MMSLAMCtrl_SemiStaticCBF
   # local map params
   map:
     default_val: 1.8
     map_coverage: [8, 8, 0.4]
-  
+  collision_safety_margin:
+    sdf: 0.
+
 include:
   - package: "mmseq_run"
     path: "config/robot/thing.yaml"
