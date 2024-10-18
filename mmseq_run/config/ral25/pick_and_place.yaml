@@ -68,5 +68,5 @@ include:
   - package: "mmseq_run"
     path: "config/scene/ral25.yaml"
 logging:
-  log_dir: "$MOBILE_MANIPULATION_CENTRAL_BAG_DIR/Oct14/"
+  log_dir: "$MOBILE_MANIPULATION_CENTRAL_BAG_DIR/Oct18/"
   log_level: 10 # 0 - not set, 10 - debug, 20 - info
