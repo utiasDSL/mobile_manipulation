@@ -338,7 +338,7 @@ class HTMPC(MPC):
             for k in range(self.N+1):
                 # Relaxed Lex Constraints |e_k| \leq |e^*_k| + eps
                 rhs = np.abs(tracking_cost_fcn.get_e(x_bar_initial[k],[],r_bar_map[tracking_cost_fcn_name][k]))
-                rhs += self.params["hierarchy_const_tol"]
+                rhs += np.array(self.params["hierarchy_const_tol"][tracking_cost_fcn_name])
                 e_p_bar.append(rhs)
                 self.py_logger.debug(f"task:{tracking_cost_fcn_name}, time{k}: e_p + eps {rhs}")
             

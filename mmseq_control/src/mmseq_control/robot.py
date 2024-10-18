@@ -276,7 +276,7 @@ class CasadiModelInterface:
                                                                               self.robot.collision_link_names["tool"])
     def _setupCollisionPairDetailed(self):
         # base
-        self.collision_pairs_detailed["self"] = [["ur10_arm_forearm_collision_link", "base_collision_link_front"]]
+        self.collision_pairs_detailed["self"] = [["ur10_arm_forearm_collision_link", "base_collision_link"]]
         self.collision_pairs_detailed["self"] += self._addCollisionPairFromTwoGroups(self.robot.collision_link_names["base"],
                                                                             self.robot.collision_link_names["wrist"] +
                                                                             self.robot.collision_link_names["tool"])
@@ -467,7 +467,7 @@ class Scene:
         else:
             self.kindyn = None
 
-        self.collision_link_names = config["scene"]["collision_link_names"]
+        self.collision_link_names = config["scene"].get("collision_link_names", {"static_obstacles":["ground"]})
         self._setupCollisionLinkKinSymMdl()
 
     def _setupCollisionLinkKinSymMdl(self):

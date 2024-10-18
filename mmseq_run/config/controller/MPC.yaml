@@ -22,7 +22,11 @@ controller:
   ee_upward_constraint_enabled: False
   cst_tol_schedule_enabled: False
   base_pose_tracking_enabled: True
-  hierarchy_const_tol: 0.01
+  hierarchy_const_tol: 
+    BasePoseSE2: [0.01, 0.01, 0.01]
+    EEPos3: [0.01, 0.01, 0.01]
+    EEPose: [0.01, 0.01, 0.01, 0.01, 0.01, 0.1]
+
   self_collision_emergency_stop: True
 
   ee_upward_deviation_angle_max: 0.20    #rad, 0.26 rad ~ 15 degree
