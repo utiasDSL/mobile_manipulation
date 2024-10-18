@@ -10,7 +10,7 @@ planner:
     - 10
     - 0.0
     - 0.0
-    cruise_speed: 0.35
+    cruise_speed: 0.75
     yaw_speed: 0.5
     tracking_err_tol: 0.2
 simulation:
@@ -20,11 +20,27 @@ simulation:
     home: [-0, 0, -0., 0.75pi, -0.5pi, 0.5pi, -0.25pi, 0.6pi, 0.417pi]     # upright
 
 controller:
+  # robot parameters
+  robot:
+    limits:
+      input_rate:
+        lower: [-10, -10, -10, -80, -80, -80, -80, -80, -80]
+        upper: [10, 10, 10, 80, 80, 80, 80, 80, 80]
+      input:
+        lower: [ -1., -1.0, -0.75, -1.8, -1.8, -2.0, -1.6, -1.6, -1.6 ]
+        upper: [ 1.0, 1.0, 0.75, 1.8, 1.8, 2.0, 1.6, 1.6, 1.6 ]
+      state:
+        lower: [ -10, -10, -2.pi, -0.pi, -1pi, -1pi, -1pi, -1pi, -1pi,
+                 -1, -1, -0.4, -2, -2, -3, -3, -3, -3 ]
+        upper: [ 10, 10, 2pi, 1.pi, 0.2, 1pi, 1pi, 1pi, 1pi,
+                 1, 1, 0.4, 2, 2, 3, 3, 3, 3 ]
+  acados:
+    name: MMSLAMCtrl_SemiStatic
   # local map params
   map:
     default_val: 1.8
     map_coverage: [8, 8, 0.4]
-    
+  
 include:
   - package: "mmseq_run"
     path: "config/robot/thing.yaml"
