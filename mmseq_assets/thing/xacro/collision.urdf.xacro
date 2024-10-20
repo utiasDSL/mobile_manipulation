@@ -156,7 +156,7 @@
   </joint>
 
   <!-- Gripped Object -->
-  <xacro:collision_link_sphere name="gripped_object_collision_link" radius="0.2"/>
+  <xacro:collision_link_sphere name="gripped_object_collision_link" radius="0.3"/>
   <joint name="gripped_object_collision_joint" type="fixed">
     <origin rpy="0 0 0" xyz="0 0 0.0"/>
     <parent link="gripped_object"/>

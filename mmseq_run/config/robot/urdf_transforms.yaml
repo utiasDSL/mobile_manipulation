@@ -4,7 +4,7 @@ base_to_arm_transform:
   xyz: [0, 0, 0]
 gripped_object_transform:
   rpy: [0, 0, 0]
-  xyz: [0, 0., 0.29]
+  xyz: [0, -0.1, 0.29]
 camera_base_transform:
   rpy: [-0.00348352, -0.00496256, 0.00719247]
   xyz: [0.40360093, 0.02389736, 0.50356121]
