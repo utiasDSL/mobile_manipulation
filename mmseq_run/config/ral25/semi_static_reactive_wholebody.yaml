@@ -5,10 +5,10 @@ planner:
   - frame_id: base
     name: Base Position
     planner_type: BasePoseTrajectoryLine
-    initial_pose: [0,0.5,0]
+    initial_pose: [0,0.7,0]
     target_pose:
     - 10
-    - 0.5
+    - 0.7
     - 0.0
     cruise_speed: 0.75
     yaw_speed: 0.5
@@ -16,14 +16,14 @@ planner:
   - frame_id: base_link
     name: ee_pose_baseframe
     planner_type: EEPoseSE3Waypoint
-    target_pose: [1.2, -0.4, 0.7, 1.57, 0, 1.57]
+    target_pose: [1.0, -0.8, 0.7, 1.57, 0, 1.57]
     hold_period: 4
     tracking_err_tol: 0.1
 simulation:
   duration: 100
   robot:
     #home: [0., -0.2, 0, 0.5pi, -0.75pi, 0.75pi, -0.25pi, 0.5pi, 0.417pi]  # standard
-    home: [-0, 0.5, -0., 0.713, -0.95, 1.9, -1.0, 0.72, -0.25]     # upright
+    home: [-0, 0.7, -0., 0.24590115249156952, -0.7108174562454224, 1.4452999830245972, -0.7951079607009888, 0.22634093463420868, -0.25]     # upright
 
 controller:
   collision_safety_margin:
@@ -43,15 +43,20 @@ controller:
         upper: [ 10, 10, 2pi, 1.pi, 0.2, 1pi, 1pi, 1pi, 1pi,
                  1, 1, 0.4, 2, 2, 3, 3, 3, 3 ]
   acados:
-    name: MMSLAMCtrl_SemiStatic_Arm
+    name: MMSLAMCtrl_SemiStaticCBF_Arm
   # local map params
   map:
     default_val: 1.8
     map_coverage: [4, 4, 1.0]
   collision_constraint_type: 
-    sdf: "SignedDistanceConstraint" # SignedDistanceConstraint or SignedDistanceConstraintCBF 
+    sdf: "SignedDistanceConstraintCBF" # SignedDistanceConstraint or SignedDistanceConstraintCBF 
   collision_cbf_gamma:
-    sdf: 0.3
+    sdf: 0.5
+  
+  cost_params:
+    EEPoseBaseFrame:
+      Qk: [2, 2, 2, 0.8, 0.8, 0.2]
+      P: [1, 1, 1, 1, 1, 1]
 include:
   - package: "mmseq_run"
     path: "config/robot/thing.yaml"
