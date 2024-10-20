@@ -200,12 +200,16 @@ class SignedDistanceConstraintCBF(NonlinearConstraint):
         
         # self.g_eqn = -(h_grad_eqn @ robot_mdl.ssSymMdl["fmdl"](self.x_sym, self.u_sym) + self.p_dict["gamma"]*h_eqn)
         h_grad_eqn = cs.jacobian(h_eqn, self.x_sym)
-        self.g_eqn = -(h_grad_eqn[:, :nq] @ self.x_sym[nq:] + self.p_dict["gamma"]*h_eqn)/5
+        gammas = [self.p_dict["gamma"]*2, self.p_dict["gamma"]]
+        gamma = cs.conditional(h_eqn>0, gammas, 0, False)
+        self.g_eqn = -(h_grad_eqn[:, :nq] @ self.x_sym[nq:] + gamma*h_eqn)/5
 
         self.g_fcn = cs.Function("g_"+self.name+"_CBF", [self.x_sym, self.u_sym, self.p_sym], [self.g_eqn])
 
         self.g_grad_eqn = cs.jacobian(self.g_eqn, cs.veccat(self.u_sym, self.x_sym))
         self.g_grad_fcn = cs.Function("g_grad", [self.x_sym, self.u_sym, self.p_sym], [self.g_grad_eqn])
+        self.gamma_fcn = cs.Function("gamma", [self.x_sym, self.u_sym, self.p_sym], [gamma])
+
         # self.h_fcn = cs.Function("h_fcn", [self.x_sym, self.u_sym, self.p_sym], [h_eqn])
         # self.xdot_fcn = cs.Function("xdot_fcn", [self.x_sym, self.u_sym, self.p_sym], [robot_mdl.ssSymMdl["fmdl"](self.x_sym, self.u_sym)])
         # self.h_grad_fcn = cs.Function("h_grad_fcn", [self.x_sym, self.u_sym, self.p_sym], [h_grad_eqn])
@@ -220,7 +224,11 @@ class SignedDistanceConstraintCBF(NonlinearConstraint):
 
         self.slack_enabled = True
 
+    def check_gamma(self, x, u, p):
+        gamma = self.gamma_fcn(x, u, p)
 
+        return gamma
+    
 class StateBoxConstraints(NonlinearConstraint):
     def __init__(self, robot_mdl, name="state"):
         """ Signed Distance Constraint
