@@ -233,7 +233,7 @@ class CasadiModelInterface:
             self.collision_pairs["self"] = config["robot"]["collision_pairs"]["self"]
         else:
             # base
-            self.collision_pairs["self"] = [["ur10_arm_forearm_collision_link", "base_collision_link_front"]]
+            self.collision_pairs["self"] = [["ur10_arm_forearm_collision_link", "base_collision_link"]]
             self.collision_pairs["self"] += self._addCollisionPairFromTwoGroups(self.robot.collision_link_names["base"],
                                                                                 self.robot.collision_link_names["wrist"] +
                                                                                 self.robot.collision_link_names["tool"])
