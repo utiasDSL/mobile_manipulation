@@ -200,6 +200,25 @@ class MPC():
             vals.append(v)
         return vals
     
+    def evaluate_cbf_gammas(self, constraints: MPCConstraints.SignedDistanceConstraintCBF, x_bar, u_bar, nlp_p_map_bar):
+        ps = []
+        cost_p_dict = constraints.get_p_dict()
+        cost_p_struct = casadi_sym_struct(cost_p_dict)
+        cost_p_map = cost_p_struct(0)
+
+        vals = []
+        for k in range(self.N+1):
+            nlp_p_map = nlp_p_map_bar[k]
+            for key in cost_p_map.keys():
+                cost_p_map[key] = nlp_p_map[key]
+            if k < self.N:
+                v = constraints.check_gamma(x_bar[k], u_bar[k], cost_p_map.cat.full().flatten())
+            else:
+                v = constraints.check_gamma(x_bar[k], u_bar[k-1], cost_p_map.cat.full().flatten())
+
+            vals.append(v)
+        return vals
+    
     def evaluate_sdf_h_fcn(self, constraints: MPCConstraints.Constraint, x_bar, u_bar, nlp_p_map_bar):
         ps = []
         cost_p_dict = constraints.get_p_dict()

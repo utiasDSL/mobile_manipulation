@@ -1,5 +1,7 @@
 import numpy as np
 from scipy.interpolate import interp1d
+import copy
+from typing import List
 
 import matplotlib.pyplot as plt
 # import seaborn as sns
@@ -701,6 +703,91 @@ class DataPlotter:
 
         return axes
 
+    def plot_base_state_separate(self, axes=None, index=0, legend=None, linewidth=1, color=None):
+        ts = self.data["ts"]
+        r_ew_ws = self.data.get("r_bw_ws",[])
+        yaw_bw_ws = self.data.get("yaw_bw_ws", [])
+
+        if len(r_ew_ws) == 0 and len(yaw_bw_ws)==0:
+            return
+
+        if axes is None:
+            axes = []
+            f, axes = plt.subplots(3, 1, sharex=True)
+
+        if legend is None:
+            legend = self.data["name"]
+
+        prop_cycle = plt.rcParams["axes.prop_cycle"]
+        colors = prop_cycle.by_key()["color"]
+        # colors = sns.color_palette("ch:s=.35,rot=-.35", n_colors=3)
+        cm = LinearSegmentedColormap.from_list(
+            "my_list", colors, N=50)
+        
+        if color is None:
+            color = cm(index)
+            
+        if len(r_ew_ws) > 0:
+            for i in range(2):
+                axes[i].plot(ts, r_ew_ws[:, i], label=" ".join([legend, "actual"]), color=color, linestyle="-",linewidth=linewidth)
+
+        if len(yaw_bw_ws)>0:
+            axes[2].plot(ts, yaw_bw_ws, label=" ".join([legend, "actual"]), color=color, linestyle="-",linewidth=linewidth )
+
+
+        y_label = ["x", "y", "$Θ$"]
+        for i, ax in enumerate(axes):
+            ax.grid('on')
+            ax.legend()
+            ax.set_ylabel(y_label[i])
+
+        axes[0].set_title("Base state tracking")
+        axes[2].set_xlabel("Time (s)")
+
+        return axes
+
+    def plot_base_ref_separate(self, axes=None, index=0, legend=None, linewidth=1, color=None):
+        ts = self.data["ts"]
+        r_ew_w_ds = self.data.get("r_bw_w_ds", [])
+        yaw_bw_w_ds = self.data.get("yaw_bw_w_ds", [])
+
+        if len(r_ew_w_ds) == 0  and len(yaw_bw_w_ds) ==0:
+            return
+
+        if axes is None:
+            axes = []
+            f, axes = plt.subplots(3, 1, sharex=True)
+
+        if legend is None:
+            legend = self.data["name"]
+
+        prop_cycle = plt.rcParams["axes.prop_cycle"]
+        colors = prop_cycle.by_key()["color"]
+        # colors = sns.color_palette("ch:s=.35,rot=-.35", n_colors=3)
+        cm = LinearSegmentedColormap.from_list(
+            "my_list", colors, N=50)
+        
+        if color is None:
+            color = cm(index)
+            
+        if len(r_ew_w_ds) > 0:
+            for i in range(2):
+                axes[i].plot(ts, r_ew_w_ds[:, i], label=legend + "desired", color="r", linestyle="--")
+        if len(yaw_bw_w_ds)>0:
+            axes[2].plot(ts, yaw_bw_w_ds, label=legend + "desired", color="r", linestyle="--",linewidth=linewidth )
+
+        y_label = ["x", "y", "$Θ$"]
+        for i, ax in enumerate(axes):
+            ax.grid('on')
+            ax.legend()
+            ax.set_ylabel(y_label[i])
+
+        axes[0].set_title("Base state tracking")
+        axes[2].set_xlabel("Time (s)")
+
+        return axes
+
+
     def plot_base_velocity_tracking(self, axes=None, index=0, legend=None):
         ts = self.data["ts"]
         v_bw_w_ds = self.data.get("v_bw_w_ds", [])
@@ -857,6 +944,65 @@ class DataPlotter:
             ax.set_xlabel("Time (s)")
             ax.set_ylabel("Sd(q) (m)")
             ax.legend()
+
+    def plot_sdf_collision_separate(self, axes=None, index=0, color=None, linewidth=1, block=True, legend=None):
+        nq = int(self.data["nq"])
+        ts = self.data["ts"]
+        qs = self.data["xs"][:, :nq]
+        names = []
+        params = {}
+
+        if self.config["controller"]["sdf_collision_avoidance_enabled"]:
+            param_names =  ["_".join(["mpc","sdf", "param", str(i)])+"s" for i in range(self.model_interface.sdf_map.dim+1)]
+            sdf_params = [self.data[name] for name in param_names]
+            params["sdf"] = sdf_params
+            names += ["sdf"]
+
+        sds = self.model_interface.evaluteSignedDistancePerPair(names, qs, params)
+        num_pairs = 0
+        for name, sd_per_pair in sds.items():
+            for pair, sd in sd_per_pair.items():
+                num_pairs += 1
+
+        if axes is None:
+            axes = []
+            f, axes = plt.subplots(num_pairs, 1, sharex=True)
+
+        if legend is None:
+            legend = self.data["name"]
+
+        prop_cycle = plt.rcParams["axes.prop_cycle"]
+        colors = prop_cycle.by_key()["color"]
+        # colors = sns.color_palette("ch:s=.35,rot=-.35", n_colors=3)
+        cm = LinearSegmentedColormap.from_list(
+            "my_list", colors, N=50)
+
+        
+        if color is None:
+            color = cm(index)
+
+        i = 0
+        for name, sd_per_pair in sds.items():
+            for pair, sd in sd_per_pair.items():
+                ax = axes[i]
+                ax.plot(ts, sd, label=" ".join([legend, pair]), color=color, linestyle="-",linewidth=linewidth)
+                ax.set_ylabel("Sd(q) (m)")
+                ax.legend()
+                ax.grid('on')
+
+                i += 1
+            
+                margin = self.config["controller"]["collision_safety_margin"].get(name, None)
+                if margin is None:
+                    margin = self.config["controller"]["collision_safety_margin"].get("static_obstacles", None)
+
+                if margin:
+                    ax.plot(ts, [margin]*len(ts), 'r--', linewidth=2, label=f"minimum clearance")
+
+            axes[0].set_title("{} Distance".format(name))
+            axes[-1].set_xlabel("Time (s)")
+        
+        return axes
 
     def plot_collision_detailed(self):
         nq = int(self.data["nq"])
@@ -1360,6 +1506,7 @@ class DataPlotter:
                 axes[l].set_xticks(xticks)
                 axes[l].set_xticklabels(xlables)
                 axes[l].grid('on')
+        axes[-1].set_xlabel("Time (s)")
         axes[0].legend()
         plt.show(block=block)
 
@@ -1470,9 +1617,11 @@ class DataPlotter:
         if data is None and "constraint" in data_name.split("_"):
             # mpc constraints with prediction
             N = len(self.data["ts"])
-            constraint_name = data_name.split("_")[1]
+            data_name_split = data_name.split("_")
+            name_end_index = data_name_split.index("constraint")
+            constraint_name = "_".join(data_name_split[1:name_end_index])
             for constraint in self.controller.constraints:
-                print("checking {}".format(constraint.name))
+                print("checking {} against {}".format(constraint_name,constraint.name))
 
                 if constraint.name !=constraint_name:
                     continue
@@ -1493,6 +1642,80 @@ class DataPlotter:
             data = data.squeeze(axis=-1)
 
         print(data.shape)
+        if len(data.shape) == 3:
+            N, P, D = data.shape
+        
+        data_per_figure = 6
+        if D%data_per_figure == 0:
+            figs_num = D//data_per_figure
+        else:
+            figs_num = D//data_per_figure + 1
+
+
+
+        if legend is None:
+            legend = self.data["name"]
+
+        t_sim = self.data["ts"]
+        mpc_dt = self.config["controller"]["dt"]
+        t_prediction = np.arange(P) * mpc_dt
+        t_all = t_sim.reshape((N, 1)) + t_prediction.reshape((1, P))
+
+        for fi in range(figs_num):
+            if axes is None or fi!=0:
+                data_num = data_per_figure if fi < figs_num - 1 else D - fi*data_per_figure
+                f, axes = plt.subplots(data_num, 1, sharex=True)
+                if data_num ==1:
+                    axes=[axes]
+            else:
+                data_num = len(axes)
+
+            for i in range(data_num):
+                data_index = i+fi*data_per_figure
+                axes[i].plot(t_all[:, 0].flatten(), data[:,0, data_index].flatten(), "o-", label=" ".join(["actual", legend]), linewidth=2, markersize=8)
+                axes[i].plot(t_all[off_set::4].T, data[off_set::4, :, data_index].T, "o-", linewidth=1, fillstyle='none')
+                
+                axes[i].set_ylabel("d[{}]".format(data_index))
+
+                axes[i].legend()
+                axes[i].grid()
+            axes[0].set_title(" ".join(data_name.split("_")[1:] + ["figure", str(fi+1)+"/"+str(figs_num)]))
+            
+        plt.show(block=block)
+    
+        return axes
+
+    def plot_mpc_prediction_cbf_gamma(self, data_name, t=0, axes=None, index=0, block=True, legend=None):
+        t_sim = self.data["ts"]
+        t_index = np.argmin(np.abs(t_sim - t))
+        off_set = t_index % 4
+        # Time x prediction step x data dim
+        # mpc constraints with prediction
+        N = len(self.data["ts"])
+        data_name_split = data_name.split("_")
+        name_end_index = data_name_split.index("constraint")
+        constraint_name = "_".join(data_name_split[1:name_end_index])
+        for constraint in self.controller.constraints:
+            print("checking {} against {}".format(constraint_name,constraint.name))
+
+            if constraint.name !=constraint_name:
+                continue
+
+            data_name = "mpc_sdf_gamma_constraint_prediction"
+            self.data[data_name] = []
+            for t_index in range(N):
+                param_map_bar = [reconstruct_sym_struct_map_from_array(self.controller.p_struct, param_map_array) for param_map_array in self.data["mpc_ocp_params"][t_index]]
+                x_bar = self.data["mpc_x_bars"][t_index]
+                u_bar = self.data["mpc_u_bars"][t_index]
+                self.data[data_name].append(self.controller.evaluate_cbf_gammas(constraint, x_bar, u_bar, param_map_bar))
+            self.data[data_name] = np.array(self.data[data_name])
+        if self.data.get(data_name, None) is None:
+            return
+        data = self.data.get(data_name, None)
+        
+        if len(data.shape) ==4:
+            data = data.squeeze(axis=-1)
+
         if len(data.shape) == 3:
             N, P, D = data.shape
         
@@ -1570,7 +1793,10 @@ class DataPlotter:
         self.plot_time_htmpc(block=False)
         # self.plot_solver_iters()
         self.plot_time_series_data_htmpc("time_get_map", block=False)
-        self.plot_mpc_prediction("mpc_sdf_constraint_predictions", block=False)
+        self.plot_mpc_prediction("mpc_sdf_constraint_predictions",t=0.1, block=False)
+        # self.plot_mpc_prediction("mpc_self_constraint_predictions", block=False)
+        # self.plot_mpc_prediction("mpc_EEPos3_Lex_constraint_predictions", block=False)
+
 
         # self.plot_solver_iters(block=False)
         # self.plot_mpc_prediction("mpc_obstacle_cylinder_1_link_constraints")
@@ -1621,6 +1847,15 @@ class DataPlotter:
         self.plot_state_normalized()
         self.plot_cmds_normalized()
         self.plot_collision()
+    
+    def plot_exp(self, time):
+        self.plot_ee_tracking()
+        self.plot_sdf_map(t=time)
+        self.plot_collision()
+        self.plot_time_htmpc(block=False)
+        self.plot_mpc_prediction("mpc_sdf_constraint_predictions",t=0, block=False)
+        self.plot_mpc_prediction_cbf_gamma("mpc_sdf_constraint_predictions",t=0, block=False)
+
     
     def plot_sdf(self, t, use_iter_snapshot=False, block=True):
         t_sim = self.data["ts"]
@@ -1801,6 +2036,8 @@ class DataPlotter:
         z_lim = [np.min(param_map["z_grid_sdf"]), np.max(param_map["z_grid_sdf"])]
 
         z_lims = np.linspace(z_lim[0], z_lim[1], int((z_lim[1] - z_lim[0])/0.1))
+        z_lims = [0.1, 0.7]
+        print("Visualizing Map at Time {}".format(t_sim[t_index]))
         for z in z_lims:
             sdf_map.vis(x_lim=x_lim,
                         y_lim=y_lim,
