@@ -146,7 +146,11 @@ class ControllerROSNode:
         dt_pub = 1./ self.cmd_vel_pub_rate
         dt_pub_sec = int(dt_pub)
         dt_pub_nsec = int((dt_pub - dt_pub_sec) * 1e9)
-        self.cmd_vel_timer = rospy.Timer(rospy.Duration(dt_pub_sec, dt_pub_nsec), self._publish_cmd_vel_new)
+        if self.ctrl_config["cmd_vel_type"] == "integration":
+            self.cmd_vel_timer = rospy.Timer(rospy.Duration(dt_pub_sec, dt_pub_nsec), self._publish_cmd_vel)
+        elif self.ctrl_config["cmd_vel_type"] == "interpolation":
+            self.cmd_vel_timer = rospy.Timer(rospy.Duration(dt_pub_sec, dt_pub_nsec), self._publish_cmd_vel_new)
+
 
         self.lock = threading.Lock()
         self.sot_lock = threading.Lock()
@@ -163,12 +167,11 @@ class ControllerROSNode:
 
     def _publish_cmd_vel(self, event):
         if self.mpc_plan is not None:
-            self.lock.acquire()
-
             t = rospy.Time.now().to_sec()
+
+            self.lock.acquire()
             t_elasped = t - self.mpc_plan_time_stamp
-            acc_indx = int(t_elasped/self.mpc_dt)
-            self.cmd_vel += self.mpc_plan[acc_indx] * (event.current_real - event.last_real).to_sec()
+            self.cmd_vel += self.mpc_plan_interp(t_elasped) * (event.current_real - event.last_real).to_sec()
 
             self.lock.release()
 
@@ -177,10 +180,11 @@ class ControllerROSNode:
     def _publish_cmd_vel_new(self, event):
         if self.mpc_plan is not None:
             t = rospy.Time.now().to_sec()
-            # print("cmd vel loopo {}".format(t))
+            # print("cmd vel loop {}".format(t))
+            # print("mpc_plan_time{}".format(self.mpc_plan_time_stamp))
+            self.lock.acquire()
             t_elasped = t - self.mpc_plan_time_stamp
             # print("cmd t elapsed {}".format(t_elasped))
-            self.lock.acquire()
             self.cmd_vel = self.mpc_plan_interp(t_elasped)
             self.lock.release()
 
@@ -557,11 +561,18 @@ class ControllerROSNode:
                 print("Close to goal. Braking")
                 v_bar[:, :3] = 0
 
-            mpc_plan = v_bar
-            N = mpc_plan.shape[0]
-            t_mpc = np.arange(N) * self.mpc_dt
-            mpc_plan_interp = interp1d(t_mpc, mpc_plan, axis=0, 
-                                            bounds_error=False, fill_value="extrapolate")
+            if self.ctrl_config["cmd_vel_type"] == "interpolation":
+                mpc_plan = v_bar
+                N = mpc_plan.shape[0]
+                t_mpc = np.arange(N) * self.mpc_dt
+                mpc_plan_interp = interp1d(t_mpc, mpc_plan, axis=0, 
+                                                bounds_error=False, fill_value="extrapolate")
+            elif self.ctrl_config["cmd_vel_type"] == "integration":
+                mpc_plan = u_bar
+                N = mpc_plan.shape[0]
+                t_mpc = np.arange(N) * self.mpc_dt
+                mpc_plan_interp = interp1d(t_mpc, mpc_plan, axis=0, 
+                                                bounds_error=False, fill_value=np.zeros_like(u_bar[0]))
             self.lock.acquire()
             self.mpc_plan = mpc_plan
             self.mpc_plan_time_stamp = t
