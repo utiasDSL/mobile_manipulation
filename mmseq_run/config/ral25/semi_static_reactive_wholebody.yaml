@@ -85,7 +85,7 @@ controller:
       z: 50  # linear term
       Z: 1    # quadratic term
   acados:
-    name: MMSLAMCtrl_SemiStatic_ArmCBF
+    name: MMSLAMCtrl_SemiStatic_Arm_HTMPCCBF
   # local map params
   map:
     default_val: 1.8
@@ -101,7 +101,7 @@ include:
   - package: "mmseq_run"
     path: "config/controller/MPC.yaml"
   - package: "mmseq_run"
-    path: "config/controller/NavMPC.yaml"
+    path: "config/controller/NavHTMPC.yaml"
   - package: "mmseq_run"
     path: "config/sim/isaac_sim.yaml"
   - package: "mmseq_run"

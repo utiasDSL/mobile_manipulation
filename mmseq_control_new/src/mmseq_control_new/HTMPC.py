@@ -67,13 +67,14 @@ class HTMPCBase(MPC):
         u_bar_initial = self.u_bar.copy()
 
         # 0.2 Get ref, sdf map,
-        r_bar_map = {}
+        r_bar_maps = []
         self.ree_bar = []
         self.rbase_bar = []
 
         for planner in planners:
             # get tracking points from planner, tracking points are tuples of desired position and velocity (p, v) 
             # for planners without velocity reference, none should be given (p, None) 
+            r_bar_map = {}
             if planner.ref_type == "path":
                 p_bar, v_bar = planner.getTrackingPointArray((xo[:self.DoF], xo[self.DoF:]), self.N+1, self.dt)
             else:
@@ -125,6 +126,8 @@ class HTMPCBase(MPC):
                 self.ree_bar = p_bar 
             elif planner.type == "base":
                 self.rbase_bar = p_bar
+            
+            r_bar_maps.append(r_bar_map)
 
         t1 = time.perf_counter()
         if map is not None and self.params["sdf_collision_avoidance_enabled"]:
@@ -142,7 +145,7 @@ class HTMPCBase(MPC):
             tracking_cost_fcn = stmpc_cost_fcns[0]
             tracking_cost_fcn_name = tracking_cost_fcn.name
             tracking_cost_fcns.append(tracking_cost_fcn)
-
+            r_bar_map = r_bar_maps[task_id]
 
             t1 = time.perf_counter()
             curr_p_map_bar = []
@@ -184,22 +187,23 @@ class HTMPCBase(MPC):
 
                 # set parameters for tracking cost functions
                 p_keys = p_struct.keys()
-                p_name_r = "_".join(["r", tracking_cost_fcn_name])
 
-                if p_name_r in p_keys:
-                    r_k = r_bar_map[tracking_cost_fcn_name][k]
-                    # set reference
-                    curr_p_map[p_name_r] = r_k
-                    p_name_W = "_".join(["W", tracking_cost_fcn_name])
 
-                    # Set weight matricies, assuming identity matrix with identical diagonal terms
-                    if k == self.N:
-                        curr_p_map[p_name_W] = np.diag(self.params["cost_params"][tracking_cost_fcn_name]["P"])
+                for (name, r_bar) in r_bar_map.items():
+                    p_name_r = "_".join(["r", name])
+                    p_name_W = "_".join(["W", name])
+
+                    if p_name_r in p_keys:
+                        # set reference
+                        curr_p_map[p_name_r] = r_bar[k]
+
+                        # Set weight matricies, assuming identity matrix with identical diagonal terms
+                        if k == self.N:
+                            curr_p_map[p_name_W] = np.diag(self.params["cost_params"][name]["P"])
+                        else:
+                            curr_p_map[p_name_W] = np.diag(self.params["cost_params"][name]["Qk"])
                     else:
-                        curr_p_map[p_name_W] = np.diag(self.params["cost_params"][tracking_cost_fcn_name]["Qk"])
-
-                else:
-                    self.py_logger.warning(f"unknown p name {p_name_r} in {tracking_cost_fcn_name}'s p_struct")
+                        self.py_logger.warning(f"unknown p name {p_name_r}")
                 
                 for p in range(task_id):
                     # set parameters for lexicographic optimality constraints
@@ -208,7 +212,7 @@ class HTMPCBase(MPC):
                     curr_p_map[p_name_e_p] = e_p_bar_map[name][k]
 
                     p_name_r = "_".join(["r", name])
-                    r_k = r_bar_map[name][k]
+                    r_k = r_bar_maps[p][name][k]
                     # set reference
                     curr_p_map[p_name_r] = r_k
 
@@ -353,6 +357,10 @@ class HTMPCBase(MPC):
         self.sdf_bar["base"] = self.model_interface.sdf_map.query_val(self.base_bar[:, 0], self.base_bar[:, 1], np.ones(self.N+1)*0.2)
         self.sdf_grad_bar["base"] = self.model_interface.sdf_map.query_grad(self.base_bar[:, 0], self.base_bar[:, 1], np.ones(self.N+1)*0.2).reshape((3,-1))
 
+        sdf_param = self.model_interface.sdf_map.get_params()
+        for i, param in enumerate(sdf_param):
+            self.log["_".join(["sdf", "param", str(i)])] = param
+            
         # Log: final cost for each task after all stmpcs have been solved
         for i, tracking_cost_fcn in enumerate(tracking_cost_fcns):
             self.log["cost_final"][i] = self.evaluate_cost_function(tracking_cost_fcn, 
@@ -385,6 +393,9 @@ class HTMPCBase(MPC):
 
         for i in range(task_num):
             log["_".join(["ocp_param", str(i)])] = []
+
+        for i in range(self.model_interface.sdf_map.dim+1):
+            log["_".join(["sdf", "param", str(i)])] = 0
 
         return log
     
