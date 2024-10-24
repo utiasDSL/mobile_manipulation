@@ -539,6 +539,41 @@ class NavHTMPC(HTMPCBase):
 
         self.lam_bar = [None, None]
 
+class NavHTMPCWorldFrame(HTMPCBase):
+
+    def __init__(self, config):
+        super().__init__(config)
+            
+        self.BasePoseSE2LexConstraint = HierarchicalTrackingConstraint(self.BasePoseSE2Cost, "_".join([self.BasePoseSE2Cost.name, "Lex"]))
+        common_csts = []
+        common_cost_fcns = []
+        for name in self.collision_link_names:
+            if name in self.model_interface.scene.collision_link_names["static_obstacles"]:
+                softened = self.params["collision_constraints_softend"]["static_obstacles"]
+            else:
+                softened = self.params["collision_constraints_softend"][name]
+
+            if softened:
+                common_cost_fcns.append(self.collisionSoftCsts[name])
+            else:
+                common_csts.append(self.collisionCsts[name])
+
+        self.stmpc_cost_fcns = []
+        self.stmpc_cost_fcns.append([self.BasePoseSE2Cost, self.BaseVel3Cost, self.CtrlEffCost] + common_cost_fcns)
+
+        if config["ee_pose_tracking_enabled"]:
+            self.stmpc_cost_fcns.append([self.EEPoseSE3Cost, self.RegularizationCost, self.CtrlEffCost] + common_cost_fcns)
+        else:
+            self.stmpc_cost_fcns.append([self.EEPos3Cost, self.RegularizationCost, self.CtrlEffCost] + common_cost_fcns)
+
+        self.stmpc_constraints = [common_csts]
+        self.stmpc_constraints.append([self.BasePoseSE2LexConstraint] + common_csts)
+
+        self.stmpcs, self.stmpc_solvers, self.stmpc_p_structs = self._construct(self.stmpc_cost_fcns, self.stmpc_constraints)
+        self.constraints = common_csts + [self.BasePoseSE2LexConstraint]
+
+        self.lam_bar = [None, None]
+
 if __name__ == "__main__":
     # robot mdl
     from mmseq_utils import parsing
