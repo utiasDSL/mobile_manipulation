@@ -7,7 +7,7 @@ controller:
   ee_pose_tracking_enabled: True
   
   collision_constraint_type: 
-    sdf: "SignedDistanceConstraint" # SignedDistanceConstraint or SignedDistanceConstraintCBF 
+    sdf: "SignedDistanceConstraintCBF" # SignedDistanceConstraint or SignedDistanceConstraintCBF 
   type: "NavHTMPCWorld"
   collision_cbf_gamma:
     sdf: 1.2
@@ -24,6 +24,9 @@ controller:
     BasePoseSE2:
       Qk: [1, 1, 0.25]
       P: [1, 1, 1]
+    BaseVel3:
+      Qk: [0.3, 0.3, 0.3]
+      P: [1, 1, 1]
     Effort:
       Qqa: [0, 0, 0, 0, 0, 0]
       Qqb: [0, 0, 0]
@@ -33,8 +36,12 @@ controller:
       Qub: [2.0, 2.0, 1.0]
       Qdua: [0, 0, 0, 0, 0, 0]
       Qdub: [0.1, 0.1, 0.1]
+    slack:
+      z: 50  # linear term
+      Z: 1    # quadratic term
+
   acados:
-    name: MMSLAMCtrl_NavHTMPCWorld
+    name: MMSLAMCtrl_NavHTMPCWorldCBF
     ocp_solver_options:
       nlp_solver_max_iter: 30
       qp_solver_warm_start: 2

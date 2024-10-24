@@ -4,25 +4,47 @@ controller:
   self_collision_avoidance_enabled: True
   static_obstacles_collision_avoidance_enabled: True
   base_pose_tracking_enabled: True
-  # robot parameters
-  robot:
-    limits:
-      input_rate:
-        lower: [-10, -10, -10, -80, -80, -80, -80, -80, -80]
-        upper: [10, 10, 10, 80, 80, 80, 80, 80, 80]
-      input:
-        lower: [ -1., -1.0, -0.75, -1.8, -1.8, -2.0, -1.6, -1.6, -1.6 ]
-        upper: [ 1.0, 1.0, 0.75, 1.8, 1.8, 2.0, 1.6, 1.6, 1.6 ]
-      state:
-        lower: [ -10, -10, -2.pi, -0.pi, -1pi, -1pi, -1pi, -1pi, -1pi,
-                 -0.4, -0.4, -0.4, -2, -2, -3, -3, -3, -3 ]
-        upper: [ 10, 10, 2pi, 1.pi, 0.2, 1pi, 1pi, 1pi, 1pi,
-                 0.4, 0.4, 0.4, 2, 2, 3, 3, 3, 3 ]
+
   collision_constraint_type: 
     sdf: "SignedDistanceConstraintCBF" # SignedDistanceConstraint or SignedDistanceConstraintCBF 
+  
   type: "STMPC"
   collision_cbf_gamma:
     sdf: 1.2
+
+  dt: 0.3
+  prediction_horizon: 3
+  robot:
+    time_discretization_dt: 0.3
+
+  collision_cbf_gamma:
+    sdf: 0.9
+
+  cost_params:
+    EEPose:
+      Qk: [3, 3, 3, 3, 3, 0.5]
+      P: [1, 1, 1, 1, 1, 1]
+    BasePoseSE2:
+      Qk: [1, 1, 0.25]
+      P: [1, 1, 1]
+    BaseVel3:
+      Qk: [0.3, 0.3, 0.3]
+      P: [1, 1, 1]
+    Effort:
+      Qqa: [0, 0, 0, 0, 0, 0]
+      Qqb: [0, 0, 0]
+      Qva: [0.01, 0.01, 0.01, 0.01, 0.01, 0.01]
+      Qvb: [0.01, 0.01, 0.05]
+      Qua: [0.5, 0.5, 0.5, 0.5, 0.2, 0.8]
+      Qub: [2.0, 2.0, 1.0]
+      Qdua: [0, 0, 0, 0, 0, 0]
+      Qdub: [0.1, 0.1, 0.1]
+    Regularization:
+      eps: 1.0e-06
+    slack:
+      z: 50  # linear term
+      Z: 1    # quadratic term
+
   
   acados:
     name: MMSLAMCtrlCBF
@@ -33,7 +55,3 @@ controller:
       nlp_solver_tol_eq: 1.0e-02
       nlp_solver_tol_ineq: 1.0e-02
       nlp_solver_tol_comp: 1.0e-04
-
-include:
-  - package: "mmseq_run"
-    path: "config/controller/mpc_params/ctrl_slam_Sep19.yaml"
