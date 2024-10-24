@@ -121,12 +121,12 @@ class RAL25(HybridMPC):
                 planners: List[Union[Planner, TrajectoryPlanner]], 
                 map=None):
         if planners[0].type == "base" and planners[1].type == "EE":
-            curr_controller_name = "NavHTMPC"
+            curr_controller_name, controller = self._get_controller("Nav")
         elif planners[0].type == "EE" and planners[1].type == "base":
-            curr_controller_name = "ManHTMPC"
+            curr_controller_name, controller = self._get_controller("Man")
+        # curr_controller_name, controller = self._get_controller("Nav")
 
         self.py_logger.info("Acting Controller {}".format(curr_controller_name))
-        controller = self.controllers[curr_controller_name] 
 
         if self.prev_controller_name is not None and self.prev_controller_name != curr_controller_name:
             controller.reset()
@@ -143,6 +143,14 @@ class RAL25(HybridMPC):
         self.prev_controller_name = curr_controller_name
 
         return results
+    
+
+    def _get_controller(self, name_id="Nav"):
+        for controller_name, controller in self.controllers.items():
+            if name_id in controller_name:
+                return controller_name, controller
+        self.py_logger.warning("Did not find controller with name id {}".format(name_id))
+        return controller_name, controller
 
     
     def _copy_internal_states(self, controller: MPC):
