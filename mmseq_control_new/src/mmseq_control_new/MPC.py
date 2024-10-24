@@ -303,7 +303,7 @@ class MPC():
         ocp.dims.N = self.N
         ocp.solver_options.tf = self.tf
         ocp.code_export_directory = str(self.output_dir / "c_generated_code")
-        ocp.solver_options.ext_fun_compile_flags = '-O2'
+        ocp.solver_options.ext_fun_compile_flags = '-O3'
 
         ocp.cost.cost_type = 'EXTERNAL'
         cost_expr = []
