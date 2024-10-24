@@ -14,7 +14,7 @@ controller:
   hierarchy_constraint_type: "HierarchicalTrackingConstraint"    # error, cost_value, cost_value_sum
   ctrl_rate: 10 #hz
   cmd_vel_pub_rate: 100 # hz
-  cmd_vel_type: "integration"         # integration: publish vel by integrating from acc_bar
+  cmd_vel_type: "interpolation"         # integration: publish vel by integrating from acc_bar
                                       # interpolation: publish vel by interpolating vel_bar
   soft_cst: True
   penalize_du: False
