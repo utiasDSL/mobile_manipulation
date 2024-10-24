@@ -1,17 +1,17 @@
 planner:
-  use_joy: False
+  use_joy: True
   sot_type: "SoTRal25"
   tasks:
   - frame_id: base
     name: base_local_planner
     planner_type: ROSTrajectoryPlannerOnDemand
-    cruise_speed: 1
+    cruise_speed: 0.5
     yaw_speed: 0.35
     yaw_accel: 100
-    tracking_err_tol: 0.6
+    tracking_err_tol: 0.75
     ref_traj_duration: 12
     intermediate_waypoints: [[[2.5, -0.0, 0.0]],
-                             [[10, 0.0, 0.0]]
+                             [[7, 1.0, 0.0]]
                              ]
     plan_on_start: True
   # - frame_id: base_link
@@ -25,7 +25,7 @@ planner:
     planner_type: EELookAheadWorld
     default_pose: [1.35, 0.17, 0.7, 1.57, 0, 1.57]
     look_ahead_time: 8
-    max_angle: 1.06 # rad
+    max_angle: 0.1 # rad
   # - frame_id: base
   #   name: ee_global_planner
   #   planner_type: EEPos3WaypointOnDemand
@@ -36,9 +36,9 @@ planner:
   - frame_id: base
     name: ee_global_planner
     planner_type: EEPoseSE3WaypointOnDemand
-    target_waypoints: [[3.706, -0.3, 0.9, 1.57, 0, 0],
-                       [10, -0.3, 0.7, 1.57, 0, 1.57]] # in base frame
-    hold_period: 5
+    target_waypoints: [[3.6, -0.3, 0.85, 1.57, 0, 0],
+                       [8.35, 2, 0.7, 1.57, 0, 1.57]] # in base frame
+    hold_period: 4.5
     tracking_err_tol: 0.3
 simulation:
   duration: 100
@@ -52,7 +52,7 @@ include:
   - package: "mmseq_run"
     path: "config/controller/MPC.yaml"
   - package: "mmseq_run"
-    path: "config/ral25/controller.yaml"
+    path: "config/ral25/controller.yaml" # config/ral25/controller.yaml or config/controller/NavMPC.yaml
   - package: "mmseq_run"
     path: "config/sim/isaac_sim.yaml"
   - package: "mmseq_run"
@@ -62,5 +62,5 @@ include:
   - package: "mmseq_run"
     path: "config/scene/single_object.yaml"
 logging:
-  log_dir: "$MOBILE_MANIPULATION_CENTRAL_BAG_DIR/ral25/"
-  log_level: 10 # 0 - not set, 10 - debug, 20 - info
+  log_dir: "$MOBILE_MANIPULATION_CENTRAL_BAG_DIR/ral25/ee_hold/"
+  log_level: 20 # 0 - not set, 10 - debug, 20 - info

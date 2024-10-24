@@ -10,7 +10,7 @@ controller:
     sdf: "SignedDistanceConstraintCBF" # SignedDistanceConstraint or SignedDistanceConstraintCBF 
   type: "NavHTMPCWorld"
   collision_cbf_gamma:
-    sdf: 1.2
+    sdf: 1.5
     
   dt: 0.3
   prediction_horizon: 3
@@ -19,7 +19,7 @@ controller:
     
   cost_params:
     EEPose:
-      Qk: [3, 3, 3, 3, 3, 0.5]
+      Qk: [0.5, 0.5, 0.5, 3, 3, 0.5]
       P: [1, 1, 1, 1, 1, 1]
     BasePoseSE2:
       Qk: [1, 1, 0.25]
@@ -32,7 +32,7 @@ controller:
       Qqb: [0, 0, 0]
       Qva: [0.01, 0.01, 0.01, 0.01, 0.01, 0.01]
       Qvb: [0.01, 0.01, 0.05]
-      Qua: [0.5, 0.5, 0.5, 0.5, 0.2, 0.8]
+      Qua: [1.5, 0.5, 0.5, 0.5, 0.2, 0.8]
       Qub: [2.0, 2.0, 1.0]
       Qdua: [0, 0, 0, 0, 0, 0]
       Qdub: [0.1, 0.1, 0.1]
@@ -47,5 +47,5 @@ controller:
       qp_solver_warm_start: 2
       nlp_solver_tol_stat: 5.0e-02
       nlp_solver_tol_eq: 1.0e-02
-      nlp_solver_tol_ineq: 1.0e-02
+      nlp_solver_tol_ineq: 3.0e-02
       nlp_solver_tol_comp: 1.0e-04

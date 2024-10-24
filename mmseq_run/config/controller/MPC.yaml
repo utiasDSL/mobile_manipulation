@@ -46,7 +46,7 @@ controller:
   
   collision_safety_margin:
     self: 0.25
-    sdf: 0.25
+    sdf: 0.0
     static_obstacles: 0.15
 
   # soft constraints parameters
