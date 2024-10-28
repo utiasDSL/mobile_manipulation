@@ -466,7 +466,7 @@ class EELookAheadWorld(Planner):
             r_bf_bc_bc = Rw_bc.T @ np.hstack((r_bf_bc_w,1))
 
             r_bf_eec_bc = r_bf_bc_bc[:2] - self.default_pose[:2]
-            phi = np.arctan2(r_bf_eec_bc[1], r_bf_eec_bc[0])
+            phi = np.arctan2(r_bf_bc_bc[1], r_bf_bc_bc[0])
             phi = min(phi, self.max_angle)
             phi = max(phi, -self.max_angle)
 

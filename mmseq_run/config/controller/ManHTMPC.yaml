@@ -7,10 +7,10 @@ controller:
   ee_pose_tracking_enabled: True
   
   collision_constraint_type: 
-    sdf: "SignedDistanceConstraint" # SignedDistanceConstraint or SignedDistanceConstraintCBF 
+    sdf: "SignedDistanceConstraintCBF" # SignedDistanceConstraint or SignedDistanceConstraintCBF 
   type: "HTMPC"
   collision_cbf_gamma:
-    sdf: 1.5
+    sdf: 1.0
   
   dt: 0.3
   prediction_horizon: 3
@@ -27,18 +27,18 @@ controller:
     Effort:
       Qqa: [0, 0, 0, 0, 0, 0]
       Qqb: [0, 0, 0]
-      Qva: [0.01, 0.01, 0.01, 0.01, 0.01, 0.01]
-      Qvb: [0.01, 0.01, 0.05]
+      Qva: [0.1, 0.1, 0.1, 0.1, 0.1, 0.1]
+      Qvb: [0.1, 0.1, 0.1]
       Qua: [1.5, 0.5, 0.5, 0.5, 0.2, 0.8]
       Qub: [2.0, 2.0, 1.0]
       Qdua: [0, 0, 0, 0, 0, 0]
       Qdub: [0.1, 0.1, 0.1]
   acados:
-    name: MMSLAMCtrl_ManHTMPC
+    name: MMSLAMCtrl_ManHTMPCCBF_RTI
     ocp_solver_options:
       nlp_solver_max_iter: 30
       qp_solver_warm_start: 2
       nlp_solver_tol_stat: 5.0e-02
       nlp_solver_tol_eq: 1.0e-06
-      nlp_solver_tol_ineq: 3.0e-03
-      nlp_solver_tol_comp: 1.0e-04
+      nlp_solver_tol_ineq: 3.0e-02
+      nlp_solver_tol_comp: 5.0e-04

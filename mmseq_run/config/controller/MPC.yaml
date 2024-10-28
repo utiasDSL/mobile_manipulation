@@ -46,7 +46,7 @@ controller:
   
   collision_safety_margin:
     self: 0.25
-    sdf: 0.0
+    sdf: 0.25
     static_obstacles: 0.15
 
   # soft constraints parameters
@@ -141,7 +141,7 @@ controller:
       hessian_approx: "GAUSS_NEWTON"
       integrator_type: "IRK"
       print_level: 0
-      nlp_solver_type: "SQP"  #SQP_RTI, SQP
+      nlp_solver_type: "SQP_RTI"  #SQP_RTI, SQP
       globalization: "MERIT_BACKTRACKING"
       qp_solver_iter_max: 100
       nlp_solver_tol_comp: 1.e-06

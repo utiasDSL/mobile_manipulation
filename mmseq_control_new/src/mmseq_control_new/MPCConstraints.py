@@ -202,7 +202,7 @@ class SignedDistanceConstraintCBF(NonlinearConstraint):
         h_grad_eqn = cs.jacobian(h_eqn, self.x_sym)
         gammas = [self.p_dict["gamma"]*2, self.p_dict["gamma"]]
         gamma = cs.conditional(h_eqn>0, gammas, 0, False)
-        self.g_eqn = -(h_grad_eqn[:, :nq] @ self.x_sym[nq:] + gamma*h_eqn)/5
+        self.g_eqn = -(h_grad_eqn[:, :nq] @ self.x_sym[nq:] + self.p_dict["gamma"]*h_eqn)/5
 
         self.g_fcn = cs.Function("g_"+self.name+"_CBF", [self.x_sym, self.u_sym, self.p_sym], [self.g_eqn])
 

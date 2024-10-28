@@ -10,7 +10,7 @@ controller:
     sdf: "SignedDistanceConstraintCBF" # SignedDistanceConstraint or SignedDistanceConstraintCBF 
   type: "NavHTMPCWorld"
   collision_cbf_gamma:
-    sdf: 1.5
+    sdf: 1.0
     
   dt: 0.3
   prediction_horizon: 3
@@ -19,10 +19,10 @@ controller:
     
   cost_params:
     EEPose:
-      Qk: [0.5, 0.5, 0.5, 3, 3, 0.5]
+      Qk: [0.2, 0.2, 0.8, 3, 3, 0.2]
       P: [1, 1, 1, 1, 1, 1]
     BasePoseSE2:
-      Qk: [1, 1, 0.25]
+      Qk: [0.75, 0.75, 0.25]
       P: [1, 1, 1]
     BaseVel3:
       Qk: [0.3, 0.3, 0.3]
@@ -30,10 +30,10 @@ controller:
     Effort:
       Qqa: [0, 0, 0, 0, 0, 0]
       Qqb: [0, 0, 0]
-      Qva: [0.01, 0.01, 0.01, 0.01, 0.01, 0.01]
-      Qvb: [0.01, 0.01, 0.05]
-      Qua: [1.5, 0.5, 0.5, 0.5, 0.2, 0.8]
-      Qub: [2.0, 2.0, 1.0]
+      Qva: [0.1, 0.1, 0.1, 0.1, 0.1, 0.1]
+      Qvb: [0.1, 0.1, 0.1]
+      Qua: [2, 1.0, 1.25, 0.7, 0.7, 0.8]
+      Qub: [1.0, 1.0, 0.75]
       Qdua: [0, 0, 0, 0, 0, 0]
       Qdub: [0.1, 0.1, 0.1]
     slack:
@@ -41,11 +41,11 @@ controller:
       Z: 1    # quadratic term
 
   acados:
-    name: MMSLAMCtrl_NavHTMPCWorldCBF
+    name: MMSLAMCtrl_NavHTMPCWorldCBF_RTI
     ocp_solver_options:
       nlp_solver_max_iter: 30
       qp_solver_warm_start: 2
       nlp_solver_tol_stat: 5.0e-02
       nlp_solver_tol_eq: 1.0e-02
       nlp_solver_tol_ineq: 3.0e-02
-      nlp_solver_tol_comp: 1.0e-04
+      nlp_solver_tol_comp: 5.0e-04

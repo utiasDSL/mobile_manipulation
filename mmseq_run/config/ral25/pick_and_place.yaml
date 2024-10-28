@@ -1,24 +1,24 @@
 planner:
-  use_joy: False
+  use_joy: True
   sot_type: "SoTRal25"
   tasks:
   - frame_id: base
     name: base_local_planner
     planner_type: ROSTrajectoryPlannerOnDemand
-    cruise_speed: 0.35
+    cruise_speed: 0.4
     yaw_speed: 0.35
     yaw_accel: 100
     tracking_err_tol: 0.6
     ref_traj_duration: 12
-    intermediate_waypoints: [[[1.2, -0.8, -0.3],
-                              [2.35, -1.25, 0],
-                              [3.5, -1.1, 1.4],
-                              [4.1, -0.3, 1.65]],
-                             [[4.1, 2.35, 1.78],
-                              [3.6, 3.7, 2.8],
+    intermediate_waypoints: [[[1.3, -0.7, -0.3],
+                              [2.35, -1.2, 0],
+                              [3.5, -1.2, 1.4],
+                              [4.0, -0.3, 1.65]],
+                             [[4.0, 2.35, 1.78],
+                              [3.6, 3.5, 2.8],
                               [2.44, 3.45, -3.11],
-                              [1.21, 3.3, -2.2],
-                              [1.1, 2.0, -1.51]]
+                              [1.3, 3.25, -2.2],
+                              [1.15, 1.5, -1.51]]
                              ]
     plan_on_start: True
   # - frame_id: base_link
@@ -32,7 +32,7 @@ planner:
     planner_type: EELookAheadWorld
     default_pose: [1.35, 0.17, 0.7, 1.57, 0, 1.57]
     look_ahead_time: 8
-    max_angle: 1.06 # rad
+    max_angle: 1 # rad
   # - frame_id: base
   #   name: ee_global_planner
   #   planner_type: EEPos3WaypointOnDemand
@@ -44,9 +44,9 @@ planner:
     name: ee_global_planner
     planner_type: EEPoseSE3WaypointOnDemand
     target_waypoints: [[5., 0.4, 0.9, 1.57, 0, 1.57],
-                       [0.2, 1.1, 0.8, 1.57, 0, -1.57]] # in base frame
+                       [0.0, 1.0, 0.9, 1.57, 0, -1.57]] # in base frame
     hold_period: 2
-    tracking_err_tol: 0.3
+    tracking_err_tol: 0.5
 simulation:
   duration: 100
   robot:
@@ -69,5 +69,5 @@ include:
   - package: "mmseq_run"
     path: "config/scene/ral25.yaml"
 logging:
-  log_dir: "$MOBILE_MANIPULATION_CENTRAL_BAG_DIR/ral25/"
+  log_dir: "$MOBILE_MANIPULATION_CENTRAL_BAG_DIR/ral25/pick_and_place"
   log_level: 10 # 0 - not set, 10 - debug, 20 - info
