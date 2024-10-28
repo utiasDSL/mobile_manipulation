@@ -128,16 +128,22 @@ class RAL25(HybridMPC):
 
         self.py_logger.info("Acting Controller {}".format(curr_controller_name))
 
+        solver_iter_num = 1
+
         if self.prev_controller_name is not None and self.prev_controller_name != curr_controller_name:
             controller.reset()
             # pass in xu bar 
-            # controller.u_bar = np.zerso_like(controller.u_bar)
-            # controller.x_bar = self.x_bar.copy()
-            # controller.t_bar = self.t_bar.copy()
+            controller.u_bar = self.u_bar.copy()
+            controller.x_bar = self.x_bar.copy()
+            controller.t_bar = self.t_bar.copy()
+            solver_iter_num = 3
+
+            self.py_logger.info("Controller Changed. Set solver iter to {}".format(solver_iter_num))
+
             # controller.lam_bar = None
 
 
-        results = controller.control(t, robot_states, planners, map)
+        results = controller.control(t, robot_states, planners, map, solver_iter_num)
         self._copy_internal_states(controller)
         self._log(controller, curr_controller_name)
         self.prev_controller_name = curr_controller_name
