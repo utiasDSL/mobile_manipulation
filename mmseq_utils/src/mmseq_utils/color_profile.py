@@ -7,7 +7,7 @@ Created on Sat Sep  4 22:45:53 2021
 """
 
 BLUE = '#0f4c81'
-YELLOW = '#ffaf12'
+YELLOW = "#FFAE42"
 SCARLET = '#cd212A'
 ORANGE = '#fa7a35'
 CHIVE = '#4b5335'

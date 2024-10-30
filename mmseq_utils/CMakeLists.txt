@@ -18,6 +18,7 @@ catkin_install_python(PROGRAMS
    scripts/plot_logger_pybullet.py
    scripts/plot_benchmark_result_squarewave.py
    scripts/plot_benchmark_result_self_collision.py
+   scripts/plot_benchmark_result_semi_static_reactive.py
    scripts/plot_path_comparison.py
    scripts/plot_rosbag.py
    scripts/plot_plan.py

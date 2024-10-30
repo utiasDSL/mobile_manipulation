@@ -6,7 +6,7 @@ import os
 import pandas
 
 from mmseq_utils.logging import DataLogger
-from mmseq_utils.plotting import DataPlotter, multipage, construct_logger
+from mmseq_utils.plotting import DataPlotter, multipage, construct_logger, HTMPCDataPlotter
 import matplotlib.pyplot as plt
 from pandas import DataFrame, concat
 
@@ -136,7 +136,7 @@ def benchmark(folder_path):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('-f', "--folder", required=True, help="Path to data folder.")
-    parser.add_argument("--htmpc", action="store_true", help="plot htmpc info")
+    parser.add_argument("--control", action="store_true", help="plot htmpc info")
     parser.add_argument("--show", action="store_true", help="plot htmpc info")
     parser.add_argument("--tracking", action="store_true",
                         help="plot tracking data")
@@ -154,6 +154,8 @@ if __name__ == "__main__":
                         help="debug")
     parser.add_argument("--compare", action="store_true",
                         help="plot comparisons")
+    parser.add_argument("--htmpc", action="store_true", default=False,
+                        help="use htmpc plotter")
     parser.add_argument("--compareidkc", action="store_true",
                         help="plot comparisons")
     parser.add_argument("--benchmark", action="store_true", help="gather benchmark results")
@@ -161,6 +163,7 @@ if __name__ == "__main__":
     parser.add_argument("--printparam", action="store_true", help="export figures to file")
     parser.add_argument("--paramname", type=str,help="control timestep to inspect")
     parser.add_argument("--plottimeoptimal", action="store_true", help="export figures to file")
+    parser.add_argument("--exp", action="store_true", help="export figures to file")
 
     args = parser.parse_args()
 
@@ -171,8 +174,12 @@ if __name__ == "__main__":
     elif args.benchmark:
         benchmark(args.folder)
     else:
-        data_plotter = construct_logger(args.folder)
         if args.htmpc:
+            plotter_class = HTMPCDataPlotter
+        else:
+            plotter_class = DataPlotter
+        data_plotter = construct_logger(args.folder, is_htmpc=args.htmpc, data_plotter_class=plotter_class)
+        if args.control:
             data_plotter.plot_mpc()
         if args.sdf:
             data_plotter.plot_sdf_map(args.timestep)
@@ -192,6 +199,8 @@ if __name__ == "__main__":
             data_plotter.print_mpc_param(args.paramname)
         if args.plottimeoptimal:
             data_plotter.plot_time_optimal_plan_tracking_results()
+        if args.exp:
+            data_plotter.plot_exp(args.timestep)
         if args.savefigs:
             data_plotter.save_figs()
         plt.show()
