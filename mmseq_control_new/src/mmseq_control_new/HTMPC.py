@@ -390,26 +390,12 @@ class HTMPCBase(MPC):
                         print(f"stage {i}: lam: {stmpc_solver.get(i, 'lam')}")
 
                     for i in range(self.N):
-                        print(f"stage {i}: t: {stmpc_solver.get(i, 't')}")
-
-                    for i in range(self.N):
                         print(f"stage {i}: pi: {stmpc_solver.get(i, 'pi')}")
 
                     for i in range(self.N):
                         print(f"stage {i}: sl: {stmpc_solver.get(i, 'sl')}")
                     for i in range(self.N):
                         print(f"stage {i}: su: {stmpc_solver.get(i, 'su')}")
-                        # v = self.evaluate_constraints(self.collisionCsts['sdf'],
-                        #                                     x_bar, u_bar, curr_p_map_bar)
-                        # h = self.evaluate_sdf_h_fcn(self.collisionCsts['sdf'],
-                        #                             x_bar, u_bar, curr_p_map_bar)
-                        # xdot = self.evaluate_sdf_xdot_fcn(self.collisionCsts['sdf'],
-                        #                             x_bar, u_bar, curr_p_map_bar)
-                        # for i in range(self.N):
-                        #     print(f"stage {i}: t: {stmpc_solver.get(i, 't')}")
-                        #     print(f"state {i}: sdf: {v[i]}")
-                        #     print(f"state {i}: h: {h[i]}")
-                        #     print(f"state {i}: xdot: {xdot[i]}")
 
                     self.log["iter_snapshot"][task_id] = {
                         "t": t,
@@ -431,7 +417,6 @@ class HTMPCBase(MPC):
                         solution["u_" + i_string] = stmpc_solver.get(i, "u")
                         solution["z_" + i_string] = stmpc_solver.get(i, "z")
                         solution["lam_" + i_string] = stmpc_solver.get(i, "lam")
-                        solution["t_" + i_string] = stmpc_solver.get(i, "t")
                         solution["sl_" + i_string] = stmpc_solver.get(i, "sl")
                         solution["su_" + i_string] = stmpc_solver.get(i, "su")
                         if i < self.N:

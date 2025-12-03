@@ -885,17 +885,6 @@ class STMPC(MPC):
                 print(f"stage {i}: sl: {self.ocp_solver.get(i, 'sl')}")
             for i in range(self.N):
                 print(f"stage {i}: su: {self.ocp_solver.get(i, 'su')}")
-                # v = self.evaluate_constraints(self.collisionCsts['sdf'],
-                #                                     x_bar, u_bar, curr_p_map_bar)
-                # h = self.evaluate_sdf_h_fcn(self.collisionCsts['sdf'],
-                #                             x_bar, u_bar, curr_p_map_bar)
-                # xdot = self.evaluate_sdf_xdot_fcn(self.collisionCsts['sdf'],
-                #                             x_bar, u_bar, curr_p_map_bar)
-                # for i in range(self.N):
-                #     print(f"stage {i}: t: {self.ocp_solver.get(i, 't')}")
-                #     print(f"state {i}: sdf: {v[i]}")
-                #     print(f"state {i}: h: {h[i]}")
-                #     print(f"state {i}: xdot: {xdot[i]}")
 
             self.log["iter_snapshot"] = {
                 "t": t,
@@ -917,7 +906,6 @@ class STMPC(MPC):
                 solution["u_" + i_string] = self.ocp_solver.get(i, "u")
                 solution["z_" + i_string] = self.ocp_solver.get(i, "z")
                 solution["lam_" + i_string] = self.ocp_solver.get(i, "lam")
-                solution["t_" + i_string] = self.ocp_solver.get(i, "t")
                 solution["sl_" + i_string] = self.ocp_solver.get(i, "sl")
                 solution["su_" + i_string] = self.ocp_solver.get(i, "su")
                 if i < self.N:

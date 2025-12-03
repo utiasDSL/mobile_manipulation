@@ -433,9 +433,12 @@ class DataPlotter:
         self.data["mpc_ee_predictions"] = []
         self.data["mpc_base_predictions"] = []
 
+        print(self.data["mpc_x_bars"].shape)
         for t_index in range(N):
-            print(self.data["mpc_x_bars"].shape)
             x_bar = self.data["mpc_x_bars"][t_index]
+            # Handle HTMPC data with shape (num_tasks, N+1, nx) - take the last task
+            if x_bar.ndim == 3:
+                x_bar = x_bar[-1]  # Use the last task's trajectory
             ee_bar, base_bar = self.controller._getEEBaseTrajectories(x_bar)
             self.data["mpc_ee_predictions"].append(ee_bar)
             self.data["mpc_base_predictions"].append(base_bar)
@@ -3685,3 +3688,6 @@ def construct_logger(
             )
         elif folder_num == 1 and file_num == 1:
             return data_plotter_class.from_ROSEXP_results(path_to_folder, process)
+        elif folder_num == 0 and "data.npz" in items and "config.yaml" in items:
+            # if data.npz and config.yaml are directly in the folder
+            return data_plotter_class.from_PYSIM_results(path_to_folder, process)
