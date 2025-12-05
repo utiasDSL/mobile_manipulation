@@ -15,5 +15,5 @@ controller:
       path: None
 
 
-  # Signed Distance Field Type, SDF3D vs SDF2D
-  sdf_type: "SDF3DNew"
+  # Signed Distance Field Type: SDF2D or SDF3D
+  sdf_type: "SDF3D"

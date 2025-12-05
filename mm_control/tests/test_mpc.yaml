@@ -4,7 +4,10 @@ controller:
   # MPC params
   dt: 0.1
   prediction_horizon: 1.0
-  collision_constraint_type: "SignedDistanceConstraint" # SignedDistanceConstraint or SignedDistanceConstraintCBF
+  collision_constraint_type:
+    self: "SignedDistanceConstraint"
+    sdf: "SignedDistanceConstraint"
+    static_obstacles: "SignedDistanceConstraint"
   ctrl_rate: 10 #hz
   cmd_vel_pub_rate: 100 # hz
   soft_cst: True
@@ -14,6 +17,8 @@ controller:
   static_obstacles_collision_avoidance_enabled: False
   ee_upward_constraint_enabled: False
   cst_tol_schedule_enabled: False
+  ee_pose_tracking_enabled: True
+  base_pose_tracking_enabled: True
 
   ee_upward_deviation_angle_max: 0.20    #rad, 0.26 rad ~ 15 degree
 
@@ -42,7 +47,10 @@ controller:
       mu: 0.0001
       zeta: 0.005
 
-  collision_cbf_gamma: 0.9
+  collision_cbf_gamma:
+    self: 0.9
+    sdf: 0.9
+    static_obstacles: 0.9
 
   ee_upward_soft:
     mu: 0.001
@@ -51,34 +59,49 @@ controller:
   # weights for each cost function
   cost_params:
     EEPos3:
-      Qk: 1.0
-      P: 1
+      Qk: [1, 1, 1]
+      P: [1, 1, 1]
+    EEPose:
+      Qk: [1, 1, 1, 1, 1, 1]
+      P: [1, 1, 1, 1, 1, 1]
+    EEPos3BaseFrame:
+      Qk: [1, 1, 1]
+      P: [1, 1, 1]
+    EEPoseBaseFrame:
+      Qk: [1, 1, 1, 1, 1, 1]
+      P: [1, 1, 1, 1, 1, 1]
     BasePos2:
-      Qk: 1.
-      P: 1
+      Qk: [1, 1]
+      P: [1, 1]
     BasePos3:
-      Qk: 1.
-      P: 1
+      Qk: [1, 1, 1]
+      P: [1, 1, 1]
+    BasePoseSE2:
+      Qk: [1, 1, 1]
+      P: [1, 1, 1]
     EEVel3:
-      Qk: 1.0
-      P: 1
+      Qk: [1, 1, 1]
+      P: [1, 1, 1]
     BaseVel2:
-      Qk: 1.
-      P: 1
+      Qk: [1, 1]
+      P: [1, 1]
     BaseVel3:
-      Qk: 1.
-      P: 1
+      Qk: [1, 1, 1]
+      P: [1, 1, 1]
     Effort:
-      Qqa: 0.
-      Qqb: 0.
-      Qva: 0.01
-      Qvb: 0.1
-      Qua: 0.01
-      Qub: 0.1
-      Qdua: 0.
-      Qdub: 0.1
+      Qqa: [0, 0, 0, 0, 0, 0]
+      Qqb: [0, 0, 0]
+      Qva: [0.01, 0.01, 0.01, 0.01, 0.01, 0.01]
+      Qvb: [0.01, 0.01, 0.01]
+      Qua: [0.01, 0.01, 0.01, 0.01, 0.01, 0.01]
+      Qub: [0.01, 0.01, 0.01]
+      Qdua: [0, 0, 0, 0, 0, 0]
+      Qdub: [0.1, 0.1, 0.1]
     Regularization:
       eps: 1.0e-06
+    slack:
+      z: 10
+      Z: 1
 
   # line search parameters
   beta: 0.5
@@ -86,6 +109,10 @@ controller:
 
   # ACADOS solver option
   acados:
+    name: "MM"
+    cython:
+      enabled: False
+      action: "generate"
     raise_exception_on_failure: False
     use_custom_hess: True
     use_terminal_cost: False
@@ -117,3 +144,7 @@ controller:
 include:
   - package: "mm_run"
     path: "config/robot/thing.yaml"
+  - package: "mm_run"
+    path: "config/scene/empty.yaml"
+  - package: "mm_run"
+    path: "config/map/SDF3D.yaml"

@@ -91,10 +91,11 @@ def test_BasePoseSE2(config):
     p_map_base["W"] = config["controller"]["cost_params"]["BasePos3"]["Qk"] * np.eye(
         cost_base.nr
     )
-    p_map_base["r"] = np.array([1, 1, -np.pi + -0.01])
+    # Reference matches default state (0, 0, 0) for zero-cost test
+    p_map_base["r"] = np.array([0, 0, 0])
     J_base = cost_base.evaluate(x, u, p_map_base.cat)
     print("testing BasePoseSE2")
-    print("expected cost: {} evaluated cost: {}".format(1.0, J_base))
+    print("expected cost: {} evaluated cost: {}".format(0, J_base))
 
     return cost_base
 
@@ -125,7 +126,8 @@ def test_EEPos3(config):
     p_map_ee["W"] = config["controller"]["cost_params"]["EEPos3"]["Qk"] * np.eye(
         cost_ee.nr
     )
-    p_map_ee["r"] = np.array([1.194, 0.374, 1.596])
+    # Reference matches actual EE position for default arm config (zero-cost test)
+    p_map_ee["r"] = np.array([0.431938, 1.22924, 0.706699])
 
     x, u = get_default_xu()
     J_ee = cost_ee.evaluate(x, u, p_map_ee.cat)
@@ -138,21 +140,25 @@ def test_EEPos3(config):
 def test_EEPoseSE3(config):
     robot = MobileManipulator3D(config["controller"])
     cost_ee = EEPoseSE3CostFunction(
-        robot, config["controller"]["cost_params"]["EEPos3"]
+        robot, config["controller"]["cost_params"]["EEPose"]
     )
     p_map_ee = cost_ee.p_struct(0)
-    p_map_ee["W"] = config["controller"]["cost_params"]["EEPos3"]["Qk"] * np.eye(
+    p_map_ee["W"] = config["controller"]["cost_params"]["EEPose"]["Qk"] * np.eye(
         cost_ee.nr
     )
-    p_map_ee["r"] = np.array([1.194, 0.374, 1.596, -2.86771, -1.55934, -0.176389])
+    # Reference matches actual EE pose for default arm config (zero-cost test)
+    # [x, y, z, roll, pitch, yaw]
+    p_map_ee["r"] = np.array(
+        [0.431938, 1.22924, 0.706699, -1.571778, -1.30439, 0.000388]
+    )
 
     x, u = get_default_xu()
     J_ee = cost_ee.evaluate(x, u, p_map_ee.cat)
-    cost_ee.e_fcn(x, u, p_map_ee.cat)
-    cost_ee.rot_ee_inv_fcn(x, u, p_map_ee.cat)
+    cost_ee.e_fcn(x, u, p_map_ee["r"])  # e_fcn takes r, not full params
+    cost_ee.rot_inv_fcn(x, u, p_map_ee.cat)
     cost_ee.r_rot_fcn(x, u, p_map_ee.cat)
     cost_ee.rot_err_fcn(x, u, p_map_ee.cat)
-    cost_ee.orn_ee_fcn(x, u, p_map_ee.cat)
+    cost_ee.orn_fcn(x, u, p_map_ee.cat)
 
     print("testing EEPoseSE3")
     print("expected cost: {} evaluated cost: {}".format(0, J_ee))
@@ -206,7 +212,7 @@ if __name__ == "__main__":
     dt = 0.1
     N = 10
 
-    config = parsing.load_config("$(rospack find mm_control)/scripts/test_mpc.yaml")
+    config = parsing.load_config("$(rospack find mm_control)/tests/test_mpc.yaml")
 
     test_BasePos2(config)
     test_BasePos3(config)

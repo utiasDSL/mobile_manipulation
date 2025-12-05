@@ -8,5 +8,5 @@ controller:
     filter_enabled: False
     filter_type: "gaussian"   # gaussian or tv
 
-  # Signed Distance Field Type, SDF3D vs SDF2D
-  sdf_type: "SDF2DNew"
+  # Signed Distance Field Type: SDF2D or SDF3D
+  sdf_type: "SDF2D"
