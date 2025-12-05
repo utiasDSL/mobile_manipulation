@@ -1,0 +1,6 @@
+base_to_arm_transform:
+  rpy: [0, 0, 0]
+  xyz: [0, 0, 0.0188]
+gripped_object_transform:
+  rpy: [1.5017, 0.096, 3.134]
+  xyz: [-0.006, -0.0192, 0.447]

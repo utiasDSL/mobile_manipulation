@@ -1,0 +1,8 @@
+<?xml version="1.0" ?>
+<robot name="thing" xmlns:xacro="http://www.ros.org/wiki/xacro">
+  <xacro:include filename="$(find mobile_manipulation_central)/urdf/xacro/cartesian_base_joints.urdf.xacro" />
+  <xacro:include filename="$(find mobile_manipulation_central)/urdf/xacro/thing_no_wheels.urdf.xacro" />
+  <xacro:include filename="$(find mm_assets)/thing/xacro/end_effector_fingers.urdf.xacro" />
+  <xacro:include filename="arm_coverage.urdf.xacro" />
+
+</robot>

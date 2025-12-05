@@ -1,0 +1,4 @@
+# Teleop configuration for PS4 joystick using the x-pad configuration.
+joy_node:
+  deadzone: 0.1
+  autorepeat_rate: 20

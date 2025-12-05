@@ -1,0 +1,132 @@
+simulation:
+  robot:
+    #home: [0, 0, 0, 0.5pi, -0.75pi, -0.5pi, -0.25pi, -0.5pi, 0.5pi]  # upright
+    home: [1.5, 2, -0.3, 0.2pi, -0.25pi, 0.5pi, -0.25pi, 0.6pi, 0.417pi]  # no overlap bw two cams
+    #home: [0, -0, 0, 0.5pi, -0.25pi, 0.5pi, -0.25pi, 0.5pi, 0.417pi]  # standard
+    #home: [1, -1, 0.75pi, 0.35pi, -0.65pi, 0.346pi, -0.233pi, 0.75pi, 0.32pi]  # standard
+    dims:
+      q: 9  # generalized position
+      v: 9  # generalized velocity
+      x: 18 # state
+      u: 9  # input
+    noise:
+      measurement:
+        q_std_dev: 0
+        v_std_dev: 0
+      process:
+        v_std_dev: 0
+    joint_names:
+      - "x_to_world_joint"
+      - "y_to_x_joint"
+      - "base_to_y_joint"
+      - "ur10_arm_shoulder_pan_joint"
+      - "ur10_arm_shoulder_lift_joint"
+      - "ur10_arm_elbow_joint"
+      - "ur10_arm_wrist_1_joint"
+      - "ur10_arm_wrist_2_joint"
+      - "ur10_arm_wrist_3_joint"
+    tool_joint_name: "gripped_object_joint"
+    base_joint_name: "base_to_y_joint"
+    link_names:
+      - "base"
+      - "ur10_arm_base_link"
+      - "ur10_arm_shoulder_link"
+      - "ur10_arm_upper_arm_link"
+      - "ur10_arm_forearm_link"
+      - "ur10_arm_wrist_1_link"
+      - "ur10_arm_wrist_2_link"
+      - "ur10_arm_wrist_3_link"
+      - "gripped_object"
+    tool_link_name: "gripped_object"
+    base_link_name: "base"
+    base_type: omnidirectional
+    urdf:
+#      package: "mm_assets"
+#      path: "thing/urdf/mm_pyb_fingers.urdf"
+      package: "mm_assets"
+      path: "thing/urdf/thing_sim.urdf"
+      includes:
+        - "$(find mobile_manipulation_central)/urdf/xacro/cartesian_base_joints.urdf.xacro"
+        - "$(find mobile_manipulation_central)/urdf/xacro/thing_no_wheels.urdf.xacro"
+        - "$(find mm_assets)/thing/xacro/end_effector_empty.urdf.xacro"
+        - "$(find mm_assets)/thing/xacro/arm_coverage.urdf.xacro"
+        - "$(find mm_assets)/thing/xacro/cameras.urdf.xacro"
+      args:
+        use_collision: "false"
+        transform_params: "$(find mm_run)/config/robot/urdf_transforms.yaml"
+
+controller:
+  # robot parameters
+  robot:
+    dims:
+      q: 9  # generalized position
+      v: 9  # generalized velocity
+      x: 18 # state
+      u: 9  # input
+    x0: [ 1, -1, 0, 0.5pi, -0.25pi, 0.5pi, -0.25pi, 0.5pi, 0.417pi ]
+
+    limits:
+      input_rate:
+        lower: [-10, -10, -10, -80, -80, -80, -80, -80, -80]
+        upper: [10, 10, 10, 80, 80, 80, 80, 80, 80]
+      input:
+        lower: [ -1., -1.0, -0.75, -2.16, -2.16, -3.15, -3.2, -3.2, -3.2 ]
+        upper: [ 1.0, 1.0, 0.75, 2.16, 2.16, 3.15, 3.2, 3.2, 3.2 ]
+      state:
+        lower: [ -10, -10, -2.pi, -0.166pi, -1pi, -1pi, -1pi, -1pi, -1pi,
+                 -1.0, -1.0, -0.4, -2, -2, -3, -3, -3, -3 ]
+        upper: [ 10, 10, 2pi, 1.166pi, 0.2, 1pi, 1pi, 1pi, 1pi,
+                 1.0, 1.0, 0.4, 2, 2, 3, 3, 3, 3 ]
+    time_discretization_dt: 0.1
+    link_names:
+      - "base"
+      - "ur10_arm_base_link"
+      - "ur10_arm_shoulder_link"
+      - "ur10_arm_upper_arm_link"
+      - "ur10_arm_forearm_link"
+      - "ur10_arm_wrist_1_link"
+      - "ur10_arm_wrist_2_link"
+      - "ur10_arm_wrist_3_link"
+      - "gripped_object"
+    tool_link_name: "gripped_object"
+    base_link_name: "base"
+    base_type: omnidirectional
+
+    tool_vicon_name: "ThingContainer"
+
+    collision_link_names:
+      base:
+        - "base_collision_link"
+        # - "base_collision_link_front"
+        #- "base_collision_link_back"
+
+      rack:
+        # - "rack_collision_link"
+        - "rack_collision_link_sphere_1"
+        - "rack_collision_link_sphere_2"
+      upper_arm:
+        - "ur10_arm_upper_arm_collision_link"
+        - "ur10_arm_upper_arm_collision_sphere_link1"
+        - "ur10_arm_upper_arm_collision_sphere_link2"
+        - "ur10_arm_upper_arm_collision_sphere_link3"
+      forearm:
+        - "ur10_arm_forearm_collision_link"
+        - "ur10_arm_forearm_collision_sphere_link1"
+        - "ur10_arm_forearm_collision_sphere_link2"
+      wrist:
+        - "ur10_arm_wrist1_collision_link"
+        - "ur10_arm_wrist3_collision_link"
+      tool:
+        - "gripped_object_collision_link"
+
+
+    urdf:
+      package: "mm_assets"
+      path: "thing/urdf/thing_ctrl.urdf"
+      includes:
+        - "$(find mobile_manipulation_central)/urdf/xacro/thing_no_wheels.urdf.xacro"
+        - "$(find mm_assets)/thing/xacro/end_effector_fingers.urdf.xacro"
+        - "$(find mm_assets)/thing/xacro/collision.urdf.xacro"
+      args:
+        use_collision: "True"
+        transform_params: "$(find mm_run)/config/robot/robot_transforms_real.yaml"

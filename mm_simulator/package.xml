@@ -1,0 +1,17 @@
+<?xml version="1.0"?>
+<package format="2">
+  <name>mm_simulator</name>
+  <version>0.0.0</version>
+  <description>Mobile manipulation simulation package</description>
+
+  <maintainer email="todo@todo.todo">Maintainer</maintainer>
+  <license>MIT</license>
+
+  <depend>rospy</depend>
+  <depend>std_msgs</depend>
+  <depend>mm_utils</depend>
+  <buildtool_depend>catkin</buildtool_depend>
+
+  <export>
+  </export>
+</package>

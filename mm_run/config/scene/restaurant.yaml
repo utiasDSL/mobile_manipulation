@@ -1,0 +1,21 @@
+simulation:
+  static_obstacles:
+    enabled: True
+
+    urdf:
+      package: "mm_assets"
+      path: "scenes/urdf/restaurant.urdf"
+      includes:
+        - "$(find mm_assets)/scenes/xacro/restaurant.urdf.xacro"
+
+controller:
+  scene:
+    enabled: True
+    collision_link_names:
+      static_obstacles:
+        - "ground"
+    urdf:
+      package: "mm_assets"
+      path: "scenes/urdf/restaurant.urdf"
+      includes:
+        - "$(find mm_assets)/scenes/xacro/restaurant.urdf.xacro"

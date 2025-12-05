@@ -1,6 +1,21 @@
-*.pyc
-*.pdf
-mmseq_control/src/mmseq_control/casadi_c/*
-mmseq_control_new/acados_outputs/*
+# URDF
 *.urdf
-.vscode/*
+
+# Editors
+.vscode/
+.cursor/
+.ruff_cache/
+
+# Acados
+c_generated_code/
+acados_*
+
+# Casadi
+casadi_c*
+
+# Python
+__pycache__/
+*.py[cod]
+
+# Results/output data
+results/

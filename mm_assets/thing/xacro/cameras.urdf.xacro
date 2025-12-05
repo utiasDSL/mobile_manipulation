@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<robot name="coverage" xmlns:xacro="http://wiki.ros.org/xacro">
+
+  <!-- Set false to not include <coverage> blocks, which is useful if we just want to visualize in a simulator. -->
+
+  <xacro:property name="material" value="seethrough"/>
+
+  <xacro:macro name="camera_link" params="name radius">
+    <link name="${name}">
+    </link>
+  </xacro:macro>
+
+
+  <!-- Base Camera -->
+  <xacro:camera_link name="camera_base_link" radius="0.03"/>
+  <joint name="camera_base_link_joint" type="fixed">
+    <xacro:transformed_origin name="camera_base_transform" />
+    <parent link="base_link"/>
+    <child link="camera_base_link"/>
+  </joint>
+
+  <xacro:camera_link name="camera_base_color_optical_frame" radius="0.03"/>
+  <joint name="camera_base_optical_joint" type="fixed">
+    <origin rpy="-1.57 0 -1.57" xyz="0 0 0" />
+    <parent link="camera_base_link"/>
+    <child link="camera_base_color_optical_frame"/>
+  </joint>
+
+  <xacro:camera_link name="camera_hand_link" radius="0.03"/>
+  <joint name="camera_hand_joint" type="fixed">
+    <xacro:transformed_origin name="camera_hand_transform" />
+    <parent link="gripper"/>
+    <child link="camera_hand_link"/>
+  </joint>
+
+  <xacro:camera_link name="camera_hand_color_optical_frame" radius="0.03"/>
+  <joint name="camera_hand_optical_joint" type="fixed">
+    <origin rpy="-1.57 0 -1.57" xyz="0 0 0" />
+    <parent link="camera_hand_link"/>
+    <child link="camera_hand_color_optical_frame"/>
+  </joint>
+
+</robot>

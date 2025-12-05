@@ -1,7 +1,0 @@
-simulation:
-  timestep: 0.01
-  duration: 25.
-
-include:
-  - package: "mmseq_run"
-    path: "config/sensor/cameras.yaml"

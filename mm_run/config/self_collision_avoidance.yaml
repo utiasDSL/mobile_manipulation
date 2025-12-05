@@ -1,0 +1,65 @@
+planner:
+  sot_type: "SoTStatic"
+  tasks:
+    - name: "EE Pos 1"
+      planner_type: "EESimplePlanner"
+      frame_id: "EE"
+      target_pos: [0., 0., 0.]
+      hold_period: 3.
+      tracking_err_tol: 0.02
+    - frame_id: base
+      name: Base Position
+      planner_type: BasePosTrajectoryLine
+      initial_pos: [0,0]
+      target_pos:
+      - 4.0
+      - 0.0
+      cruise_speed: 1.0
+      tracking_err_tol: 0.2
+
+controller:
+  home: "default"
+  self_collision_avoidance_enabled: True
+  sdf_collision_avoidance_enabled: False
+  base_pose_tracking_enabled: False
+  ee_pose_tracking_enabled: False
+  type: "MPC"
+  acados:
+    ocp_solver_options:
+      qp_solver: "FULL_CONDENSING_HPIPM"
+      # FULL_CONDENSING_QPOASES
+      # PARTIAL_CONDENSING_HPIPM, FULL_CONDENSING_QPOASES, FULL_CONDENSING_HPIPM,
+      # PARTIAL_CONDENSING_QPDUNES, PARTIAL_CONDENSING_OSQP, FULL_CONDENSING_DAQP
+      hessian_approx: "GAUSS_NEWTON"
+      integrator_type: "IRK"
+      print_level: 0
+      nlp_solver_type: "SQP"  #SQP_RTI, SQP
+      globalization: "MERIT_BACKTRACKING"
+      qp_solver_iter_max: 100
+      nlp_solver_tol_comp: 1.e-06
+      nlp_solver_tol_stat: 1.0e-03
+      nlp_solver_tol_eq: 1.0e-02
+      nlp_solver_tol_ineq: 1.0e-02
+      nlp_solver_max_iter: 100
+      qp_solver_warm_start: 2
+      nlp_solver_ext_qp_res: 0
+
+
+simulation:
+  duration: 10
+
+include:
+  - package: "mm_run"
+    path: "config/robot/thing.yaml"
+  - package: "mm_run"
+    path: "config/controller/MPC.yaml"
+  - package: "mm_run"
+    path: "config/sim/simulation.yaml"
+  - package: "mm_run"
+    path: "config/scene/empty.yaml"
+  - package: "mm_run"
+    path: "config/map/SDF3D.yaml"
+
+logging:
+  log_dir: "self_collision_avoidance"
+  log_level: 4 # 0 - not set, 10 - debug, 20 - info

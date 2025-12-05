@@ -1,0 +1,26 @@
+simulation:
+  static_obstacles:
+    enabled: True
+
+    urdf:
+      package: "mm_assets"
+      path: "scenes/urdf/static_obstacles.urdf"
+      includes:
+        - "$(find mm_assets)/scenes/xacro/static_obstacles.urdf.xacro"
+      args:
+        obstacle_params_file: "$(find mm_run)/config/scene/static_obstacles.yaml"
+
+controller:
+  scene:
+    enabled: True
+    collision_link_names:
+      static_obstacles:
+        - "obstacle_cylinder_1_link"
+        - "obstacle_cylinder_2_link"
+    urdf:
+      package: "mm_assets"
+      path: "scenes/urdf/static_obstacles.urdf"
+      includes:
+        - "$(find mm_assets)/scenes/xacro/static_obstacles.urdf.xacro"
+      args:
+        obstacle_params_file: "$(find mm_run)/config/scene/static_obstacles.yaml"

@@ -1,0 +1,167 @@
+<?xml version="1.0" encoding="utf-8"?>
+<robot name="collision" xmlns:xacro="http://wiki.ros.org/xacro">
+
+  <!-- Set false to not include <collision> blocks, which is useful if we just want to visualize in a simulator. -->
+  <xacro:arg name="use_collision" default="true"/>
+
+  <xacro:property name="material" value="seethrough"/>
+
+  <xacro:macro name="collision_link_sphere" params="name radius">
+    <link name="${name}">
+      <xacro:if value="$(arg use_collision)">
+        <collision>
+          <origin rpy="0 0 0" xyz="0 0 0" />
+          <geometry>
+            <sphere radius="${radius}"/>
+          </geometry>
+        </collision>
+      </xacro:if>
+      <visual>
+        <origin rpy="0 0 0" xyz="0 0 0" />
+        <geometry>
+          <sphere radius="${radius}"/>
+        </geometry>
+        <material name="${material}"/>
+      </visual>
+    </link>
+  </xacro:macro>
+
+    <xacro:macro name="collision_link_cylinder" params="name radius">
+    <link name="${name}">
+      <xacro:if value="$(arg use_collision)">
+        <collision>
+          <origin rpy="0 0 0" xyz="0 0 0" />
+          <geometry>
+            <cylinder  radius="${radius}" length="1"/>
+          </geometry>
+        </collision>
+      </xacro:if>
+      <visual>
+        <origin rpy="0 0 0" xyz="0 0 0" />
+        <geometry>
+          <cylinder  radius="${radius}" length="1"/>
+        </geometry>
+        <material name="${material}"/>
+      </visual>
+    </link>
+  </xacro:macro>
+
+  <!-- Collision sphere for the base -->
+  <xacro:collision_link_sphere name="base_collision_link" radius="0.55"/>
+  <joint name="base_collision_joint" type="fixed">
+    <origin rpy="0 0 0" xyz="0 0 -0.08"/>
+    <parent link="base_link"/>
+    <child link="base_collision_link"/>
+  </joint>
+
+  <!-- <xacro:collision_link_sphere name="base_collision_link_front" radius="0.3"/>
+  <joint name="base_collision_joint_front" type="fixed">
+    <origin rpy="0 0 0" xyz="0.35 0 -0.08"/>
+    <parent link="base_link"/>
+    <child link="base_collision_link_front"/>
+  </joint>
+
+  <xacro:collision_link_sphere name="base_collision_link_back" radius="0.3"/>
+  <joint name="base_collision_joint_back" type="fixed">
+    <origin rpy="0 0 0" xyz="-0.25 0 -0.08"/>
+    <parent link="base_link"/>
+    <child link="base_collision_link_back"/>
+  </joint> -->
+
+  <xacro:collision_link_cylinder name="rack_collision_link" radius="0.325"/>
+  <joint name="rack_collision_joint" type="fixed">
+    <origin rpy="0 0 0" xyz="-0.45 -0. 0.75"/>
+    <parent link="base_link"/>
+    <child link="rack_collision_link"/>
+  </joint>
+
+  <xacro:collision_link_sphere name="rack_collision_link_sphere_1" radius="0.5"/>
+  <joint name="rack_collision_joint_1" type="fixed">
+    <origin rpy="0 0 0" xyz="-0.45 -0.15 0.75"/>
+    <parent link="base_link"/>
+    <child link="rack_collision_link_sphere_1"/>
+  </joint>
+
+  <xacro:collision_link_sphere name="rack_collision_link_sphere_2" radius="0.5"/>
+  <joint name="rack_collision_joint_2" type="fixed">
+    <origin rpy="0 0 0" xyz="-0.45 0.15 0.75"/>
+    <parent link="base_link"/>
+    <child link="rack_collision_link_sphere_2"/>
+  </joint>
+
+
+  <!-- Collision sphere for the upper arm -->
+  <xacro:collision_link_sphere name="ur10_arm_upper_arm_collision_link" radius="0.15"/>
+  <joint name="ur10_arm_upper_arm_collision_joint" type="fixed">
+    <origin rpy="0 0 0" xyz="0 0 0"/>
+    <parent link="ur10_arm_upper_arm_link"/>
+    <child link="ur10_arm_upper_arm_collision_link"/>
+  </joint>
+  <xacro:collision_link_sphere name="ur10_arm_upper_arm_collision_sphere_link1" radius="0.15"/>
+  <joint name="ur10_arm_upper_arm_collision_sphere_joint1" type="fixed">
+    <origin rpy="0 1.5708 0" xyz="-0. 0 0.168"/>
+    <parent link="ur10_arm_upper_arm_link"/>
+    <child link="ur10_arm_upper_arm_collision_sphere_link1"/>
+  </joint>
+
+  <xacro:collision_link_sphere name="ur10_arm_upper_arm_collision_sphere_link2" radius="0.15"/>
+  <joint name="ur10_arm_upper_arm_collision_sphere_joint2" type="fixed">
+    <origin rpy="0 1.5708 0" xyz="-0.2 0 0.168"/>
+    <parent link="ur10_arm_upper_arm_link"/>
+    <child link="ur10_arm_upper_arm_collision_sphere_link2"/>
+  </joint>
+
+  <xacro:collision_link_sphere name="ur10_arm_upper_arm_collision_sphere_link3" radius="0.15"/>
+  <joint name="ur10_arm_upper_arm_collision_sphere_joint3" type="fixed">
+    <origin rpy="0 1.5708 0" xyz="-0.4 0 0.168"/>
+    <parent link="ur10_arm_upper_arm_link"/>
+    <child link="ur10_arm_upper_arm_collision_sphere_link3"/>
+  </joint>
+
+  <!-- Collision sphere for the forearm -->
+  <xacro:collision_link_sphere name="ur10_arm_forearm_collision_link" radius="0.15"/>
+  <joint name="ur10_arm_forearm_collision_joint" type="fixed">
+    <origin rpy="0 0 0" xyz="0 0 0.12"/>
+    <parent link="ur10_arm_forearm_link"/>
+    <child link="ur10_arm_forearm_collision_link"/>
+  </joint>
+
+  <xacro:collision_link_sphere name="ur10_arm_forearm_collision_sphere_link1" radius="0.15"/>
+  <joint name="ur10_arm_forearm_collision_sphere_joint1" type="fixed">
+    <origin rpy="0 1.5708 0" xyz="-0.2 0 0.06"/>
+    <parent link="ur10_arm_forearm_link"/>
+    <child link="ur10_arm_forearm_collision_sphere_link1"/>
+  </joint>
+
+  <xacro:collision_link_sphere name="ur10_arm_forearm_collision_sphere_link2" radius="0.15"/>
+  <joint name="ur10_arm_forearm_collision_sphere_joint2" type="fixed">
+    <origin rpy="0 1.5708 0" xyz="-0.4 0 0.06"/>
+    <parent link="ur10_arm_forearm_link"/>
+    <child link="ur10_arm_forearm_collision_sphere_link2"/>
+  </joint>
+
+  <!-- Collision sphere for the wrist -->
+  <xacro:collision_link_sphere name="ur10_arm_wrist1_collision_link" radius="0.15"/>
+  <joint name="ur10_arm_wrist1_collision_joint" type="fixed">
+    <origin rpy="0 0 0" xyz="0 0 -0.05"/>
+    <parent link="ur10_arm_wrist_1_link"/>
+    <child link="ur10_arm_wrist1_collision_link"/>
+  </joint>
+
+  <xacro:collision_link_sphere name="ur10_arm_wrist3_collision_link" radius="0.2"/>
+  <joint name="ur10_arm_wrist3_collision_joint" type="fixed">
+    <origin rpy="0 0 0" xyz="0 0 0"/>
+    <parent link="ur10_arm_wrist_3_link"/>
+    <child link="ur10_arm_wrist3_collision_link"/>
+  </joint>
+
+  <!-- Gripped Object -->
+  <xacro:collision_link_sphere name="gripped_object_collision_link" radius="0.15"/>
+  <joint name="gripped_object_collision_joint" type="fixed">
+    <origin rpy="0 0 0" xyz="0 0 0.0"/>
+    <parent link="gripped_object"/>
+    <child link="gripped_object_collision_link"/>
+  </joint>
+
+
+</robot>

@@ -1,0 +1,12 @@
+<?xml version="1.0"?>
+<launch>
+
+  <include file="$(find mm_run)/launch/thing_description.launch">
+    <arg name="visual_params" value="$(find ur_description)/config/ur10/visual_parameters.yaml"/>
+  </include>
+
+  <node name="joint_state_publisher_gui" pkg="joint_state_publisher_gui" type="joint_state_publisher_gui"/>
+  <node pkg="robot_state_publisher" type="robot_state_publisher" name="rob_st_pub_arm"></node>
+
+  <node name="rviz" pkg="rviz" type="rviz" args="-d $(find mm_run)/rviz/mm_basic.rviz" required="true"/>
+</launch>

@@ -1,0 +1,20 @@
+<?xml version="1.0"?>
+<package format="2">
+  <name>mm_run</name>
+  <version>0.0.0</version>
+  <description>Mobile manipulation run/launch package</description>
+
+  <maintainer email="todo@todo.todo">Maintainer</maintainer>
+  <license>MIT</license>
+
+  <depend>rospy</depend>
+  <depend>std_msgs</depend>
+  <depend>mm_simulator</depend>
+  <depend>mm_control</depend>
+  <depend>mm_plan</depend>
+  <depend>mm_utils</depend>
+  <buildtool_depend>catkin</buildtool_depend>
+
+  <export>
+  </export>
+</package>

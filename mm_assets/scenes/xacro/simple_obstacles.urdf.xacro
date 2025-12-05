@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8"?>
+<robot name="simple_obstacles" xmlns:xacro="http://wiki.ros.org/xacro">
+
+  <material name="red">
+    <color rgba="1.0 0.0 0.0 1.0"/>
+  </material>
+
+  <xacro:macro name="obstacle_link" params="name material *geometry">
+    <link name="${name}">
+        <collision>
+          <origin rpy="0 0 0" xyz="0 0 0" />
+          <xacro:insert_block name="geometry" />
+        </collision>
+      <visual>
+        <origin rpy="0 0 0" xyz="0 0 0" />
+        <xacro:insert_block name="geometry" />
+        <material name="${material}"/>
+      </visual>
+    </link>
+  </xacro:macro>
+
+  <link name="obstacle_base_link"/>
+
+<!--  <xacro:obstacle_link name="obstacle_link_1" material="red">-->
+<!--    <geometry>-->
+<!--      <sphere radius="0.5"/>-->
+<!--    </geometry>-->
+<!--  </xacro:obstacle_link>-->
+<!--  <joint name="obstacle_joint_1" type="fixed">-->
+<!--    <origin rpy="0 0 0" xyz="2 0 0"/>-->
+<!--    <parent link="obstacle_base_link"/>-->
+<!--    <child link="obstacle_link_1"/>-->
+<!--  </joint>-->
+
+<!--  <xacro:obstacle_link name="obstacle_link_2" material="red">-->
+<!--    <geometry>-->
+<!--      <sphere radius="0.25"/>-->
+<!--    </geometry>-->
+<!--  </xacro:obstacle_link>-->
+<!--  <joint name="obstacle_joint_2" type="fixed">-->
+<!--    <origin rpy="0 0 0" xyz="1 1 1"/>-->
+<!--    <parent link="obstacle_base_link"/>-->
+<!--    <child link="obstacle_link_2"/>-->
+<!--  </joint>-->
+
+    <xacro:obstacle_link name="obstacle_link_2" material="red">
+    <geometry>
+      <cylinder radius="0.25" length="1."/>
+<!--      <sphere radius="0.25"/>-->
+    </geometry>
+  </xacro:obstacle_link>
+  <joint name="obstacle_joint_2" type="fixed">
+    <origin rpy="0 0 0" xyz="5.0 0.5 0.5"/>
+    <parent link="obstacle_base_link"/>
+    <child link="obstacle_link_2"/>
+  </joint>
+
+  <xacro:obstacle_link name="obstacle_link_3" material="red">
+    <geometry>
+      <cylinder radius="0.25" length="1."/>
+<!--      <sphere radius="0.25"/>-->
+    </geometry>
+  </xacro:obstacle_link>
+  <joint name="obstacle_joint_3" type="fixed">
+    <origin rpy="0 0 0" xyz="3.0 -0.5 0.5"/>
+    <parent link="obstacle_base_link"/>
+    <child link="obstacle_link_3"/>
+  </joint>
+
+</robot>

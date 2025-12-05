@@ -1,0 +1,7 @@
+simulation:
+  timestep: 0.01
+  duration: 25.
+
+include:
+  - package: "mm_run"
+    path: "config/sensor/cameras.yaml"

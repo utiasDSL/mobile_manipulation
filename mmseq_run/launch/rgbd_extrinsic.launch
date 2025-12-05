@@ -1,8 +1,0 @@
-<?xml version="1.0"?>
-<!-- Launches the ROS-based simulation, which uses the real mpc_ros nodes talking to a PyBullet sim environment. -->
-
-<launch>
-  <node pkg="tf" type="static_transform_publisher" name="fake_loc_broadcaster" args="0 0 0 0 0 0 1 world base_link 100" />
-  <node pkg="tf" type="static_transform_publisher" name="cam_base_broadcaster" args="0.40360093 0.02389736 0.48356121 -0.00173282 -0.00248752  0.00359189  0.99998895 base_link camera_base_link 100" />
-  <node pkg="tf" type="static_transform_publisher" name="cam_hand_broadcaster" args="0.0218279  -0.16487507  0.11044692 0.5146015   0.50084812  0.49597955 -0.48820154 gripper camera_hand_link 100" />
-</launch>

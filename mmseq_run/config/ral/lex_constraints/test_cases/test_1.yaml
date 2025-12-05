@@ -1,5 +1,0 @@
-controller:
-  # HT-MPC Solver Type, lex vs SQP
-  hierarchy_constraint_type: "HierarchicalTrackingConstraint"    # error, cost_value, cost_value_sum
-  cst_tol_schedule_enabled: True
-  hierarchy_const_tol: 0.001
