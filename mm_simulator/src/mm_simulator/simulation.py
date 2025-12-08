@@ -340,9 +340,9 @@ class BulletSimulation:
         self.timestep = config["timestep"]
         self.duration = config["duration"]
 
-        if config["pybullet_connection"] == "GUI":
+        if config["gui"]:
             pyb.connect(pyb.GUI, options="--width=1280 --height=720")
-        elif config["pybullet_connection"] == "DIRECT":
+        else:
             pyb.connect(pyb.DIRECT)
 
         pyb.setGravity(*config["gravity"])
@@ -389,8 +389,8 @@ class BulletSimulation:
         debug_frame_world(0.2, list(r_ew_w), orientation=Q_we, line_width=3)
 
         # video recording
-        video_name = cli_args.video if cli_args is not None else None
-        if video_name is not None:
+        if cli_args is not None and "video" in cli_args:
+            video_name = cli_args.video
             self.video_manager = VideoManager.from_config(
                 video_name=video_name, config=config, timestamp=timestamp, r_ew_w=r_ew_w
             )

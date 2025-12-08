@@ -45,7 +45,8 @@ def main():
     config = parsing.load_config(args.config)
 
     if args.GUI:
-        config["simulation"]["pybullet_connection"] = "GUI"
+        config["simulation"]["gui"] = True
+
     if args.logging_sub_folder != "default":
         config["logging"]["log_dir"] = os.path.join(
             config["logging"]["log_dir"], args.logging_sub_folder

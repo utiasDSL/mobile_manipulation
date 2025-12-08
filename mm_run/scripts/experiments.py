@@ -90,7 +90,7 @@ def main():
         )
 
     if args.GUI:
-        config["simulation"]["pybullet_connection"] = "GUI"
+        config["simulation"]["gui"] = True
 
     sim_config = config["simulation"]
     ctrl_config = config["controller"]
