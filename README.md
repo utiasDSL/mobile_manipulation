@@ -19,6 +19,7 @@ To install `mobile_manipulation_central`, clone this repository into your ROS wo
 ```bash
 cd ~/catkin_ws/src
 git clone https://github.com/utiasDSL/mobile_manipulation_central
+git checkout mm_dev
 cd ~/catkin_ws
 catkin build mobile_manipulation_central
 source devel/setup.bash
