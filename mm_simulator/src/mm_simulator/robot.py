@@ -15,26 +15,6 @@ class FixedBaseMapping:
         return q_pyb.copy(), v_pyb.copy()
 
 
-class NonholonomicBaseMapping:
-    @staticmethod
-    def forward(q, v, bodyframe=False):
-        yaw = q[2]
-        C_wb = rotz(yaw)
-        v_pyb = np.copy(v)
-        v_pyb[1] = 0  # nonholonomic constraint: cannot move sideways
-        v_pyb[:3] = C_wb @ v[:3]
-        return q.copy(), v_pyb
-
-    @staticmethod
-    def inverse(q_pyb, v_pyb, bodyframe=False):
-        yaw = q_pyb[2]
-        C_wb = rotz(yaw)
-        v = np.copy(v_pyb)
-        v[:3] = C_wb.T @ v_pyb[:3]
-        v[1] = 0
-        return q_pyb.copy(), v
-
-
 class OmnidirectionalBaseMapping:
     @staticmethod
     def forward(q, v, bodyframe=False):
@@ -76,8 +56,6 @@ class PyBulletInputMapping:
             return PyBulletInputMapping.nonholonomic
         elif s == "omnidirectional":
             return OmnidirectionalBaseMapping
-        elif s == "floating":
-            raise NotImplementedError("Floating base not yet implemented.")
         else:
             raise ValueError(f"Cannot create base type from string {s}.")
 
@@ -141,10 +119,6 @@ class SimulatedRobot:
 
         # set tool to have friction coefficient μ=1 for convenience
         pyb.changeDynamics(self.uid, self.tool_idx, lateralFriction=1.0)
-
-    def reset_arm_joints(self, qa):
-        for idx, angle in zip(self.robot_joint_indices[3:], qa):
-            pyb.resetJointState(self.uid, idx, angle)
 
     def reset_joint_configuration(self, q):
         """Reset the robot to a particular configuration.

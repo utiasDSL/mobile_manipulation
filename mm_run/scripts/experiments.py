@@ -165,7 +165,7 @@ def main():
             u, acc = results
 
         robot.command_velocity(u)
-        t, _ = sim.step(t, step_robot=False)
+        t, _ = sim.step(t)
         ee_curr_pos, ee_cur_orn = robot.link_pose()
         ee_states = (ee_curr_pos, ee_cur_orn)
         states = {"base": (robot_states[0][:3], robot_states[1][:3]), "EE": ee_states}

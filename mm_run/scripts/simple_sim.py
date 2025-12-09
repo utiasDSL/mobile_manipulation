@@ -67,7 +67,7 @@ def main():
             logger.append("xs", x)
             logger.append("cmd_vels", vd)
 
-        t, _ = sim.step(t, step_robot=False)
+        t, _ = sim.step(t)
         time.sleep(sim.timestep)
 
     plotter = DataPlotter.from_logger(logger)

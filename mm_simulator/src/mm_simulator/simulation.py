@@ -10,7 +10,6 @@ from mm_utils import math, parsing
 from mm_utils.geometry import Box3D
 
 
-# TODO rename to something like BulletObject
 class BulletBody:
     def __init__(
         self,
@@ -43,8 +42,7 @@ class BulletBody:
             com_offset = np.zeros(3)
         self.com_offset = com_offset
 
-        # we need to get the box's orientation correct here for accurate height
-        # computation
+        # we need to get the box's orientation correct here for accurate height computation
         C0 = math.quat_to_rot(self.q0)
         self.box.update_pose(rotation=C0)
 
@@ -167,7 +165,7 @@ class BulletBody:
 
     @staticmethod
     def sphere(mass, mu, radius, orientation=None, com_offset=None, color=(0, 0, 1, 1)):
-        """Construct a cylinder object."""
+        """Construct a sphere object."""
         half_extents = np.ones(3) * radius / 2
         box = Box3D(half_extents)
 
@@ -202,15 +200,6 @@ class BulletBody:
             )
         elif d["shape"] == "cuboid":
             return BulletBody.cuboid(
-                mass=d["mass"],
-                mu=mu,
-                side_lengths=d["side_lengths"],
-                color=d["color"],
-                orientation=orientation,
-                com_offset=com_offset,
-            )
-        elif d["shape"] == "right_triangular_prism":
-            return BulletBody.right_triangular_prism(
                 mass=d["mass"],
                 mu=mu,
                 side_lengths=d["side_lengths"],
@@ -404,18 +393,6 @@ class BulletSimulation:
         # used to change color when object goes non-statically stable
         self.static_stable = True
 
-    def object_poses(self):
-        """Get the pose (position and orientation) of every balanced object at
-        the current instant.
-
-        Useful for logging purposes."""
-        n = len(self.objects)
-        r_ow_ws = np.zeros((n, 3))
-        Q_wos = np.zeros((n, 4))
-        for i, obj in enumerate(self.objects.values()):
-            r_ow_ws[i, :], Q_wos[i, :] = obj.get_pose()
-        return r_ow_ws, Q_wos
-
     def settle(self, duration):
         """Run simulation while doing nothing.
 
@@ -446,28 +423,8 @@ class BulletSimulation:
             xs.append(x)
         return np.concatenate(xs)
 
-    def fixture_objects(self):
-        # rigidly attach fixtured objects to the tray
-        r_ew_w, _ = self.robot.link_pose()
-        for name, obj in self.objects.items():
-            print(f"{name}.fixture = {obj.fixture}")
-            if obj.fixture:
-                pyb.createConstraint(
-                    self.robot.uid,
-                    self.robot.tool_idx,
-                    obj.uid,
-                    -1,
-                    pyb.JOINT_FIXED,
-                    jointAxis=[0, 0, 1],  # doesn't matter
-                    parentFramePosition=[0, 0, 0],
-                    childFramePosition=list(r_ew_w - obj.r0),
-                )
-
-    def step(self, t, step_robot=True):
+    def step(self, t):
         """Step the simulation forward one timestep."""
-        if step_robot:
-            self.robot.step(secs=self.timestep)
-
         obstacle_reset = False
         for ghost in self.ghosts:
             ghost.update()

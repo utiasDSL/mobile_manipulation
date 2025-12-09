@@ -120,7 +120,7 @@ def main():
         logger.append("v_bw_ws", v[:2])
         logger.append("ω_bw_ws", v[2])
 
-        t, _ = sim.step(t, step_robot=False)
+        t, _ = sim.step(t)
         time.sleep(sim.timestep)
 
     logger.save()
