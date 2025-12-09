@@ -101,7 +101,7 @@ controller:
   acados:
     cython:
       enabled: True
-      action: "load"      # load or generate
+      recompile: False
     raise_exception_on_failure: False
     use_custom_hess: True
     use_terminal_cost: False

@@ -63,7 +63,7 @@ class DataPlotter:
                 )
 
             config["controller"]["acados"]["cython"]["enabled"] = True
-            config["controller"]["acados"]["cython"]["action"] = "load"
+            config["controller"]["acados"]["cython"]["recompile"] = False
             self.controller = control_class(config["controller"])
             self.model_interface = self.controller.model_interface
 

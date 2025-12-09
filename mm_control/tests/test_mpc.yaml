@@ -112,7 +112,7 @@ controller:
     name: "MM"
     cython:
       enabled: False
-      action: "generate"
+      recompile: True
     raise_exception_on_failure: False
     use_custom_hess: True
     use_terminal_cost: False

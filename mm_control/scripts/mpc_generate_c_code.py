@@ -27,7 +27,7 @@ if __name__ == "__main__":
         config["controller"]["acados"]["name"] = args.name
 
     config["controller"]["acados"]["cython"]["enabled"] = True
-    config["controller"]["acados"]["cython"]["action"] = "generate"
+    config["controller"]["acados"]["cython"]["recompile"] = True
 
     ctrl_config = config["controller"]
     control_class = getattr(MPC, ctrl_config["type"], None)

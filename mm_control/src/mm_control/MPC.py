@@ -463,11 +463,11 @@ class MPCBase:
         # Construct AcadosOCPSolver
         json_file_name = str(self.output_dir / f"acados_ocp_{name}.json")
         if self.params["acados"]["cython"]["enabled"]:
-            if self.params["acados"]["cython"]["action"] == "generate":
+            if self.params["acados"]["cython"]["recompile"]:
                 AcadosOcpSolver.generate(ocp, json_file=json_file_name)
                 AcadosOcpSolver.build(ocp.code_export_directory, with_cython=True)
                 ocp_solver = AcadosOcpSolver.create_cython_solver(json_file_name)
-            elif self.params["acados"]["cython"]["action"] == "load":
+            else:
                 ocp_solver = AcadosOcpSolver(
                     ocp, json_file=json_file_name, build=False, generate=False
                 )
