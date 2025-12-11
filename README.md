@@ -9,6 +9,8 @@ A ROS-based framework for mobile manipulation research, featuring MPC-based cont
 - **mm_simulator**: PyBullet simulation interface
 - **mm_utils**: Utility functions for math, parsing, logging, etc.
 
+Configuration parameters are documented in [configuration.md](./mm_run/config/configuration.md).
+
 ## Installation
 ### Prerequisites
 Ensure you have ROS Noetic installed on your system. Follow the [ROS Noetic installation guide](http://wiki.ros.org/noetic/Installation/Ubuntu) if it's not already set up.
@@ -51,18 +53,18 @@ python3 -m pip install -r requirements.txt
 ## Usage
 ### Compile MPC Controller
 ```bash
-rosrun mm_control mpc_generate_c_code.py --config $(rospack find mm_run)/config/self_collision_avoidance.yaml
+rosrun mm_control mpc_generate_c_code.py --config $(rospack find mm_run)/config/simple_experiment.yaml
 ```
 
 ### Run Controller with PyBullet Simulation (Synchronous)
 ```bash
 roscd mm_run/scripts
-python3 experiments.py --config $(rospack find mm_run)/config/self_collision_avoidance.yaml --GUI
+python3 experiment.py --config $(rospack find mm_run)/config/simple_experiment.yaml --GUI
 ```
 
 ### Run Controller and Simulation Asynchronously (ROS Nodes)
 ```bash
-roslaunch mm_run run_pybullet_sim.launch config:=$(rospack find mm_run)/config/simple_experiment.yaml use_mpc:=True
+roslaunch mm_run run_pybullet_sim.launch config:=$(rospack find mm_run)/config/simple_experiment.yaml
 ```
 
 ### Visualize Results

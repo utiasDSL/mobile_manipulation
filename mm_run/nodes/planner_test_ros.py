@@ -40,12 +40,12 @@ class ControllerROSNode:
         parser.add_argument(
             "--planner_config",
             type=str,
-            help="plannner config. This overwrites the yaml settings in config if not set to default",
+            help="planner config. This overwrites the yaml settings in config if not set to default",
         )
         parser.add_argument(
             "--logging_sub_folder",
             type=str,
-            help="save data in a sub folder of logging director",
+            help="save data in a sub folder of logging directory",
         )
         args = parser.parse_args(argv[1:])
 

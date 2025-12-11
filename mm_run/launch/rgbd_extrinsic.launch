@@ -1,5 +1,5 @@
 <?xml version="1.0"?>
-<!-- Launches the ROS-based simulation, which uses the real mpc_ros nodes talking to a PyBullet sim environment. -->
+<!-- Launches static transform publishers for RGBD camera extrinsics. -->
 
 <launch>
   <node pkg="tf" type="static_transform_publisher" name="fake_loc_broadcaster" args="0 0 0 0 0 0 1 world base_link 100"/>

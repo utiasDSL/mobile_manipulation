@@ -49,8 +49,6 @@ include:
   - package: "mm_run"
     path: "config/controller/MPC.yaml"
   - package: "mm_run"
-    path: "config/controller/NavMPC.yaml"
-  - package: "mm_run"
     path: "config/sim/isaac_sim.yaml"
   - package: "mm_run"
     path: "config/scene/empty.yaml"

@@ -1,131 +1,77 @@
+# MPC Controller configuration for simulation
+# Extends MPC.yaml with simulation-specific settings
+
+include:
+  - package: "mm_run"
+    path: "config/controller/MPC.yaml"
+
 controller:
-  # MPC Controller Type
-  type: "MPC"
-  # MPC params
-  dt: 0.1
-  robot:
-    time_discretization_dt: 0.1
-  prediction_horizon: 1.0
-  collision_constraint_type: "SignedDistanceConstraint" # SignedDistanceConstraint or SignedDistanceConstraintCBF
-  ctrl_rate: 20 #hz
-  cmd_vel_pub_rate: 100 # hz
-  soft_cst: True
-  penalize_du: False
+  # Simulation-specific overrides
+  ctrl_rate: 20  # Higher rate for simulation (20 Hz vs 10 Hz for real robot)
+
+  # Disable collision avoidance for simpler simulation
   self_collision_avoidance_enabled: False
   sdf_collision_avoidance_enabled: False
   static_obstacles_collision_avoidance_enabled: False
-  ee_upward_constraint_enabled: False
-  cst_tol_schedule_enabled: False
-  base_pose_tracking_enabled: True
-  self_collision_emergency_stop: True
 
-  ee_upward_deviation_angle_max: 0.20    #rad, 0.26 rad ~ 15 degree
+  # Simplified collision constraint type (scalar instead of per-type dict)
+  collision_constraint_type: "SignedDistanceConstraint"
 
+  # Enable soft constraints for SDF and static obstacles in simulation
   collision_constraints_softend:
-    self: False
     sdf: True
     static_obstacles: True
 
+  # Smaller safety margin for SDF in simulation
   collision_safety_margin:
-    self: 0.25
     sdf: 0.15
-    static_obstacles: 0.15
 
-  # soft constraints parameters
-  xu_soft:
-    mu: 0.001
-    zeta: 0.005
-  collision_soft:
-    self:
-      mu: 0.0001
-      zeta: 0.005
-    sdf:
-      mu: 0.0001
-      zeta: 0.005
-    static_obstacles:
-      mu: 0.0001
-      zeta: 0.005
-
+  # Simplified CBF gamma (scalar instead of per-type dict)
   collision_cbf_gamma: 0.9
 
-  ee_upward_soft:
-    mu: 0.001
-    zeta: 0.01
-
-  # weights for each cost function
+  # Simplified cost params (scalars instead of arrays for simulation)
   cost_params:
     EEPos3:
       Qk: 10.0
-      P: 1.
+      P: 1.0
     EEPos3BaseFrame:
       Qk: 3
       P: 1
     BasePos2:
-      Qk: 10.
-      P: 1
+      Qk: 10.0
+      P: 1.0
     BasePos3:
-      Qk: 10.
-      P: 1
+      Qk: 10.0
+      P: 1.0
     BasePoseSE2:
-      Qk: 10.
-      P: 1
+      Qk: 10.0
+      P: 1.0
     EEVel3:
-      Qk: 5.
-      P: 1
+      Qk: 5.0
+      P: 1.0
     BaseVel2:
-      Qk: 5.
-      P: 1
+      Qk: 5.0
+      P: 1.0
     BaseVel3:
-      Qk: 5.
-      P: 1
+      Qk: 5.0
+      P: 1.0
     Effort:
-      Qqa: 0.
-      Qqb: 0.
+      Qqa: 0.0
+      Qqb: 0.0
       Qva: 0.01
       Qvb: 0.01
       Qua: 0.005
       Qub: 0.005
-      Qdua: 0.
+      Qdua: 0.0
       Qdub: 0.1
-    Regularization:
-      eps: 1.0e-06
     slack:
-      z: 100  # linear term
-      Z: 1    # quadratic term
+      z: 100  # Higher slack penalty for simulation
 
-  # line search parameters
-  beta: 0.5
-  alpha: 0.05
-
-  # ACADOS solver option
+  # ACADOS solver options for simulation
   acados:
-    cython:
-      enabled: True
-      recompile: False
-    raise_exception_on_failure: False
-    use_custom_hess: True
-    use_terminal_cost: False
     ocp_solver_options:
-      qp_solver: "FULL_CONDENSING_HPIPM"
-      # FULL_CONDENSING_QPOASES
-      # PARTIAL_CONDENSING_HPIPM, FULL_CONDENSING_QPOASES, FULL_CONDENSING_HPIPM,
-      # PARTIAL_CONDENSING_QPDUNES, PARTIAL_CONDENSING_OSQP, FULL_CONDENSING_DAQP
-      hessian_approx: "GAUSS_NEWTON"
-      integrator_type: "IRK"
-      print_level: 0
-      nlp_solver_type: "SQP"  #SQP_RTI, SQP
-      globalization: "MERIT_BACKTRACKING"
-      qp_solver_iter_max: 100
-      nlp_solver_tol_stat: 1.0e-04
-      nlp_solver_tol_eq: 1.0e-02
-      nlp_solver_tol_ineq: 1.0e-02
-      nlp_solver_max_iter: 100
-      qp_solver_warm_start: 2
-      nlp_solver_ext_qp_res: 0
+      nlp_solver_type: "SQP"  # Use SQP instead of SQP_RTI for simulation
+      nlp_solver_tol_stat: 1.0e-04  # Tighter tolerance
     slack_enabled:
-      x: True
-      x_e: True
-      u: True
-      h_0: True
-      h: True
-      h_e: False
+      u: True  # Enable slack for control inputs in simulation
+      h_e: False  # Disable slack for terminal constraints

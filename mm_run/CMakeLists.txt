@@ -11,8 +11,7 @@ catkin_package()
 ## Mark executable scripts (Python etc.) for installation
 ## in contrast to setup.py, you can choose the destination
 catkin_install_python(PROGRAMS
-   scripts/experiments.py
-   scripts/simple_sim.py
+   scripts/experiment.py
    nodes/sim_ros.py
    nodes/isaac_sim_ros.py
    nodes/mpc_ros.py

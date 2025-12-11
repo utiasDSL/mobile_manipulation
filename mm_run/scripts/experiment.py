@@ -60,13 +60,13 @@ def main():
         "--planner_config",
         type=str,
         default="default",
-        help="plannner config. This overwrites the yaml settings in config if not set to default",
+        help="planner config. This overwrites the yaml settings in config if not set to default",
     )
     parser.add_argument(
         "--logging_sub_folder",
         type=str,
         default="default",
-        help="save data in a sub folder of logging director",
+        help="save data in a sub folder of logging directory",
     )
     parser.add_argument(
         "--GUI",
@@ -159,7 +159,7 @@ def main():
         controller_log.log(20, "Controller Run Time: {}".format(t1 - t0))
 
         if "MPC" in ctrl_config["type"]:
-            _, acc, u_bar, v_bar = results
+            _, acc, u_bar, _ = results
             u += u_bar[0] * sim.timestep
         else:
             u, acc = results
@@ -173,7 +173,6 @@ def main():
         sot.update(t, states)
 
         # log
-        r_ew_w, Q_we = robot.link_pose()
         v_ew_w, ω_ew_w = robot.link_velocity()
         r_ew_wd = []
         r_bw_wd = []
@@ -181,10 +180,7 @@ def main():
         v_ew_wd = []
         for planner in planners:
             if planner.type == "EE":
-                if planner.name == "PartialPlanner":
-                    r_ew_wd, v_ew_wd = planner.getTrackingPoint(t, robot_states)
-                else:
-                    r_ew_wd, v_ew_wd = planner.getTrackingPoint(t, robot_states)
+                r_ew_wd, v_ew_wd = planner.getTrackingPoint(t, robot_states)
             elif planner.type == "base":
                 if planner.name == "PartialPlanner":
                     r_bw_wd, v_bw_wd = planner.getTrackingPoint(t, robot_states)
@@ -198,16 +194,15 @@ def main():
         logger.append("controller_run_time", t1 - t0)
         logger.append("cmd_vels", u)
         logger.append("cmd_accs", acc)
-        logger.append("r_ew_ws", r_ew_w)
-        logger.append("Q_wes", Q_we)
+        logger.append("r_ew_ws", ee_curr_pos)
+        logger.append("Q_wes", ee_cur_orn)
         logger.append("v_ew_ws", v_ew_w)
         logger.append("ω_ew_ws", ω_ew_w)
         logger.append("r_bw_ws", robot_states[0][:2])
 
-        if len(r_ew_wd) > 0:
+        if len(r_bw_wd) > 0:
             if r_bw_wd.shape[0] == 2:
                 logger.append("r_bw_w_ds", r_bw_wd)
-
             elif r_bw_wd.shape[0] == 3:
                 logger.append("r_bw_w_ds", r_bw_wd[:2])
                 logger.append("yaw_bw_w_ds", r_bw_wd[2])

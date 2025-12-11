@@ -32,7 +32,7 @@ def main():
     parser.add_argument(
         "--logging_sub_folder",
         type=str,
-        help="save data in a sub folder of logging director",
+        help="save data in a sub folder of logging directory",
     )
     parser.add_argument(
         "--GUI",

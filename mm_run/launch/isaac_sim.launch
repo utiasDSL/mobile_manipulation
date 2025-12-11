@@ -1,5 +1,5 @@
 <?xml version="1.0"?>
-<!-- Launches the ROS-based simulation, which uses the real mpc_ros nodes talking to a PyBullet sim environment. -->
+<!-- Launches Isaac Sim ROS node. -->
 
 <launch>
   <arg name="config"/>

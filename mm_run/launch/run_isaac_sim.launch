@@ -1,11 +1,10 @@
 <?xml version="1.0"?>
-<!-- Launches the ROS-based simulation, which uses the real mpc_ros nodes talking to a PyBullet sim environment. -->
+<!-- Launches Isaac Sim simulation with MPC controller. -->
 
 <launch>
   <arg name="config"/>
   <arg name="ctrl_config" default="default" doc="alternative controller config overwriting the one in config"/>
-  <arg name="planner_config" default="default" doc="alternative controller config overwriting the one in config"/>
-  <arg name="use_mpc" default="true" doc="use mpc as controller"/>
+  <arg name="planner_config" default="default" doc="alternative planner config overwriting the one in config"/>
   <arg name="logging_sub_folder"  default="default" doc="save data to a sub folder if set"/>
   <arg name="isaac-venv" default="$(env ISAACSIM_PYTHON_EXE_1)"/>
 

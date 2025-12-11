@@ -1,6 +1,14 @@
+# Example configuration demonstrating mobile manipulation with MPC
+# This showcases:
+# - Base trajectory planning (mobile base movement)
+# - End-effector pose planning (arm manipulation)
+# - Self-collision avoidance (important safety feature)
+# - MPC controller with Acados
+
 planner:
   sot_type: "SoTStatic"
   tasks:
+  # Task 1: Move mobile base along a trajectory
   - frame_id: base
     name: Base Position
     planner_type: BasePoseTrajectoryLine
@@ -9,6 +17,8 @@ planner:
     cruise_speed: 1.0
     yaw_speed: 0.5               # rad/s
     tracking_err_tol: 0.2
+
+  # Task 2: Move end-effector to target pose
   - frame_id: EE
     name: EE Pose
     planner_type: EEPoseSE3Waypoint
@@ -17,6 +27,12 @@ planner:
     tracking_err_tol: 0.05
 
 controller:
+  # Enable self-collision avoidance (prevents robot from colliding with itself)
+  self_collision_avoidance_enabled: True
+  sdf_collision_avoidance_enabled: False
+  static_obstacles_collision_avoidance_enabled: False
+
+  # Acados solver configuration
   acados:
     name: "SimpleExperiment"
 
