@@ -4348,13 +4348,13 @@
     </library_effects>
     <library_images>
         <image id="ID10">
-            <init_from>model/Texture_1.jpeg.jpeg</init_from>
+            <init_from>model/Texture_1.jpeg</init_from>
         </image>
         <image id="ID99">
-            <init_from>model/Texture_2.jpeg.jpeg</init_from>
+            <init_from>model/Texture_2.jpeg</init_from>
         </image>
         <image id="ID648">
-            <init_from>model/Texture_3.jpeg.jpeg</init_from>
+            <init_from>model/Texture_3.jpeg</init_from>
         </image>
     </library_images>
     <scene>

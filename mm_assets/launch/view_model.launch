@@ -1,7 +1,0 @@
-<?xml version="1.0"?>
-<launch>
-  <arg name="model"/>
-  <include file="$(find urdf_tutorial)/launch/display.launch">
-    <arg name="model" value="$(arg model)"/>
-  </include>
-</launch>
