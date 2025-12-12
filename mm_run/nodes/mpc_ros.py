@@ -108,6 +108,12 @@ class ControllerROSNode:
         self.logger.add("nx", self.ctrl_config["robot"]["dims"]["x"])
         self.logger.add("nu", self.ctrl_config["robot"]["dims"]["u"])
 
+        # Get shared timestamp from ROS parameter (set by sim node)
+        # Wait for sim node to set it
+        while not rospy.has_param("/experiment_timestamp"):
+            rospy.sleep(0.1)
+        self.session_timestamp = rospy.get_param("/experiment_timestamp")
+
         # ROS Related
         self.robot_interface = MobileManipulatorROSInterface()
         self.vicon_tool_interface = ViconObjectInterface(
@@ -186,7 +192,7 @@ class ControllerROSNode:
     def shutdownhook(self):
         self.ctrl_c = True
         self.robot_interface.brake()
-        self.logger.save()
+        self.logger.save(session_timestamp=self.session_timestamp)
 
     def _publish_cmd_vel(self, event):
         if self.mpc_plan is not None:

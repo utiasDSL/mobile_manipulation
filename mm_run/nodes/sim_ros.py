@@ -64,6 +64,13 @@ def main():
     # initial time, state, input
     t = 0.0
 
+    # Create shared timestamp for logging (format: YYYY-MM-DD_HH-MM-SS)
+    session_timestamp = timestamp.strftime("%Y-%m-%d_%H-%M-%S")
+
+    # Set ROS parameter so control node can use the same timestamp
+    rospy.init_node("sim_ros")
+    rospy.set_param("/experiment_timestamp", session_timestamp)
+
     # init logger
     logger = DataLogger(config, name="sim")
     logger.add("sim_timestep", sim.timestep)
@@ -75,7 +82,6 @@ def main():
     logger.add("nu", sim_config["robot"]["dims"]["u"])
 
     # ros interface
-    rospy.init_node("sim_ros")
     ros_interface = SimulatedMobileManipulatorROSInterface()
     ros_interface.publish_time(t)
 
@@ -123,7 +129,7 @@ def main():
         t, _ = sim.step(t)
         time.sleep(sim.timestep)
 
-    logger.save()
+    logger.save(session_timestamp=session_timestamp)
 
 
 if __name__ == "__main__":

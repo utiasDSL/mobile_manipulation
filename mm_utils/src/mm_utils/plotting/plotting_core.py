@@ -16,8 +16,8 @@ from spatialmath.base import rotz
 import mm_control.MPC as MPC
 from mm_utils import math, parsing
 from mm_utils.math import wrap_pi_array
-from mm_utils.plotting.mpc import MPCPlotterMixin
-from mm_utils.plotting.trajectory import TrajectoryPlotterMixin
+from mm_utils.plotting.plot_mpc import MPCPlotterMixin
+from mm_utils.plotting.plot_trajectory import TrajectoryPlotterMixin
 
 # =============================================================================
 # UTILITY FUNCTIONS
@@ -227,8 +227,6 @@ class DataPlotter(TrajectoryPlotterMixin, MPCPlotterMixin):
         nq = self.data["nq"]
         qs = self.data["xs"][:, :nq]
 
-        print(self.data["xs"].shape)
-
         # keyed by obstacle names or "self"
         names = ["self", "static_obstacles"]
         params = {"self": [], "static_obstacles": []}
@@ -355,7 +353,6 @@ class DataPlotter(TrajectoryPlotterMixin, MPCPlotterMixin):
         self.data["mpc_ee_predictions"] = []
         self.data["mpc_base_predictions"] = []
 
-        print(self.data["mpc_x_bars"].shape)
         for t_index in range(N):
             x_bar = self.data["mpc_x_bars"][t_index]
             ee_bar, base_bar = self.controller._getEEBaseTrajectories(x_bar)
@@ -493,7 +490,6 @@ class DataPlotter(TrajectoryPlotterMixin, MPCPlotterMixin):
             "max": run_time_states[1],
             "min": run_time_states[2],
         }
-        print(self.data["statistics"]["constraints_violation"]["num"])
 
     def summary(self, stat_names):
         """get a summary of statistics

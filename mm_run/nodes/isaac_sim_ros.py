@@ -1,19 +1,19 @@
+import argparse
+import datetime
 import os
 import sys
 
+import numpy as np
+import rospy
 from omni.isaac.kit import SimulationApp
+
+from mm_utils import parsing
+from mm_utils.logging import DataLogger
 
 # URDF import, configuration and simulation sample
 simulation_app = SimulationApp({"headless": False})
 
-import argparse  # noqa: E402
-
-import numpy as np  # noqa: E402
-import rospy  # noqa: E402
 from omni.isaac.core.utils import extensions  # noqa: E402
-
-from mm_utils import parsing  # noqa: E402
-from mm_utils.logging import DataLogger  # noqa: E402
 
 extensions.enable_extension("omni.isaac.ros_bridge")
 from mm_sim_isaac.isaac_sim_env import IsaacSimEnv  # noqa: E402
@@ -43,6 +43,13 @@ def main():
     sim_config = config["simulation"]
 
     rospy.init_node("isaac_sim_ros")
+
+    # Create shared timestamp for logging (format: YYYY-MM-DD_HH-MM-SS)
+    timestamp = datetime.datetime.now()
+    session_timestamp = timestamp.strftime("%Y-%m-%d_%H-%M-%S")
+
+    # Set ROS parameter so control node can use the same timestamp
+    rospy.set_param("/experiment_timestamp", session_timestamp)
 
     sim = IsaacSimEnv(sim_config)
     robot = sim.robot
@@ -109,7 +116,7 @@ def main():
         sim.step(render=True)
         sim.publish_ros_topics()
 
-    logger.save()
+    logger.save(session_timestamp=session_timestamp)
     simulation_app.close()
 
 

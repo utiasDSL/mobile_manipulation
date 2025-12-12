@@ -223,7 +223,8 @@ def main():
 
         time.sleep(sim.timestep)
 
-    logger.save()
+    session_timestamp = timestamp.strftime("%Y-%m-%d_%H-%M-%S")
+    logger.save(session_timestamp=session_timestamp)
 
 
 if __name__ == "__main__":

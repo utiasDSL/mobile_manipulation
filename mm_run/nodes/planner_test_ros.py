@@ -1,4 +1,5 @@
 import argparse
+import datetime
 import logging
 import os
 import sys
@@ -81,6 +82,11 @@ class ControllerROSNode:
 
         # init logger
         self.logger = DataLogger(config.copy(), name="control")
+
+        # Create timestamp for logging
+        timestamp = datetime.datetime.now()
+        self.session_timestamp = timestamp.strftime("%Y-%m-%d_%H-%M-%S")
+
         # ROS Related
         self.robot_interface = MobileManipulatorROSInterface()
         self.vicon_tool_interface = ViconObjectInterface(
@@ -124,7 +130,7 @@ class ControllerROSNode:
     def shutdownhook(self):
         self.ctrl_c = True
         self.robot_interface.brake()
-        self.logger.save()
+        self.logger.save(session_timestamp=self.session_timestamp)
 
     def _publish_planner_data(self, event):
         self.sot_lock.acquire()

@@ -1,4 +1,3 @@
-from datetime import datetime
 from pathlib import Path
 
 import numpy as np
@@ -53,16 +52,16 @@ class DataLogger:
             # Start new list
             self.data[key] = [a]
 
-    def save(self):
+    def save(self, session_timestamp):
         """Save the data and configuration to a timestamped directory.
 
         Directory structure:
             <base_directory>/<session_timestamp>/<name>/
                 data.npz
                 config.yaml
+
+        :param session_timestamp: Timestamp string in format "%Y-%m-%d_%H-%M-%S".
         """
-        # Create timestamped directory for this logging session
-        session_timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         dir_path = self.base_directory / session_timestamp / self.name
         dir_path.mkdir(parents=True, exist_ok=True)
 

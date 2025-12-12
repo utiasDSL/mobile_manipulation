@@ -8,9 +8,9 @@ This module provides plotting functionality organized into logical sections:
 - Utility functions: Logger construction
 """
 
-from mm_utils.plotting.core import DataPlotter, construct_logger
-from mm_utils.plotting.mpc import MPCPlotterMixin
-from mm_utils.plotting.trajectory import TrajectoryPlotterMixin
+from mm_utils.plotting.plot_mpc import MPCPlotterMixin
+from mm_utils.plotting.plot_trajectory import TrajectoryPlotterMixin
+from mm_utils.plotting.plotting_core import DataPlotter, construct_logger
 
 __all__ = [
     "DataPlotter",
