@@ -3,8 +3,9 @@ from abc import ABC, abstractmethod
 
 import numpy as np
 
-import mm_plan.BasePlanner as basep
-import mm_plan.EEPlanner as eep
+from mm_plan.BasePlanner import BasePosTrajectoryLine
+from mm_plan.EEPlanner import EESimplePlanner
+from mm_plan.planner_registry import PlannerRegistry
 from mm_utils import parsing
 from mm_utils.math import wrap_pi_scalar
 
@@ -16,15 +17,7 @@ class SoTBase(ABC):
 
         self.planners = []
         for task_entry in config["tasks"]:
-            planner_class = getattr(eep, task_entry["planner_type"], None)
-            if planner_class is None:
-                planner_class = getattr(basep, task_entry["planner_type"], None)
-            if planner_class is not None:
-                planner = planner_class(task_entry)
-            else:
-                raise ValueError(
-                    "planner type {} not recognized".format(task_entry["planner_type"])
-                )
+            planner = PlannerRegistry.create(task_entry)
             self.planners.append(planner)
 
         self.planner_num = len(self.planners)
@@ -287,7 +280,7 @@ class SoTSequentialTasks(SoTCycle):
         task_config_list = []
 
         for i in range(self.target_num):
-            base_config = basep.BasePosTrajectoryLine.getDefaultParams()
+            base_config = BasePosTrajectoryLine.getDefaultParams()
             base_config["name"] = "Base Pos " + str(i + 1)
 
             if i == 0:
@@ -299,7 +292,7 @@ class SoTSequentialTasks(SoTCycle):
             base_config["tracking_err_tol"] = self.base_tracking_err_tol
             base_config["cruise_speed"] = self.base_cruise_speed
 
-            ee_config = eep.EESimplePlanner.getDefaultParams()
+            ee_config = EESimplePlanner.getDefaultParams()
             ee_config["frame_id"] = "base"
             ee_config["name"] = "EE Pos " + str(i + 1)
             ee_config["target_pos"] = ee_target_pos[i]

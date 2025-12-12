@@ -12,23 +12,9 @@ from numpy.typing import NDArray
 from scipy.interpolate import interp1d
 
 import mm_control.MPCConstraints as MPCConstraints
+from mm_control.cost_registry import CostFunctionRegistry
 from mm_control.MPCConstraints import ControlBoxConstraints, StateBoxConstraints
-from mm_control.MPCCostFunctions import (
-    BasePos2CostFunction,
-    BasePos3CostFunction,
-    BasePoseSE2CostFunction,
-    BaseVel2CostFunction,
-    BaseVel3CostFunction,
-    ControlEffortCostFunction,
-    CostFunctions,
-    EEPos3BaseFrameCostFunction,
-    EEPos3CostFunction,
-    EEPoseSE3BaseFrameCostFunction,
-    EEPoseSE3CostFunction,
-    EEVel3CostFunction,
-    RegularizationCostFunction,
-    SoftConstraintsRBFCostFunction,
-)
+from mm_control.MPCCostFunctions import CostFunctions, SoftConstraintsRBFCostFunction
 from mm_control.robot import CasadiModelInterface as ModelInterface
 from mm_control.robot import MobileManipulator3D as MM
 from mm_plan.PlanBaseClass import Planner, TrajectoryPlanner
@@ -57,45 +43,6 @@ class MPCBase:
         self.tf = self.params["prediction_horizon"]
         self.N = int(self.tf / self.dt)
         self.QPsize = self.nx * (self.N + 1) + self.nu * self.N
-
-        self.EEPos3Cost = EEPos3CostFunction(
-            self.robot, config["cost_params"]["EEPos3"]
-        )
-        self.EEPos3BaseFrameCost = EEPos3BaseFrameCostFunction(
-            self.robot, config["cost_params"]["EEPos3"]
-        )
-
-        self.EEPoseSE3Cost = EEPoseSE3CostFunction(
-            self.robot, config["cost_params"]["EEPose"]
-        )
-        self.EEPoseBaseFrameSE3Cost = EEPoseSE3BaseFrameCostFunction(
-            self.robot, config["cost_params"]["EEPose"]
-        )
-
-        self.BasePos2Cost = BasePos2CostFunction(
-            self.robot, config["cost_params"]["BasePos2"]
-        )
-        self.BasePos3Cost = BasePos3CostFunction(
-            self.robot, config["cost_params"]["BasePos3"]
-        )
-        self.BasePoseSE2Cost = BasePoseSE2CostFunction(
-            self.robot, config["cost_params"]["BasePoseSE2"]
-        )
-
-        self.EEVel3Cost = EEVel3CostFunction(
-            self.robot, config["cost_params"]["EEVel3"]
-        )
-        self.BaseVel2Cost = BaseVel2CostFunction(
-            self.robot, config["cost_params"]["BaseVel2"]
-        )
-        self.BaseVel3Cost = BaseVel3CostFunction(
-            self.robot, config["cost_params"]["BaseVel3"]
-        )
-
-        self.CtrlEffCost = ControlEffortCostFunction(
-            self.robot, config["cost_params"]["Effort"]
-        )
-        self.RegularizationCost = RegularizationCostFunction(self.nx, self.nu)
 
         self.collision_link_names = (
             ["self"] if self.params["self_collision_avoidance_enabled"] else []
@@ -486,36 +433,34 @@ class MPC(MPCBase):
     def __init__(self, config):
         super().__init__(config)
         num_terminal_cost = 2
-        if config["base_pose_tracking_enabled"]:
-            costs = [
-                self.BasePoseSE2Cost,
-                self.BaseVel3Cost,
-                self.EEPoseSE3Cost,
-                self.EEVel3Cost,
-                self.EEPoseBaseFrameSE3Cost,
-                self.CtrlEffCost,
-            ]
-        else:
-            costs = [
-                self.BasePos2Cost,
-                self.BaseVel2Cost,
-                self.EEPos3Cost,
-                self.EEVel3Cost,
-                self.CtrlEffCost,
-            ]
+        cost_params = config["cost_params"]
 
+        # Select base tracking costs based on configuration
+        costs = []
+        # fmt: off
+        if config.get("base_pose_tracking_enabled", False):
+            costs.append(CostFunctionRegistry.create("BasePoseSE2", self.robot, cost_params["BasePoseSE2"]))
+            costs.append(CostFunctionRegistry.create("BaseVel3", self.robot, cost_params["BaseVel3"]))
+            costs.append(CostFunctionRegistry.create("EEPoseSE3", self.robot, cost_params["EEPose"]))
+            costs.append(CostFunctionRegistry.create("EEVel3", self.robot, cost_params["EEVel3"]))
+            costs.append(CostFunctionRegistry.create("EEPoseSE3BaseFrame", self.robot, cost_params["EEPose"]))
+        else:
+            costs.append(CostFunctionRegistry.create("BasePos2", self.robot, cost_params["BasePos2"]))
+            costs.append(CostFunctionRegistry.create("BaseVel2", self.robot, cost_params["BaseVel2"]))
+            costs.append(CostFunctionRegistry.create("EEPos3", self.robot, cost_params["EEPos3"]))
+            costs.append(CostFunctionRegistry.create("EEVel3", self.robot, cost_params["EEVel3"]))
+
+        # Control effort (always included)
+        costs.append(CostFunctionRegistry.create("ControlEffort", self.robot, cost_params["Effort"]))
+        # fmt: on
+
+        # Add collision costs/constraints
         constraints = []
         for name in self.collision_link_names:
-            if (
-                name
-                in self.model_interface.scene.collision_link_names["static_obstacles"]
-            ):
-                softened = self.params["collision_constraints_softend"][
-                    "static_obstacles"
-                ]
-            else:
-                softened = self.params["collision_constraints_softend"][name]
-
+            # fmt: off
+            is_static = name in self.model_interface.scene.collision_link_names["static_obstacles"]
+            softened = self.params["collision_constraints_softend"]["static_obstacles" if is_static else name]
+            # fmt: on
             if softened:
                 costs.append(self.collisionSoftCsts[name])
             else:
