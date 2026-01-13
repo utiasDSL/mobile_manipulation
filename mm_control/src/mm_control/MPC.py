@@ -99,7 +99,20 @@ class MPC(MPCBase):
         robot_states: Tuple[NDArray[np.float64], NDArray[np.float64]],
         references: dict,
     ):
-        self.py_logger.debug("control time {}".format(t))
+        """
+        :param t: current control time
+        :param robot_states: (q, v) generalized coordinates and velocities
+        :param references: Dictionary with reference trajectories from TaskManager:
+            {
+                "base_pose": array of shape (N+1, 3) or None,
+                "base_velocity": array of shape (N+1, 3) or None,
+                "ee_pose": array of shape (N+1, 6) or None,
+                "ee_velocity": array of shape (N+1, 6) or None,
+            }
+        :return: v_bar, velocity trajectory, shape (N+1, nu)
+        :return: u_bar, currently the best control inputs, aka, u_bar[0]
+        """
+        self.py_logger.debug(f"control time {t}")
         self.curr_control_time = t
         q, v = robot_states
         q[2:9] = wrap_pi_array(q[2:9])
@@ -113,12 +126,8 @@ class MPC(MPCBase):
         self._solve_and_extract(xo, t, curr_p_map_bar, x_bar_initial, u_bar_initial)
         self._update_logging(curr_p_map_bar)
 
-        return (
-            self.v_cmd,
-            self.u_prev,
-            self.u_bar.copy(),
-            self.x_bar[:, self.DoF :].copy(),
-        )
+        velocity_traj = self.x_bar[:, self.DoF :].copy()
+        return velocity_traj, self.u_bar.copy()
 
     def _prepare_warm_start(self, t, xo):
         """Prepare warm start trajectories from previous solution or zeros."""
@@ -325,7 +334,6 @@ class MPC(MPCBase):
             self.log["iter_snapshot"] = None
 
         # Extract solution
-        self.u_prev = self.u_bar[0].copy()
         self.lam_bar = []
         for i in range(self.N):
             self.x_bar[i, :] = self.ocp_solver.get(i, "x")

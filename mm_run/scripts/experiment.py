@@ -5,6 +5,7 @@ import os
 import time
 
 import numpy as np
+from scipy.interpolate import interp1d
 from scipy.spatial.transform import Rotation as Rot
 
 import mm_control.MPC as MPC
@@ -132,15 +133,27 @@ def main():
         references = sot.getReferences(t, robot_states, controller.N + 1, controller.dt)
 
         t0 = time.perf_counter()
-        results = controller.control(t, robot_states, references)
+        v_bar, u_bar = controller.control(t, robot_states, references)
         t1 = time.perf_counter()
-        controller_log.log(20, "Controller Run Time: {}".format(t1 - t0))
+        controller_log.log(20, f"Controller Run Time: {t1 - t0}")
 
-        if "MPC" in ctrl_config["type"]:
-            _, acc, u_bar, _ = results
+        if ctrl_config["cmd_vel_type"] == "integration":
             u += u_bar[0] * sim.timestep
+        elif ctrl_config["cmd_vel_type"] == "interpolation":
+            # Interpolate velocity trajectory at sim.timestep
+            # v_bar has shape (N+1, nu), times are at 0, dt, 2*dt, ..., N*dt
+            N = v_bar.shape[0]
+            t_v_bar = np.arange(N) * controller.dt
+            v_interp = interp1d(
+                t_v_bar,
+                v_bar,
+                axis=0,
+                bounds_error=False,
+                fill_value="extrapolate",
+            )
+            u = v_interp(sim.timestep)
         else:
-            u, acc = results
+            raise ValueError(f"Unknown cmd_vel_type: {ctrl_config['cmd_vel_type']}")
 
         robot.command_velocity(u)
         t, _ = sim.step(t)
@@ -188,7 +201,6 @@ def main():
         logger.append("xs", np.hstack(robot_states))
         logger.append("controller_run_time", t1 - t0)
         logger.append("cmd_vels", u)
-        logger.append("cmd_accs", acc)
         logger.append("r_ew_ws", ee_curr_pos)
         logger.append("Q_wes", ee_cur_orn)
         logger.append("v_ew_ws", v_ew_w)

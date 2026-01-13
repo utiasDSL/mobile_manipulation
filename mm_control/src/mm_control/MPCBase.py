@@ -104,7 +104,8 @@ class MPCBase:
                 "ee_pose": array of shape (N+1, 6) or None,
                 "ee_velocity": array of shape (N+1, 6) or None,
             }
-        :return: u, currently the best control inputs, aka, u_bar[0]
+        :return: v_bar, velocity trajectory, shape (N+1, nu)
+        :return: u_bar, currently the best control inputs, aka, u_bar[0]
         """
         pass
 

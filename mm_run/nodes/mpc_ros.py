@@ -450,7 +450,7 @@ class ControllerROSNode:
         self.home = self.robot_interface.q
 
         states = (self.robot_interface.q, self.robot_interface.v)
-        print("robot coord: {}".format(self.robot_interface.q))
+        print(f"robot coord: {self.robot_interface.q}")
         self.sot = TaskManager(self.planner_config.copy())
 
         print("-----Checking Planners----- ")
@@ -543,11 +543,9 @@ class ControllerROSNode:
             self.sot_lock.release()
 
             tc1 = time.perf_counter()
-            u, acc, u_bar, v_bar = self.controller.control(
-                t - t0, robot_states, references
-            )
+            v_bar, u_bar = self.controller.control(t - t0, robot_states, references)
             tc2 = time.perf_counter()
-            self.controller_log.log(20, "Controller Run Time: {}".format(tc2 - tc1))
+            self.controller_log.log(20, f"Controller Run Time: {tc2 - tc1}")
 
             # if the robot is very close to the goal, stop the robot
             # Check if any active planner is close to finish
@@ -687,9 +685,6 @@ class ControllerROSNode:
                 elif v_bw_wd.shape[0] == 3:
                     self.logger.append("v_bw_w_ds", v_bw_wd[:2])
                     self.logger.append("ω_bw_w_ds", v_bw_wd[2])
-
-            self.logger.append("cmd_vels", u)
-            self.logger.append("cmd_accs", acc)
 
             if self.use_joy and self.start_end_button_interface.button == 1:
                 break

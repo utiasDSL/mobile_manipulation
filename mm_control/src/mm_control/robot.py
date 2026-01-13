@@ -356,7 +356,7 @@ class CasadiModelInterface:
         for pair in self.collision_pairs["self"]:
             os = self.pinocchio_interface.getGeometryObject(pair)
             if None in os:
-                print("either {} or {} isn't a collision geometry".format(*pair))
+                print(f"either {pair[0]} or {pair[1]} isn't a collision geometry")
                 continue
 
             sd_sym = self.pinocchio_interface.getSignedDistance(
@@ -381,7 +381,7 @@ class CasadiModelInterface:
             for pair in pairs:
                 os = self.pinocchio_interface.getGeometryObject(pair)
                 if None in os:
-                    print("either {} or {} isn't a collision geometry".format(*pair))
+                    print(f"either {pair[0]} or {pair[1]} isn't a collision geometry")
                     continue
 
                 sd_sym = self.pinocchio_interface.getSignedDistance(

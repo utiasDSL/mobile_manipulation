@@ -1,6 +1,7 @@
 controller:
   # MPC Controller Type
   type: "MPC"
+
   # MPC params
   dt: 0.1
   robot:
@@ -9,7 +10,7 @@ controller:
   ctrl_rate: 10 #hz
   cmd_vel_pub_rate: 100 # hz
   cmd_vel_type: "interpolation"         # integration: publish vel by integrating from acc_bar
-                                      # interpolation: publish vel by interpolating vel_bar
+                                        # interpolation: publish vel by interpolating vel_bar
   soft_cst: True
   penalize_du: False
   self_collision_avoidance_enabled: True
@@ -20,7 +21,7 @@ controller:
 
   self_collision_emergency_stop: True
 
-  ee_upward_deviation_angle_max: 0.20    #rad, 0.26 rad ~ 15 degree
+  ee_upward_deviation_angle_max: 0.20    # In radians
 
   collision_constraint_type:
     self: "SignedDistanceConstraint"
@@ -34,7 +35,7 @@ controller:
     self: 0.25
     static_obstacles: 0.15
 
-  # soft constraints parameters
+  # Soft constraints parameters
   xu_soft:
     mu: 0.001
     zeta: 0.005
@@ -88,7 +89,7 @@ controller:
       z: 10  # linear term
       Z: 1    # quadratic term
 
-  # line search parameters
+  # Line search parameters
   beta: 0.5
   alpha: 0.05
 
