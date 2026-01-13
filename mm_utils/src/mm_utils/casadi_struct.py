@@ -2,6 +2,14 @@ from casadi.tools import entry, struct_MX
 
 
 def casadi_sym_struct(data: dict):
+    """Create CasADi symbolic structure from dictionary.
+
+    Args:
+        data (dict): Dictionary mapping parameter names to CasADi symbolic expressions.
+
+    Returns:
+        casadi.struct_MX: CasADi structure containing the symbolic parameters.
+    """
     param_entries = []
     order = []
 
@@ -13,6 +21,15 @@ def casadi_sym_struct(data: dict):
 
 
 def reconstruct_sym_struct_map_from_array(p_struct, p_map_array):
+    """Reconstruct CasADi structure map from flattened array.
+
+    Args:
+        p_struct (casadi.struct_MX): CasADi structure template.
+        p_map_array (ndarray): Flattened parameter array.
+
+    Returns:
+        casadi.struct_MX: Reconstructed structure map with reshaped parameters.
+    """
     p_map_new = p_struct(0)
     index = 0
     for key in p_struct.order:

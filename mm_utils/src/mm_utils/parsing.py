@@ -12,7 +12,15 @@ import yaml
 
 
 def recursive_dict_update(default, custom):
-    """Return a dict merged from default and custom"""
+    """Recursively merge custom dictionary into default dictionary.
+
+    Args:
+        default (dict): Default dictionary (will be modified in-place).
+        custom (dict): Custom dictionary with overrides.
+
+    Returns:
+        dict: Merged dictionary (same object as default).
+    """
     if not isinstance(default, dict) or not isinstance(custom, dict):
         raise TypeError("Params of recursive_update should be dicts")
 
@@ -26,10 +34,21 @@ def recursive_dict_update(default, custom):
 
 
 def load_config(path, depth=0, max_depth=5):
-    """Load configuration file located at `path`.
+    """Load configuration file with support for included files.
 
     `depth` and `max_depth` arguments are provided to protect against
     unexpectedly deep or infinite recursion through included files.
+
+    Args:
+        path (str): Path to configuration file.
+        depth (int): Current recursion depth (used internally).
+        max_depth (int): Maximum allowed recursion depth.
+
+    Returns:
+        dict: Merged configuration dictionary.
+
+    Raises:
+        Exception: If maximum inclusion depth is exceeded.
     """
     if depth > max_depth:
         raise Exception(f"Maximum inclusion depth {max_depth} exceeded.")
@@ -64,6 +83,16 @@ def parse_number(x, dtype=float):
     If the number can be converted to a float, then it is and is returned.
     Otherwise, check if it ends with "pi" and convert it to a float that is a
     multiple of pi.
+
+    Args:
+        x (str or number): Number or string to parse (e.g., "1.5", "2pi").
+        dtype (type): Target data type (default: float).
+
+    Returns:
+        float or dtype: Parsed number.
+
+    Raises:
+        ValueError: If the string cannot be parsed as a number.
     """
     try:
         return dtype(x)
@@ -75,6 +104,20 @@ def parse_number(x, dtype=float):
 
 
 def parse_array_element(x):
+    """Parse a single array element (float, pi-scaled, or repeated value).
+
+    Args:
+        x (str): String to parse. Can be:
+            - A float (e.g., "1.5")
+            - Pi-scaled (e.g., "2pi" for 2*pi)
+            - Repeated (e.g., "1.0rep5" for [1.0, 1.0, 1.0, 1.0, 1.0])
+
+    Returns:
+        list: Parsed value as a list.
+
+    Raises:
+        ValueError: If the string cannot be parsed.
+    """
     try:
         return [float(x)]
     except ValueError:
@@ -87,7 +130,14 @@ def parse_array_element(x):
 
 
 def parse_array(a):
-    """Parse a one-dimensional iterable into a numpy array."""
+    """Parse a one-dimensional iterable into a numpy array.
+
+    Args:
+        a (iterable): One-dimensional iterable of array elements (can include floats, "pi"-scaled values, or repeated values).
+
+    Returns:
+        ndarray: Parsed numpy array.
+    """
     subarrays = []
     for x in a:
         subarrays.append(parse_array_element(x))
@@ -95,6 +145,16 @@ def parse_array(a):
 
 
 def parse_path(path):
+    """Parse and resolve file path, handling ROS package and environment variable references.
+
+    Args:
+        path (str): Path string that may contain:
+            - $(rospack find <package>) commands
+            - Environment variables (e.g., $HOME)
+
+    Returns:
+        str or None: Resolved path string, or None if rospack command fails.
+    """
     # Regular expression to match the $(rospack find <package>) command
     rospack_pattern = r"\$\((rospack find \w+)\)"
 
@@ -126,7 +186,15 @@ def parse_path(path):
 
 
 def parse_ros_path(d, as_string=True):
-    """Resolve full path from a dict of containing ROS package and relative path."""
+    """Resolve full path from a dict containing ROS package and relative path.
+
+    Args:
+        d (dict): Dictionary with keys "package" (str) and "path" (str).
+        as_string (bool): If True, return path as string; if False, return Path object.
+
+    Returns:
+        str or Path: Resolved full path.
+    """
     rospack = rospkg.RosPack()
     path = Path(rospack.get_path(d["package"])) / d["path"]
     if as_string:
@@ -135,13 +203,33 @@ def parse_ros_path(d, as_string=True):
 
 
 def xacro_include(path):
+    """Generate xacro include directive string.
+
+    Args:
+        path (str): Path to file to include.
+
+    Returns:
+        str: Xacro include directive XML string.
+    """
     return f"""
     <xacro:include filename="{path}" />
     """
 
 
 def parse_and_compile_urdf(d, max_runs=10, compare_existing=True):
-    """Parse and compile a URDF from a xacro'd URDF file."""
+    """Parse and compile a URDF from a xacro'd URDF file.
+
+    Args:
+        d (dict): Dictionary with "includes" (list) and optionally "args" (dict) keys. Also used for output path via parse_ros_path.
+        max_runs (int): Maximum number of xacro processing iterations.
+        compare_existing (bool): If True, compare with existing file before writing.
+
+    Returns:
+        str: Path to compiled URDF file.
+
+    Raises:
+        ValueError: If URDF file does not converge after max_runs iterations.
+    """
 
     s = """
     <?xml version="1.0" ?>

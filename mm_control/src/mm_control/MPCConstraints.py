@@ -7,13 +7,12 @@ from mm_utils.casadi_struct import casadi_sym_struct
 
 class Constraint(ABC):
     def __init__(self, nx, nu, name):
-        """MPC constraints base class
+        """MPC constraints base class.
 
-        :param dt: discretization time step
-        :param nx: state dim
-        :param nu: control dim
-        :param N:  prediction window
-        :param name: name to identify the constraint
+        Args:
+            nx (int): State dimension.
+            nu (int): Control dimension.
+            name (str): Name to identify the constraint.
         """
 
         self.nx = nx
@@ -32,9 +31,27 @@ class Constraint(ABC):
 
     @abstractmethod
     def check(self, x, u, p):
+        """Check constraint satisfaction.
+
+        Args:
+            x (ndarray): State vector.
+            u (ndarray): Control input vector.
+            p (ndarray): Parameter vector.
+
+        Returns:
+            ndarray: Constraint values (should be < 0 for satisfaction).
+        """
         pass
 
     def get_p_dict(self, sym=True):
+        """Get parameter dictionary with name suffixes.
+
+        Args:
+            sym (bool): If True, return symbolic parameters; if False, return zero matrices.
+
+        Returns:
+            dict or None: Parameter dictionary with keys suffixed by constraint name, or None if no parameters.
+        """
         if self.p_dict is None:
             return None
         else:
@@ -49,23 +66,26 @@ class Constraint(ABC):
                 }
 
     def get_p_dict_default(self):
+        """Get default parameter dictionary (zero values).
+
+        Returns:
+            dict or None: Default parameter dictionary with zero values, or None if no parameters.
+        """
         p_dict = self.get_p_dict(False)
         return p_dict
 
 
 class NonlinearConstraint(Constraint):
     def __init__(self, nx, nu, ng, g_fcn, p_dict, constraint_name):
-        """nonlinear inequality constraint
-                            g(x, u, p) < 0
+        """Nonlinear inequality constraint g(x, u, p) < 0.
 
-        :param nx: state dim
-        :param nu: control dim
-        :param ng: constraint dim
-        :param N:  prediction window
-        :param g_fcn: g_fcn(x_bar_sym, u_bar_sym,*params_sym) casadi.Function
-        :param params_sym: parameters [casadi struct_symMX]
-        :param constraint_name: name to identify the constraint
-        :param tol: constraint violation tolerence
+        Args:
+            nx (int): State dimension.
+            nu (int): Control dimension.
+            ng (int): Constraint dimension.
+            g_fcn (casadi.Function): Function g_fcn(x_bar_sym, u_bar_sym, *params_sym).
+            p_dict (dict): Parameter dictionary.
+            constraint_name (str): Name to identify the constraint.
         """
 
         super().__init__(nx, nu, constraint_name)
@@ -82,6 +102,16 @@ class NonlinearConstraint(Constraint):
             self.g_eqn = None
 
     def check(self, x, u, p):
+        """Check nonlinear constraint satisfaction.
+
+        Args:
+            x (ndarray): State vector.
+            u (ndarray): Control input vector.
+            p (ndarray): Parameter vector.
+
+        Returns:
+            ndarray: Constraint values (should be < 0 for satisfaction).
+        """
         g = self.g_fcn(x, u, p)
 
         return g
@@ -89,13 +119,13 @@ class NonlinearConstraint(Constraint):
 
 class SignedDistanceConstraint(NonlinearConstraint):
     def __init__(self, robot_mdl, signed_distance_fcn, d_safe, name="obstacle"):
-        """Signed Distance Constraint
-                   - (sd(x_k, param1, param2, ...) - d_safe) < 0
+        """Signed Distance Constraint: -(sd(x_k, param1, param2, ...) - d_safe) < 0.
 
-        :param robot_mdl: class mm_control.robot.MobileManipulator3D
-        :param signed_distance_fcn: signed distance model, casadi function
-        :param d_safe: safe clearance, scalar, same for all body pairs
-        :param name: name of this constraint
+        Args:
+            robot_mdl (MobileManipulator3D): Robot model.
+            signed_distance_fcn (casadi.Function): Signed distance model.
+            d_safe (float): Safe clearance, scalar, same for all body pairs.
+            name (str): Name of this constraint.
         """
         nx = robot_mdl.ssSymMdl["nx"]
         nu = robot_mdl.ssSymMdl["nu"]
@@ -128,11 +158,11 @@ class SignedDistanceConstraint(NonlinearConstraint):
 
 class StateBoxConstraints(NonlinearConstraint):
     def __init__(self, robot_mdl, name="state"):
-        """State Box Constraint
-                   lb_x < x < ub_x
+        """State Box Constraint: lb_x < x < ub_x.
 
-        :param robot_mdl: class mm_control.robot.MobileManipulator3D
-        :param name: name of this constraint
+        Args:
+            robot_mdl (MobileManipulator3D): Robot model.
+            name (str): Name of this constraint.
         """
         nx = robot_mdl.ssSymMdl["nx"]
         nu = robot_mdl.ssSymMdl["nu"]
@@ -151,11 +181,11 @@ class StateBoxConstraints(NonlinearConstraint):
 
 class ControlBoxConstraints(NonlinearConstraint):
     def __init__(self, robot_mdl, name="control"):
-        """Control Box Constraint
-                   lb_u < u < ub_u
+        """Control Box Constraint: lb_u < u < ub_u.
 
-        :param robot_mdl: class mm_control.robot.MobileManipulator3D
-        :param name: name of this constraint
+        Args:
+            robot_mdl (MobileManipulator3D): Robot model.
+            name (str): Name of this constraint.
         """
         nx = robot_mdl.ssSymMdl["nx"]
         nu = robot_mdl.ssSymMdl["nu"]

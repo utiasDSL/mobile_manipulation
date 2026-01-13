@@ -12,8 +12,9 @@ class DataLogger:
     def __init__(self, config, name="data"):
         """Initialize the data logger.
 
-        :param config: Configuration dictionary with logging settings
-        :param name:   Subdirectory name for this logger (e.g., 'sim' or 'control')
+        Args:
+            config (dict): Configuration dictionary with logging settings.
+            name (str): Subdirectory name for this logger (e.g., 'sim' or 'control').
         """
         if not isinstance(config, dict) or "logging" not in config:
             raise ValueError("Config must be a dict with 'logging' key")
@@ -32,13 +33,29 @@ class DataLogger:
         self.data = {}
 
     def add(self, key, value):
-        """Add a single value for the given key."""
+        """Add a single value for the given key.
+
+        Args:
+            key (str): Key name.
+            value: Value to store.
+
+        Raises:
+            ValueError: If key already exists in the data log.
+        """
         if key in self.data:
             raise ValueError(f"Key '{key}' already exists in the data log.")
         self.data[key] = value
 
     def append(self, key, value):
-        """Append a value to the list for the given key."""
+        """Append a value to the list for the given key.
+
+        Args:
+            key (str): Key name.
+            value: Value to append (will be converted to numpy array).
+
+        Raises:
+            ValueError: If shape mismatch with existing values for the key.
+        """
         a = np.array(value)
 
         if key in self.data:
@@ -60,7 +77,8 @@ class DataLogger:
                 data.npz
                 config.yaml
 
-        :param session_timestamp: Timestamp string in format "%Y-%m-%d_%H-%M-%S".
+        Args:
+            session_timestamp (str): Timestamp string in format "%Y-%m-%d_%H-%M-%S".
         """
         dir_path = self.base_directory / session_timestamp / self.name
         dir_path.mkdir(parents=True, exist_ok=True)

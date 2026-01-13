@@ -15,6 +15,11 @@ class MPC(MPCBase):
     """Single-task Model Predictive Controller using Acados"""
 
     def __init__(self, config):
+        """Initialize MPC controller.
+
+        Args:
+            config (dict): Configuration dictionary with MPC parameters.
+        """
         super().__init__(config)
         num_terminal_cost = 2
         cost_params = config["cost_params"]
@@ -78,7 +83,14 @@ class MPC(MPCBase):
         self.constraints = constraints + [self.controlCst, self.stateCst]
 
     def _get_config_key_for_cost_name(self, cost_name):
-        """Map cost function name to simplified config parameter key."""
+        """Map cost function name to simplified config parameter key.
+
+        Args:
+            cost_name (str): Cost function name (e.g., "EEPoseSE3").
+
+        Returns:
+            str: Simplified config key (e.g., "EEPose").
+        """
         name_mapping = {
             "EEPoseSE3": "EEPose",
             "EEVel6": "EEVel",
@@ -88,7 +100,11 @@ class MPC(MPCBase):
         return name_mapping.get(cost_name, cost_name)
 
     def _set_control_effort_params(self, curr_p_map):
-        """Set ControlEffort cost function parameters in the parameter map."""
+        """Set ControlEffort cost function parameters in the parameter map.
+
+        Args:
+            curr_p_map (casadi.struct_MX): Current parameter map to update.
+        """
         effort_params = self.params["cost_params"]["Effort"]
         for param_name in ["Qqa", "Qqb", "Qva", "Qvb", "Qua", "Qub"]:
             curr_p_map[f"{param_name}_ControlEffort"] = effort_params[param_name]
@@ -100,17 +116,21 @@ class MPC(MPCBase):
         references: dict,
     ):
         """
-        :param t: current control time
-        :param robot_states: (q, v) generalized coordinates and velocities
-        :param references: Dictionary with reference trajectories from TaskManager:
-            {
-                "base_pose": array of shape (N+1, 3) or None,
-                "base_velocity": array of shape (N+1, 3) or None,
-                "ee_pose": array of shape (N+1, 6) or None,
-                "ee_velocity": array of shape (N+1, 6) or None,
-            }
-        :return: v_bar, velocity trajectory, shape (N+1, nu)
-        :return: u_bar, currently the best control inputs, aka, u_bar[0]
+        Args:
+            t (float): Current control time.
+            robot_states (tuple): (q, v) generalized coordinates and velocities.
+            references (dict): Dictionary with reference trajectories from TaskManager:
+                {
+                    "base_pose": array of shape (N+1, 3) or None,
+                    "base_velocity": array of shape (N+1, 3) or None,
+                    "ee_pose": array of shape (N+1, 6) or None,
+                    "ee_velocity": array of shape (N+1, 6) or None,
+                }
+
+        Returns:
+            tuple: (v_bar, u_bar) where:
+                - v_bar: velocity trajectory, shape (N+1, nu)
+                - u_bar: control input trajectory, shape (N, nu)
         """
         self.py_logger.debug(f"control time {t}")
         self.curr_control_time = t
@@ -130,7 +150,15 @@ class MPC(MPCBase):
         return velocity_traj, self.u_bar.copy()
 
     def _prepare_warm_start(self, t, xo):
-        """Prepare warm start trajectories from previous solution or zeros."""
+        """Prepare warm start trajectories from previous solution or zeros.
+
+        Args:
+            t (float): Current control time.
+            xo (ndarray): Current state vector.
+
+        Returns:
+            tuple: (x_bar_initial, u_bar_initial) initial guess trajectories.
+        """
         if self.t_bar is not None:
             self.u_t = interp1d(
                 self.t_bar,
@@ -152,12 +180,12 @@ class MPC(MPCBase):
         """Convert references from TaskManager format to MPC cost function format.
 
         Args:
-            references: Dictionary from TaskManager with keys:
+            references (dict): Dictionary from TaskManager with keys:
                 - "base_pose": array of shape (N+1, 3) or None
                 - "base_velocity": array of shape (N+1, 3) or None
                 - "ee_pose": array of shape (N+1, 6) or None
                 - "ee_velocity": array of shape (N+1, 6) or None
-            xo: Current state vector [q, v] to compute current EE pose if needed
+            xo (ndarray): Current state vector [q, v] to compute current EE pose if needed
 
         Returns:
             Dictionary with cost function names as keys:
@@ -202,7 +230,16 @@ class MPC(MPCBase):
         return r_bar_map
 
     def _setup_horizon_parameters(self, r_bar_map, x_bar_initial, u_bar_initial):
-        """Setup OCP parameters for each horizon step."""
+        """Setup OCP parameters for each horizon step.
+
+        Args:
+            r_bar_map (dict): Dictionary mapping cost function names to reference trajectories.
+            x_bar_initial (ndarray): Initial state trajectory guess, shape (N+1, nx).
+            u_bar_initial (ndarray): Initial control trajectory guess, shape (N, nu).
+
+        Returns:
+            list: List of parameter maps for each horizon step.
+        """
         tp1 = time.perf_counter()
         curr_p_map_bar = []
 
@@ -224,7 +261,14 @@ class MPC(MPCBase):
         return curr_p_map_bar
 
     def _set_initial_guess(self, curr_p_map, i, x_bar_initial, u_bar_initial):
-        """Set initial guess for state, control, and multipliers."""
+        """Set initial guess for state, control, and multipliers.
+
+        Args:
+            curr_p_map (casadi.struct_MX): Current parameter map (not used, but kept for consistency).
+            i (int): Horizon step index.
+            x_bar_initial (ndarray): Initial state trajectory guess, shape (N+1, nx).
+            u_bar_initial (ndarray): Initial control trajectory guess, shape (N, nu).
+        """
         t1 = time.perf_counter()
         self.ocp_solver.set(i, "x", x_bar_initial[i])
         if i < self.N:
@@ -235,7 +279,13 @@ class MPC(MPCBase):
         self.log["time_ocp_set_params_set_x"] += t2 - t1
 
     def _set_tracking_params(self, curr_p_map, r_bar_map, i):
-        """Set tracking cost function parameters."""
+        """Set tracking cost function parameters.
+
+        Args:
+            curr_p_map (casadi.struct_MX): Current parameter map to update.
+            r_bar_map (dict): Dictionary mapping cost function names to reference trajectories.
+            i (int): Horizon step index.
+        """
         t1 = time.perf_counter()
         p_keys = self.p_struct.keys()
 
@@ -288,14 +338,27 @@ class MPC(MPCBase):
         self.log["time_ocp_set_params_tracking"] += t2 - t1
 
     def _set_ocp_params(self, curr_p_map, i):
-        """Set OCP parameters for the current horizon step."""
+        """Set OCP parameters for the current horizon step.
+
+        Args:
+            curr_p_map (casadi.struct_MX): Current parameter map.
+            i (int): Horizon step index.
+        """
         t1 = time.perf_counter()
         self.ocp_solver.set(i, "p", curr_p_map.cat.full().flatten())
         t2 = time.perf_counter()
         self.log["time_ocp_set_params_setp"] += t2 - t1
 
     def _solve_and_extract(self, xo, t, curr_p_map_bar, x_bar_initial, u_bar_initial):
-        """Solve the OCP and extract solution."""
+        """Solve the OCP and extract solution.
+
+        Args:
+            xo (ndarray): Current state vector.
+            t (float): Current control time.
+            curr_p_map_bar (list): List of parameter maps for each horizon step.
+            x_bar_initial (ndarray): Initial state trajectory guess, shape (N+1, nx).
+            u_bar_initial (ndarray): Initial control trajectory guess, shape (N, nu).
+        """
         t1 = time.perf_counter()
         self.ocp_solver.solve_for_x0(xo, fail_on_nonzero_status=False)
         t2 = time.perf_counter()
@@ -346,7 +409,11 @@ class MPC(MPCBase):
         self.v_cmd = self.x_bar[0][self.robot.DoF :].copy()
 
     def _update_logging(self, curr_p_map_bar):
-        """Update logging and visualization data."""
+        """Update logging and visualization data.
+
+        Args:
+            curr_p_map_bar (list): List of parameter maps for each horizon step.
+        """
         t1 = time.perf_counter()
 
         self.ee_bar, self.base_bar = self._getEEBaseTrajectories(self.x_bar)
@@ -365,6 +432,11 @@ class MPC(MPCBase):
         self.log["time_ocp_overhead"] = t2 - t1
 
     def _get_log(self):
+        """Get log dictionary structure with default keys.
+
+        Returns:
+            dict: Log dictionary with default keys initialized to zero or empty.
+        """
         log = {
             "cost_final": 0,
             "step_size": 0,
@@ -393,6 +465,7 @@ class MPC(MPCBase):
         return log
 
     def reset(self):
+        """Reset controller state and solver."""
         super().reset()
         self.ocp_solver.reset()
 

@@ -44,6 +44,17 @@ def construct_logger(
             combined/
                 data.npz
                 config.yaml
+
+    Args:
+        path_to_folder (str): Path to experiment folder.
+        process (bool): If True, post-process data (compute tracking errors, etc.).
+        data_plotter_class (class, optional): DataPlotter class to use. Defaults to DataPlotter.
+
+    Returns:
+        DataPlotter: Configured DataPlotter instance with loaded data.
+
+    Raises:
+        ValueError: If folder structure is unrecognized.
     """
     if data_plotter_class is None:
         data_plotter_class = DataPlotter
@@ -75,6 +86,13 @@ class DataPlotter(TrajectoryPlotterMixin, MPCPlotterMixin):
     """Core class for loading and processing simulation data for plotting."""
 
     def __init__(self, data, config=None, process=True):
+        """Initialize DataPlotter with simulation data.
+
+        Args:
+            data (dict): Dictionary containing simulation/control data.
+            config (dict, optional): Configuration dictionary. If provided, enables controller-dependent processing.
+            process (bool): If True, run post-processing and statistics computation.
+        """
         self.data = data
         self.data["name"] = self.data.get("name", "data")
         self.name = self.data["name"]
@@ -98,6 +116,15 @@ class DataPlotter(TrajectoryPlotterMixin, MPCPlotterMixin):
 
     @classmethod
     def from_logger(cls, logger, process):
+        """Create DataPlotter from DataLogger instance.
+
+        Args:
+            logger (DataLogger): DataLogger instance to convert.
+            process (bool): If True, run post-processing and statistics computation.
+
+        Returns:
+            DataPlotter: DataPlotter instance with converted data.
+        """
         # convert logger data to numpy format
         data = {}
         for key, value in logger.data.items():
@@ -106,6 +133,15 @@ class DataPlotter(TrajectoryPlotterMixin, MPCPlotterMixin):
 
     @classmethod
     def from_npz(cls, npz_file_path, process):
+        """Create DataPlotter from NPZ file.
+
+        Args:
+            npz_file_path (str): Path to NPZ file containing data.
+            process (bool): If True, run post-processing and statistics computation.
+
+        Returns:
+            DataPlotter: DataPlotter instance with loaded data.
+        """
         data = dict(np.load(npz_file_path))
         if "name" not in data:
             path_split = npz_file_path.split("/")
@@ -117,7 +153,15 @@ class DataPlotter(TrajectoryPlotterMixin, MPCPlotterMixin):
 
     @classmethod
     def from_PYSIM_results(cls, folder_path, process):
-        """For data obtained from running controller in the simulation loop"""
+        """For data obtained from running controller in the simulation loop.
+
+        Args:
+            folder_path (str): Path to folder containing data.npz and config.yaml.
+            process (bool): If True, post-process data (compute tracking errors, etc.).
+
+        Returns:
+            DataPlotter: Configured DataPlotter instance with loaded data.
+        """
         npz_file_path = os.path.join(folder_path, "data.npz")
         data = dict(np.load(npz_file_path, allow_pickle=True))
         config_file_path = os.path.join(folder_path, "config.yaml")
@@ -130,7 +174,15 @@ class DataPlotter(TrajectoryPlotterMixin, MPCPlotterMixin):
 
     @classmethod
     def from_ROSSIM_results(cls, folder_path, process):
-        """For data from running simulation and controller as two ROS nodes."""
+        """For data from running simulation and controller as two ROS nodes.
+
+        Args:
+            folder_path (str): Path to folder containing sim/ and control/ subdirectories.
+            process (bool): If True, post-process data (compute tracking errors, etc.).
+
+        Returns:
+            DataPlotter: Configured DataPlotter instance with loaded data.
+        """
         data_decoupled = {}
         config = None
 
@@ -170,6 +222,15 @@ class DataPlotter(TrajectoryPlotterMixin, MPCPlotterMixin):
         return cls(data, config, process)
 
     def _get_tracking_err(self, ref_name, robot_traj_name):
+        """Compute tracking error between reference and robot trajectories.
+
+        Args:
+            ref_name (str): Key name for reference trajectory in data dictionary.
+            robot_traj_name (str): Key name for robot trajectory in data dictionary.
+
+        Returns:
+            ndarray: Tracking error norms over time.
+        """
         N = len(self.data["ts"])
         rs = self.data.get(robot_traj_name, None)
         rds = self.data.get(ref_name, None)
@@ -194,6 +255,15 @@ class DataPlotter(TrajectoryPlotterMixin, MPCPlotterMixin):
         return errs
 
     def _transform_w2b_SE3(self, qb, r_w):
+        """Transform 3D points from world frame to base frame (SE2).
+
+        Args:
+            qb (ndarray): Base pose [x, y, yaw].
+            r_w (ndarray): Points in world frame, shape (N, 3).
+
+        Returns:
+            ndarray: Points in base frame, shape (N, 3).
+        """
         Rbw = rotz(-qb[2])
         rbw = np.array([qb[0], qb[1], 0])
         r_b = (Rbw @ (r_w - rbw).T).T
@@ -201,6 +271,15 @@ class DataPlotter(TrajectoryPlotterMixin, MPCPlotterMixin):
         return r_b
 
     def _transform_w2b_SE2(self, qb, r_w):
+        """Transform 2D points from world frame to base frame (SE2).
+
+        Args:
+            qb (ndarray): Base pose [x, y, yaw].
+            r_w (ndarray): Points in world frame, shape (N, 2).
+
+        Returns:
+            ndarray: Points in base frame, shape (N, 2).
+        """
         Rbw = rotz(-qb[2])[:2, :2]
         rbw = np.array(qb[:2])
         r_b = (Rbw @ (r_w - rbw).T).T
@@ -208,6 +287,14 @@ class DataPlotter(TrajectoryPlotterMixin, MPCPlotterMixin):
         return r_b
 
     def _get_mean_violation(self, data_normalized):
+        """Compute mean constraint violation from normalized data.
+
+        Args:
+            data_normalized (ndarray): Normalized data (values > 1 indicate violations).
+
+        Returns:
+            tuple: (vio_mean, total_violations) where vio_mean is mean violation per time step and total_violations is total count.
+        """
         vio_mask = data_normalized > 1.05
         vio = np.sum((data_normalized - 1) * vio_mask, axis=1)
         vio_num = np.sum(vio_mask, axis=1)
@@ -215,6 +302,7 @@ class DataPlotter(TrajectoryPlotterMixin, MPCPlotterMixin):
         return vio_mean, np.sum(vio_num)
 
     def _post_processing(self):
+        """Post-process data to compute tracking errors, constraints, manipulability, and coordinate transforms."""
         # tracking error
         self.data["err_ee"] = self._get_tracking_err("r_ew_w_ds", "r_ew_ws")
         self.data["err_base"] = self._get_tracking_err("r_bw_w_ds", "r_bw_ws")
@@ -346,6 +434,7 @@ class DataPlotter(TrajectoryPlotterMixin, MPCPlotterMixin):
         self.data["mpc_base_predictions"] = np.array(self.data["mpc_base_predictions"])
 
     def _get_statistics(self):
+        """Compute statistics (RMS, integrals, mean, max, min, std) for tracking errors and other metrics."""
         self.data["statistics"] = {}
         # EE tracking error
         err_ee_stats = math.statistics(self.data["err_ee"])
@@ -475,10 +564,13 @@ class DataPlotter(TrajectoryPlotterMixin, MPCPlotterMixin):
         }
 
     def summary(self, stat_names):
-        """get a summary of statistics
+        """Get a summary of statistics.
 
-        :param stat_names: list of stats of interests, (key, value) pairs
-        :return: array
+        Args:
+            stat_names (list): List of stats of interest, (key, value) pairs.
+
+        Returns:
+            list: Array of statistics.
         """
 
         stats = []

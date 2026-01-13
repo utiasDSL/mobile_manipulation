@@ -8,16 +8,46 @@ from mm_utils import parsing
 class FixedBaseMapping:
     @staticmethod
     def forward(q, v, bodyframe=False):
+        """Forward mapping from robot coordinates to PyBullet coordinates.
+
+        Args:
+            q (ndarray): Joint positions.
+            v (ndarray): Joint velocities.
+            bodyframe (bool): If True, transform velocities to body frame (unused for fixed base).
+
+        Returns:
+            tuple: (q_pyb, v_pyb) PyBullet coordinates.
+        """
         return q.copy(), v.copy()
 
     @staticmethod
     def inverse(q_pyb, v_pyb, bodyframe=False):
+        """Inverse mapping from PyBullet coordinates to robot coordinates.
+
+        Args:
+            q_pyb (ndarray): PyBullet joint positions.
+            v_pyb (ndarray): PyBullet joint velocities.
+            bodyframe (bool): If True, transform velocities from body frame (unused for fixed base).
+
+        Returns:
+            tuple: (q, v) Robot coordinates.
+        """
         return q_pyb.copy(), v_pyb.copy()
 
 
 class OmnidirectionalBaseMapping:
     @staticmethod
     def forward(q, v, bodyframe=False):
+        """Forward mapping from robot coordinates to PyBullet coordinates.
+
+        Args:
+            q (ndarray): Joint positions.
+            v (ndarray): Joint velocities.
+            bodyframe (bool): If True, transform base velocities to body frame.
+
+        Returns:
+            tuple: (q_pyb, v_pyb) PyBullet coordinates.
+        """
         if bodyframe:
             yaw = q[2]
             C_wb = rotz(yaw)
@@ -29,6 +59,16 @@ class OmnidirectionalBaseMapping:
 
     @staticmethod
     def inverse(q_pyb, v_pyb, bodyframe=False):
+        """Inverse mapping from PyBullet coordinates to robot coordinates.
+
+        Args:
+            q_pyb (ndarray): PyBullet joint positions.
+            v_pyb (ndarray): PyBullet joint velocities.
+            bodyframe (bool): If True, transform base velocities from body frame.
+
+        Returns:
+            tuple: (q, v) Robot coordinates.
+        """
         if bodyframe:
             yaw = q_pyb[2]
             C_wb = rotz(yaw)
@@ -49,6 +89,17 @@ class PyBulletInputMapping:
 
     @staticmethod
     def from_string(s):
+        """Create base mapping class from string identifier.
+
+        Args:
+            s (str): Base type string ("fixed", "nonholonomic", or "omnidirectional").
+
+        Returns:
+            class: Base mapping class.
+
+        Raises:
+            ValueError: If string identifier is not recognized.
+        """
         s = s.lower()
         if s == "fixed":
             return FixedBaseMapping
@@ -62,6 +113,18 @@ class PyBulletInputMapping:
 
 class SimulatedRobot:
     def __init__(self, config, position=(0, 0, 0), orientation=(0, 0, 0, 1)):
+        """Initialize simulated robot in PyBullet.
+
+        NOTE: passing the flag URDF_MERGE_FIXED_LINKS is good for performance
+        but messes up the origins of the merged links, so this is not
+        recommended. Instead, if performance is an issue, consider using the
+        base_simple.urdf model instead of the Ridgeback.
+
+        Args:
+            config (dict): Configuration dictionary with robot parameters.
+            position (tuple, optional): Initial position (x, y, z). Defaults to (0, 0, 0).
+            orientation (tuple, optional): Initial orientation quaternion (x, y, z, w). Defaults to (0, 0, 0, 1).
+        """
         # NOTE: passing the flag URDF_MERGE_FIXED_LINKS is good for performance
         # but messes up the origins of the merged links, so this is not
         # recommended. Instead, if performance is an issue, consider using the
@@ -125,6 +188,9 @@ class SimulatedRobot:
 
         It is best not to do this during a simulation, as this overrides are
         dynamic effects.
+
+        Args:
+            q (ndarray): Joint positions to set.
         """
         # Force joint velocities to be zero
         # TODO: may set to arbitrary velocity
@@ -136,7 +202,16 @@ class SimulatedRobot:
             pyb.resetJointState(self.uid, idx, value, 0)
 
     def command_velocity(self, cmd_vel, bodyframe=False, add_noise=False):
-        """Command the velocity of the robot's joints."""
+        """Command the velocity of the robot's joints.
+
+        Args:
+            cmd_vel (ndarray): Desired joint velocities.
+            bodyframe (bool): If True, interpret base velocities in body frame.
+            add_noise (bool): If True, add process noise to velocities.
+
+        Returns:
+            ndarray: Actual commanded velocities (with noise if applicable).
+        """
         q, _ = self.joint_states()
 
         # convert to PyBullet coordinates
@@ -163,8 +238,12 @@ class SimulatedRobot:
     def joint_states(self, add_noise=False, bodyframe=False):
         """Get the current state of the joints.
 
-        Return a tuple (q, v), where q is the n-dim array of positions and v is
-        the n-dim array of velocities.
+        Args:
+            add_noise (bool): If True, add measurement noise to states.
+            bodyframe (bool): If True, return base velocities in body frame.
+
+        Returns:
+            tuple: (q, v) where q is the n-dim array of positions and v is the n-dim array of velocities.
         """
         states = pyb.getJointStates(self.uid, self.robot_joint_indices)
         q_pyb = np.array([state[0] for state in states])
@@ -185,6 +264,12 @@ class SimulatedRobot:
         the link is the location of its parent joint.
 
         If no link_idx is provided, defaults to that of the tool.
+
+        Args:
+            link_idx (int, optional): Link index. If None, uses tool link. If negative, uses base link.
+
+        Returns:
+            tuple: (position, orientation) where position is (3,) array and orientation is (4,) quaternion array.
         """
         if link_idx is None:
             link_idx = self.tool_idx
@@ -196,13 +281,30 @@ class SimulatedRobot:
         return np.array(pos), np.array(orn)
 
     def link_velocity(self, link_idx=None):
+        """Get the velocity of a particular link in the world frame.
+
+        Args:
+            link_idx (int, optional): Link index. If None, uses tool link. If negative, uses base link.
+
+        Returns:
+            tuple: (linear_velocity, angular_velocity) where each is a (3,) array.
+        """
         if link_idx is None:
             link_idx = self.tool_idx
+        elif link_idx < 0:
+            link_idx = self.base_idx
         state = pyb.getLinkState(self.uid, link_idx, computeLinkVelocity=True)
         return np.array(state[-2]), np.array(state[-1])
 
     def jacobian(self, q=None):
-        """Get the end effector Jacobian at the current configuration."""
+        """Get the end effector Jacobian at the current configuration.
+
+        Args:
+            q (ndarray, optional): Joint positions. If None, uses current joint states.
+
+        Returns:
+            ndarray: 6xN Jacobian matrix where N is the number of joints.
+        """
 
         if q is None:
             q, _ = self.joint_states()

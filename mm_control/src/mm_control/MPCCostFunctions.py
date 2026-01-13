@@ -29,15 +29,12 @@ class RBF:
 
 class CostFunctions(ABC):
     def __init__(self, nx: int, nu: int, name: str = "MPCCost"):
-        """MPC cost functions base class
-                        \mathcal{J}
-        :param nx: state dim
-        :param nu: control dim
-        :param xsym: state, CasADi symbolic variable
-        :param usym: control, CasADi symbolic variable
-        :param psym: params, CasADi symbolic variable
-        :param name: name, string
+        """MPC cost functions base class.
 
+        Args:
+            nx (int): State dimension.
+            nu (int): Control dimension.
+            name (str): Name of the cost function.
         """
 
         self.nx = nx
@@ -58,24 +55,55 @@ class CostFunctions(ABC):
         super().__init__()
 
     def evaluate(self, x, u, p):
+        """Evaluate cost function at given state, control, and parameters.
+
+        Args:
+            x (ndarray): State vector.
+            u (ndarray): Control input vector.
+            p (ndarray): Parameter vector.
+
+        Returns:
+            ndarray or None: Cost value, or None if cost function is not set.
+        """
         if self.J_fcn is not None:
             return self.J_fcn(x, u, p).toarray().flatten()
         else:
             return None
 
     def get_p_dict(self):
+        """Get parameter dictionary with name suffixes.
+
+        Returns:
+            dict or None: Parameter dictionary with keys suffixed by function name, or None if no parameters.
+        """
         if self.p_dict is None:
             return None
         else:
             return {key + f"_{self.name}": val for (key, val) in self.p_dict.items()}
 
     def get_custom_H_fcn(self):
+        """Get custom Hessian approximation function.
+
+        Returns:
+            casadi.Function or None: Custom Hessian approximation function, or None if not set.
+        """
         return self.H_approx_fcn
 
 
 # Base class for trajectory tracking costs (shared by position and velocity)
 class TrajectoryTrackingCostFunction(CostFunctions):
+    """Base class for trajectory tracking cost functions."""
+
     def __init__(self, nx: int, nu: int, nr: int, f_fcn: cs.Function, name: str):
+        """Initialize trajectory tracking cost function.
+
+        Args:
+            nx (int): State dimension.
+            nu (int): Control dimension.
+            nr (int): Reference dimension.
+            f_fcn (casadi.Function): Function that maps state to tracked quantity.
+            name (str): Name of the cost function.
+        """
         super().__init__(nx, nu, name)
         self.nr = nr
         self.f_fcn = f_fcn.expand()
@@ -120,11 +148,32 @@ class TrajectoryTrackingCostFunction(CostFunctions):
         ).expand()
 
     def get_e(self, x, u, r):
+        """Get tracking error vector.
+
+        Args:
+            x (ndarray): State vector.
+            u (ndarray): Control input vector.
+            r (ndarray): Reference vector.
+
+        Returns:
+            ndarray: Tracking error vector.
+        """
         return self.e_fcn(x, u, r).toarray().flatten()
 
 
 class VelocityCostFunction(TrajectoryTrackingCostFunction):
+    """Velocity tracking cost function for end-effector or base."""
+
     def __init__(self, robot_mdl, params, target="EE", dimension=3, name=None):
+        """Initialize velocity cost function.
+
+        Args:
+            robot_mdl (MobileManipulator3D): Robot model.
+            params (dict): Cost function parameters.
+            target (str): Target to track, either "EE" or "base".
+            dimension (int): Dimension of velocity to track (3 or 6).
+            name (str, optional): Name of the cost function. If None, auto-generated.
+        """
         ss_mdl = robot_mdl.ssSymMdl
         nx, nu, nr = ss_mdl["nx"], ss_mdl["nu"], dimension
 
@@ -166,7 +215,17 @@ class VelocityCostFunction(TrajectoryTrackingCostFunction):
 
 
 class PoseSE3CostFunction(CostFunctions):
+    """End-effector pose tracking cost function in SE(3)."""
+
     def __init__(self, robot_mdl, params, base_frame=False, name=None):
+        """Initialize SE(3) pose cost function.
+
+        Args:
+            robot_mdl (MobileManipulator3D): Robot model.
+            params (dict): Cost function parameters.
+            base_frame (bool): If True, express pose in base frame; if False, in world frame.
+            name (str, optional): Name of the cost function. If None, auto-generated.
+        """
         ss_mdl = robot_mdl.ssSymMdl
         nx, nu = ss_mdl["nx"], ss_mdl["nu"]
 
@@ -228,11 +287,29 @@ class PoseSE3CostFunction(CostFunctions):
         ).expand()
 
     def get_e(self, x, u, r):
+        """Get tracking error vector.
+
+        Args:
+            x (ndarray): State vector.
+            u (ndarray): Control input vector.
+            r (ndarray): Reference vector.
+
+        Returns:
+            ndarray: Tracking error vector.
+        """
         return self.e_fcn(x, u, r).toarray().flatten()
 
 
 class BasePoseSE2CostFunction(CostFunctions):
+    """Base pose tracking cost function in SE(2)."""
+
     def __init__(self, robot_mdl, params):
+        """Initialize SE(2) base pose cost function.
+
+        Args:
+            robot_mdl (MobileManipulator3D): Robot model.
+            params (dict): Cost function parameters.
+        """
         ss_mdl = robot_mdl.ssSymMdl
         nx = ss_mdl["nx"]
         nu = ss_mdl["nu"]
@@ -292,11 +369,29 @@ class BasePoseSE2CostFunction(CostFunctions):
         ).expand()
 
     def get_e(self, x, u, r):
+        """Get tracking error vector.
+
+        Args:
+            x (ndarray): State vector.
+            u (ndarray): Control input vector.
+            r (ndarray): Reference vector.
+
+        Returns:
+            ndarray: Tracking error vector.
+        """
         return self.e_fcn(x, u, r).toarray().flatten()
 
 
 class ControlEffortCostFunction(CostFunctions):
+    """Control effort cost function (quadratic in state and control)."""
+
     def __init__(self, robot_mdl, params):
+        """Initialize control effort cost function.
+
+        Args:
+            robot_mdl (MobileManipulator3D): Robot model.
+            params (dict): Cost function parameters with weight matrices.
+        """
         ss_mdl = robot_mdl.ssSymMdl
         self.params = params
         super().__init__(ss_mdl["nx"], ss_mdl["nu"], "ControlEffort")
@@ -315,6 +410,7 @@ class ControlEffortCostFunction(CostFunctions):
         self._setupSymMdl()
 
     def _setupSymMdl(self):
+        """Setup symbolic model for control effort cost."""
         Qq = cs.vertcat(
             self.p_struct["Qqb"],
             self.p_struct["Qqa"],
@@ -347,7 +443,18 @@ class ControlEffortCostFunction(CostFunctions):
 
 
 class SoftConstraintsRBFCostFunction(CostFunctions):
+    """Radial basis function (RBF) cost for soft constraints."""
+
     def __init__(self, mu, zeta, cst_obj, name="SoftConstraint", expand=True):
+        """Initialize RBF soft constraint cost function.
+
+        Args:
+            mu (float): RBF parameter mu.
+            zeta (float): RBF parameter zeta.
+            cst_obj (Constraint): Constraint object to soften.
+            name (str): Name of the cost function.
+            expand (bool): If True, expand CasADi functions for efficiency.
+        """
         super().__init__(cst_obj.nx, cst_obj.nu, name)
 
         self.mu = mu
@@ -396,14 +503,38 @@ class SoftConstraintsRBFCostFunction(CostFunctions):
             self.H_approx_fcn = self.H_approx_fcn.expand()
 
     def evaluate_vec(self, x, u, p):
+        """Evaluate cost function vector (per-constraint costs).
+
+        Args:
+            x (ndarray): State vector.
+            u (ndarray): Control input vector.
+            p (ndarray): Parameter vector.
+
+        Returns:
+            ndarray: Cost vector, one element per constraint.
+        """
         return self.J_vec_fcn(x, u, p).toarray().flatten()
 
     def get_p_dict(self):
+        """Get parameter dictionary.
+
+        Returns:
+            dict: Parameter dictionary.
+        """
         return self.p_dict
 
 
 class RegularizationCostFunction(CostFunctions):
+    """Regularization cost function (quadratic in state and control)."""
+
     def __init__(self, nx: int, nu: int, name="Regularization"):
+        """Initialize regularization cost function.
+
+        Args:
+            nx (int): State dimension.
+            nu (int): Control dimension.
+            name (str): Name of the cost function.
+        """
         super().__init__(nx, nu, name)
         self.p_dict = {"eps": cs.MX.sym("eps_reg", 1)}
         self.p_struct = casadi_sym_struct(self.p_dict)
@@ -427,7 +558,15 @@ class RegularizationCostFunction(CostFunctions):
 
 
 class ManipulabilityCostFunction(CostFunctions):
+    """Manipulability cost function (encourages high manipulability)."""
+
     def __init__(self, robot_mdl: MobileManipulator3D, name: str = "Manipulability"):
+        """Initialize manipulability cost function.
+
+        Args:
+            robot_mdl (MobileManipulator3D): Robot model.
+            name (str): Name of the cost function.
+        """
         ss_mdl = robot_mdl.ssSymMdl
         nx = ss_mdl["nx"]
         nu = ss_mdl["nu"]
@@ -451,10 +590,30 @@ class CostFunctionRegistry:
 
     @classmethod
     def register(cls, name: str, factory):
+        """Register a cost function factory.
+
+        Args:
+            name (str): Name of the cost function.
+            factory (callable): Factory function that creates the cost function.
+        """
         cls._registry[name] = factory
 
     @classmethod
     def create(cls, name: str, robot_model, params: dict, **kwargs):
+        """Create a cost function by name.
+
+        Args:
+            name (str): Name of the cost function to create.
+            robot_model (MobileManipulator3D): Robot model.
+            params (dict): Cost function parameters.
+            **kwargs: Additional keyword arguments passed to factory.
+
+        Returns:
+            CostFunctions: Created cost function instance.
+
+        Raises:
+            ValueError: If cost function name is not registered.
+        """
         if name not in cls._registry:
             available = ", ".join(cls._registry.keys())
             raise ValueError(f"Unknown cost function: '{name}'. Available: {available}")
@@ -463,12 +622,29 @@ class CostFunctionRegistry:
 
     @classmethod
     def list_available(cls):
+        """List all available cost function names.
+
+        Returns:
+            list: List of registered cost function names.
+        """
         return list(cls._registry.keys())
 
 
 # Helper functions to create parameterized cost functions
 def create_base_pose_cost(robot_mdl, params, dimension="SE2"):
-    """Create base pose cost: dimension must be SE2 (x,y,yaw)."""
+    """Create base pose cost: dimension must be SE2 (x,y,yaw).
+
+    Args:
+        robot_mdl (MobileManipulator3D): Robot model.
+        params (dict): Cost function parameters.
+        dimension (str): Dimension type, must be "SE2".
+
+    Returns:
+        BasePoseSE2CostFunction: Base pose cost function instance.
+
+    Raises:
+        ValueError: If dimension is not "SE2".
+    """
     if dimension != "SE2":
         raise ValueError(
             f"Base pose cost only supports SE2. Got dimension='{dimension}'. "
@@ -478,13 +654,35 @@ def create_base_pose_cost(robot_mdl, params, dimension="SE2"):
 
 
 def create_base_vel_cost(robot_mdl, params, dimension=3):
-    """Create base velocity cost: dimension can be 2 (vx,vy) or 3 (vx,vy,vyaw)"""
+    """Create base velocity cost: dimension can be 2 (vx,vy) or 3 (vx,vy,vyaw).
+
+    Args:
+        robot_mdl (MobileManipulator3D): Robot model.
+        params (dict): Cost function parameters.
+        dimension (int): Velocity dimension (2 or 3).
+
+    Returns:
+        VelocityCostFunction: Base velocity cost function instance.
+    """
     dim_int = int(dimension)
     return VelocityCostFunction(robot_mdl, params, "base", dim_int, f"BaseVel{dim_int}")
 
 
 def create_ee_pose_cost(robot_mdl, params, pose_type="SE3", frame="world"):
-    """Create EE pose cost: pose_type must be SE3 (position+orientation), frame can be world or base"""
+    """Create EE pose cost: pose_type must be SE3 (position+orientation), frame can be world or base.
+
+    Args:
+        robot_mdl (MobileManipulator3D): Robot model.
+        params (dict): Cost function parameters.
+        pose_type (str): Pose type, must be "SE3".
+        frame (str): Reference frame, either "world" or "base".
+
+    Returns:
+        PoseSE3CostFunction: End-effector pose cost function instance.
+
+    Raises:
+        ValueError: If pose_type is not "SE3".
+    """
     base_frame = frame == "base"
     if pose_type != "SE3":
         raise ValueError(
@@ -496,18 +694,42 @@ def create_ee_pose_cost(robot_mdl, params, pose_type="SE3", frame="world"):
 
 
 def create_ee_vel_cost(robot_mdl, params):
-    """Create EE velocity cost: 6D (3D linear + 3D angular) for SE3 compatibility"""
+    """Create EE velocity cost: 6D (3D linear + 3D angular) for SE3 compatibility.
+
+    Args:
+        robot_mdl (MobileManipulator3D): Robot model.
+        params (dict): Cost function parameters.
+
+    Returns:
+        VelocityCostFunction: End-effector velocity cost function instance.
+    """
     return VelocityCostFunction(robot_mdl, params, "EE", 6, "EEVel6")
 
 
 def create_regularization_cost(robot_mdl, params):
-    """Create regularization cost"""
+    """Create regularization cost.
+
+    Args:
+        robot_mdl (MobileManipulator3D): Robot model.
+        params (dict): Cost function parameters (not used, but kept for consistency).
+
+    Returns:
+        RegularizationCostFunction: Regularization cost function instance.
+    """
     ss_mdl = robot_mdl.ssSymMdl
     return RegularizationCostFunction(ss_mdl["nx"], ss_mdl["nu"])
 
 
 def create_manipulability_cost(robot_mdl, params):
-    """Create manipulability cost"""
+    """Create manipulability cost.
+
+    Args:
+        robot_mdl (MobileManipulator3D): Robot model.
+        params (dict): Cost function parameters (not used, but kept for consistency).
+
+    Returns:
+        ManipulabilityCostFunction: Manipulability cost function instance.
+    """
     return ManipulabilityCostFunction(robot_mdl)
 
 

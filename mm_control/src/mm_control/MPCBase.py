@@ -24,6 +24,11 @@ class MPCBase:
     """Base class for Model Predictive Control"""
 
     def __init__(self, config):
+        """Initialize MPC base class.
+
+        Args:
+            config (dict): Configuration dictionary with MPC parameters.
+        """
         self.model_interface = ModelInterface(config)
         self.robot = self.model_interface.robot
         self.ssSymMdl = self.robot.ssSymMdl
@@ -95,35 +100,59 @@ class MPCBase:
         references: dict,
     ):
         """
-        :param t: current control time
-        :param robot_states: (q, v) generalized coordinates and velocities
-        :param references: Dictionary with reference trajectories from TaskManager:
-            {
-                "base_pose": array of shape (N+1, 3) or None,
-                "base_velocity": array of shape (N+1, 3) or None,
-                "ee_pose": array of shape (N+1, 6) or None,
-                "ee_velocity": array of shape (N+1, 6) or None,
-            }
-        :return: v_bar, velocity trajectory, shape (N+1, nu)
-        :return: u_bar, currently the best control inputs, aka, u_bar[0]
+        Args:
+            t (float): Current control time.
+            robot_states (tuple): (q, v) generalized coordinates and velocities.
+            references (dict): Dictionary with reference trajectories from TaskManager:
+                {
+                    "base_pose": array of shape (N+1, 3) or None,
+                    "base_velocity": array of shape (N+1, 3) or None,
+                    "ee_pose": array of shape (N+1, 6) or None,
+                    "ee_velocity": array of shape (N+1, 6) or None,
+                }
+
+        Returns:
+            tuple: (v_bar, u_bar) where:
+                - v_bar: velocity trajectory, shape (N+1, nu)
+                - u_bar: control input trajectory, shape (N, nu)
         """
         pass
 
     def _predictTrajectories(self, xo, u_bar):
+        """Predict state trajectory from initial state and control inputs.
+
+        Args:
+            xo (ndarray): Initial state vector.
+            u_bar (ndarray): Control input trajectory, shape (N, nu).
+
+        Returns:
+            ndarray: Predicted state trajectory, shape (N+1, nx).
+        """
         return MM.ssIntegrate(self.dt, xo, u_bar, self.ssSymMdl)
 
     def _getEEBaseTrajectories(self, x_bar):
+        """Extract end-effector and base trajectories from state trajectory.
+
+        Args:
+            x_bar (ndarray): State trajectory, shape (N+1, nx).
+
+        Returns:
+            tuple: (ee_bar, base_bar) where:
+                - ee_bar: End-effector position trajectory, shape (N+1, 3).
+                - base_bar: Base position trajectory, shape (N+1, 3).
+        """
         ee_bar = np.zeros((self.N + 1, 3))
         base_bar = np.zeros((self.N + 1, 3))
         for k in range(self.N + 1):
             base_bar[k] = x_bar[k, :3]
             fee_fcn = self.kinSymMdl[self.robot.tool_link_name]
-            ee_pos, ee_orn = fee_fcn(x_bar[k, : self.DoF])
+            ee_pos, _ = fee_fcn(x_bar[k, : self.DoF])
             ee_bar[k] = ee_pos.toarray().flatten()
 
         return ee_bar, base_bar
 
     def reset(self):
+        """Reset controller state trajectories and multipliers."""
         self.x_bar = np.zeros((self.N + 1, self.nx))  # current best guess x0,...,xN
         self.u_bar = np.zeros((self.N, self.nu))  # current best guess u0,...,uN-1
         self.t_bar = None
@@ -134,6 +163,17 @@ class MPCBase:
     def evaluate_cost_function(
         self, cost_function: CostFunctions, x_bar, u_bar, nlp_p_map_bar
     ):
+        """Evaluate cost function over the prediction horizon.
+
+        Args:
+            cost_function (CostFunctions): Cost function to evaluate.
+            x_bar (ndarray): State trajectory, shape (N+1, nx).
+            u_bar (ndarray): Control input trajectory, shape (N, nu).
+            nlp_p_map_bar (list): List of parameter maps for each horizon step.
+
+        Returns:
+            float: Total cost over the prediction horizon.
+        """
         cost_p_dict = cost_function.get_p_dict()
         cost_p_struct = casadi_sym_struct(cost_p_dict)
         cost_p_map = cost_p_struct(0)
@@ -152,6 +192,17 @@ class MPCBase:
     def evaluate_constraints(
         self, constraints: MPCConstraints.Constraint, x_bar, u_bar, nlp_p_map_bar
     ):
+        """Evaluate constraints over the prediction horizon.
+
+        Args:
+            constraints (Constraint): Constraint to evaluate.
+            x_bar (ndarray): State trajectory, shape (N+1, nx).
+            u_bar (ndarray): Control input trajectory, shape (N, nu).
+            nlp_p_map_bar (list): List of parameter maps for each horizon step.
+
+        Returns:
+            list: Constraint values at each horizon step.
+        """
         cost_p_dict = constraints.get_p_dict()
         cost_p_struct = casadi_sym_struct(cost_p_dict)
         cost_p_map = cost_p_struct(0)
@@ -174,6 +225,20 @@ class MPCBase:
         return vals
 
     def _construct(self, costs, constraints, num_terminal_cost, name="MM"):
+        """Construct and setup Acados OCP solver.
+
+        Args:
+            costs (list): List of cost function objects.
+            constraints (list): List of constraint objects.
+            num_terminal_cost (int): Number of terminal cost functions.
+            name (str): Name identifier for the OCP.
+
+        Returns:
+            tuple: (ocp, ocp_solver, p_struct) where:
+                - ocp: Acados OCP object.
+                - ocp_solver: Acados OCP solver.
+                - p_struct: Parameter structure.
+        """
         model, p_struct, p_map = self._setup_acados_model(costs, constraints, name)
         ocp = self._setup_acados_ocp(model, name)
         self._setup_costs(ocp, model, costs, num_terminal_cost)
@@ -190,7 +255,19 @@ class MPCBase:
         return ocp, ocp_solver, p_struct
 
     def _setup_acados_model(self, costs, constraints, name):
-        """Setup AcadosModel with dynamics and parameters."""
+        """Setup AcadosModel with dynamics and parameters.
+
+        Args:
+            costs (list): List of cost function objects.
+            constraints (list): List of constraint objects.
+            name (str): Name identifier for the model.
+
+        Returns:
+            tuple: (model, p_struct, p_map) where:
+                - model: AcadosModel instance.
+                - p_struct: Parameter structure.
+                - p_map: Parameter map.
+        """
         model = AcadosModel()
         model.x = cs.MX.sym("x", self.nx)
         model.u = cs.MX.sym("u", self.nu)
@@ -213,7 +290,15 @@ class MPCBase:
         return model, p_struct, p_map
 
     def _setup_acados_ocp(self, model, name):
-        """Setup AcadosOCP basic structure."""
+        """Setup AcadosOCP basic structure.
+
+        Args:
+            model (AcadosModel): Acados model instance.
+            name (str): Name identifier for the OCP.
+
+        Returns:
+            AcadosOcp: Configured Acados OCP instance.
+        """
         ocp = AcadosOcp()
         ocp.model = model
         ocp.solver_options.N_horizon = self.N
@@ -223,7 +308,14 @@ class MPCBase:
         return ocp
 
     def _setup_costs(self, ocp, model, costs, num_terminal_cost):
-        """Setup cost expressions for the OCP."""
+        """Setup cost expressions for the OCP.
+
+        Args:
+            ocp (AcadosOcp): Acados OCP instance to configure.
+            model (AcadosModel): Acados model instance.
+            costs (list): List of cost function objects.
+            num_terminal_cost (int): Number of terminal cost functions.
+        """
         ocp.cost.cost_type = "EXTERNAL"
         cost_expr = []
         for cost in costs:
@@ -250,7 +342,22 @@ class MPCBase:
                 model.cost_expr_ext_cost_custom_hess_e = cost_hess_expr_e
 
     def _setup_constraints(self, ocp, model, constraints):
-        """Setup all constraints (control, state, nonlinear) and return slack variable counts."""
+        """Setup all constraints (control, state, nonlinear) and return slack variable counts.
+
+        Args:
+            ocp (AcadosOcp): Acados OCP instance to configure.
+            model (AcadosModel): Acados model instance.
+            constraints (list): List of constraint objects.
+
+        Returns:
+            tuple: (nsx, nsu, nsx_e, nsh, nsh_e, nsh_0) slack variable counts for:
+                - nsx: State slack variables.
+                - nsu: Control slack variables.
+                - nsx_e: Terminal state slack variables.
+                - nsh: Nonlinear constraint slack variables.
+                - nsh_e: Terminal nonlinear constraint slack variables.
+                - nsh_0: Initial nonlinear constraint slack variables.
+        """
         # Control input constraints
         ocp.constraints.lbu = np.array(self.ssSymMdl["lb_u"])
         ocp.constraints.ubu = np.array(self.ssSymMdl["ub_u"])
@@ -339,7 +446,11 @@ class MPCBase:
         return nsx, nsu, nsx_e, nsh, nsh_e, nsh_0
 
     def _configure_solver_options(self, ocp):
-        """Configure solver options from config."""
+        """Configure solver options from config.
+
+        Args:
+            ocp (AcadosOcp): Acados OCP instance to configure.
+        """
         for key, val in self.params["acados"]["ocp_solver_options"].items():
             attr = getattr(ocp.solver_options, key, None)
             if attr is not None:
@@ -350,7 +461,15 @@ class MPCBase:
                 )
 
     def _create_solver(self, ocp, name):
-        """Create and return AcadosOCPSolver."""
+        """Create and return AcadosOCPSolver.
+
+        Args:
+            ocp (AcadosOcp): Acados OCP instance.
+            name (str): Name identifier for the solver.
+
+        Returns:
+            AcadosOcpSolver: Configured Acados OCP solver instance.
+        """
         json_file_name = str(self.output_dir / f"acados_ocp_{name}.json")
         if self.params["acados"]["cython"]["enabled"]:
             if self.params["acados"]["cython"]["recompile"]:
@@ -365,7 +484,14 @@ class MPCBase:
             return AcadosOcpSolver(ocp, json_file=json_file_name, build=True)
 
     def _create_collision_constraint(self, name):
-        """Create a collision constraint for the given link name."""
+        """Create a collision constraint for the given link name.
+
+        Args:
+            name (str): Collision link name.
+
+        Returns:
+            Constraint: Collision constraint object.
+        """
         sd_fcn = self.model_interface.getSignedDistanceSymMdls(name)
         is_static = (
             name in self.model_interface.scene.collision_link_names["static_obstacles"]
@@ -384,7 +510,15 @@ class MPCBase:
         return collision_cst_type(self.robot, sd_fcn, safety_margin, name)
 
     def _create_collision_soft_cost(self, name, sd_cst):
-        """Create a soft collision cost for the given constraint."""
+        """Create a soft collision cost for the given constraint.
+
+        Args:
+            name (str): Collision link name.
+            sd_cst (Constraint): Signed distance constraint to soften.
+
+        Returns:
+            SoftConstraintsRBFCostFunction: Soft collision cost function.
+        """
         expand = True
         is_static = (
             name in self.model_interface.scene.collision_link_names["static_obstacles"]
@@ -402,7 +536,17 @@ class MPCBase:
         )
 
     def _setup_slack_variables(self, ocp, nsx, nsu, nsh, nsx_e, nsh_e, nsh_0):
-        """Setup slack variables for the OCP."""
+        """Setup slack variables for the OCP.
+
+        Args:
+            ocp (AcadosOcp): Acados OCP instance to configure.
+            nsx (int): Number of state slack variables.
+            nsu (int): Number of control slack variables.
+            nsh (int): Number of nonlinear constraint slack variables.
+            nsx_e (int): Number of terminal state slack variables.
+            nsh_e (int): Number of terminal nonlinear constraint slack variables.
+            nsh_0 (int): Number of initial nonlinear constraint slack variables.
+        """
         z = self.params["cost_params"]["slack"]["z"]
         Z = self.params["cost_params"]["slack"]["Z"]
 
@@ -428,4 +572,9 @@ class MPCBase:
             ocp.cost.zu_0 = np.ones(ns_0) * z
 
     def _get_log(self):
+        """Get empty log dictionary structure.
+
+        Returns:
+            dict: Empty log dictionary with default keys.
+        """
         return {}

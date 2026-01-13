@@ -25,7 +25,12 @@ class Box3D:
         self.update_pose(position, rotation)
 
     def update_pose(self, position=None, rotation=None):
-        """Update the box's position and rotation."""
+        """Update the box's position and rotation.
+
+        Args:
+            position (ndarray, optional): 3D position vector. Defaults to [0, 0, 0].
+            rotation (ndarray, optional): 3x3 rotation matrix. Defaults to identity matrix.
+        """
         if position is None:
             position = np.zeros(3)
         if rotation is None:

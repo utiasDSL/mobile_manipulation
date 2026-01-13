@@ -5,7 +5,18 @@ from pyb_utils.camera import Camera, VideoRecorder
 
 
 def camera_from_dict(d, r_ew_w=None):
-    """Construct a camera from the configuration dict."""
+    """Construct a camera from the configuration dict.
+
+    Args:
+        d (dict): Configuration dictionary with camera parameters.
+        r_ew_w (ndarray, optional): End-effector position in world frame. Defaults to [0, 0, 0].
+
+    Returns:
+        Camera: Configured camera instance.
+
+    Raises:
+        ValueError: If required parameters are missing.
+    """
     if r_ew_w is None:
         r_ew_w = np.zeros(3)
 
@@ -61,6 +72,17 @@ class VideoManager:
     def __init__(
         self, root_dir, timestamp, video_name, save_frames, timestep, views, ext="avi"
     ):
+        """Initialize video manager for recording simulation views.
+
+        Args:
+            root_dir (Path): Root directory for video output.
+            timestamp (datetime): Timestamp for the recording session.
+            video_name (str or None): Name prefix for video files. If None, recording is disabled.
+            save_frames (bool): If True, save individual frames in addition to video.
+            timestep (float): Recording timestep in seconds.
+            views (list): List of (name, camera) tuples for each view to record.
+            ext (str): Video file extension. Defaults to "avi".
+        """
         self.save = video_name is not None
 
         # if not saving anything, no need to record
@@ -100,6 +122,15 @@ class VideoManager:
         """Parse the video recording settings from the config.
 
         Multiple viewpoints can be recorded at the same time.
+
+        Args:
+            video_name (str or None): Name prefix for video files. If None, recording is disabled.
+            config (dict): Configuration dictionary with video settings.
+            timestamp (datetime): Timestamp for the recording session.
+            r_ew_w (ndarray, optional): End-effector position in world frame. Defaults to None.
+
+        Returns:
+            VideoManager: Configured VideoManager instance.
         """
         root_dir = Path(config["video"]["dir"])
         save_frames = config["video"]["save_frames"]
@@ -125,6 +156,9 @@ class VideoManager:
 
         The frame is only saved if this timestep aligns with the recording's
         timestep.
+
+        Args:
+            t (float): Current simulation time.
         """
         # if not recording, do nothing
         if not self.save:

@@ -16,46 +16,62 @@ import casadi_kin_dyn.py3casadi_kin_dyn as cas_kin_dyn  # isort: skip
 
 
 def signed_distance_sphere_sphere(c1, c2, r1, r2):
-    """signed distance between two spheres
+    """Signed distance between two spheres.
 
-    :param c1: numpy array or casadi sym of size 3, center of sphere 1
-    :param c2: numpy array or casadi sym of size 3, center of sphere 2
-    :param r1: scalar, radius of sphere 1
-    :param r2: scalar, radius of sphere 2
-    :return:
+    Args:
+        c1 (ndarray or casadi.MX): Center of sphere 1, size 3.
+        c2 (ndarray or casadi.MX): Center of sphere 2, size 3.
+        r1 (float): Radius of sphere 1.
+        r2 (float): Radius of sphere 2.
+
+    Returns:
+        casadi.MX or float: Signed distance between the spheres.
     """
     return cs.norm_2(c1 - c2) - r1 - r2
 
 
 def signed_distance_half_space_sphere(d, p, n, c, r):
-    """signed distance of a sphere to half space
+    """Signed distance of a sphere to half space.
 
-    :param d: scalar, offset from p along n
-    :param p: vector, offset of the normal vector
-    :param n: numpy array, normal vector of the plane
-    :param c: numpy array or casadi sym of size 3, center of the sphere
-    :param r: scalar, radius of the sphere
-    :return:
+    Args:
+        d (float): Offset from p along n.
+        p (ndarray): Offset of the normal vector.
+        n (ndarray): Normal vector of the plane.
+        c (ndarray or casadi.MX): Center of the sphere, size 3.
+        r (float): Radius of the sphere.
+
+    Returns:
+        casadi.MX or float: Signed distance of sphere to half space.
     """
 
     return (c - p).T @ n - d - r
 
 
 def signed_distance_sphere_cylinder(c_sphere, c_cylinder, r_sphere, r_cylinder):
-    """signed distance between a sphere and a cylinder (with infinite height)
+    """Signed distance between a sphere and a cylinder (with infinite height).
 
-    :param c_sphere: center of the sphere
-    :param c_cylinder: center of the cylinder
-    :param r_sphere: radius of the sphere
-    :param r_cylinder: radius of the cylinder
-    :return:
+    Args:
+        c_sphere (ndarray): Center of the sphere.
+        c_cylinder (ndarray): Center of the cylinder.
+        r_sphere (float): Radius of the sphere.
+        r_cylinder (float): Radius of the cylinder.
+
+    Returns:
+        casadi.MX or float: Signed distance between sphere and cylinder.
     """
 
     return cs.norm_2(c_sphere[:2] - c_cylinder[:2]) - r_sphere - r_cylinder
 
 
 class PinocchioInterface:
+    """Interface to Pinocchio for robot model and collision checking."""
+
     def __init__(self, config):
+        """Initialize Pinocchio interface.
+
+        Args:
+            config (dict): Configuration dictionary with robot and scene parameters.
+        """
         # 1. build robot model
         urdf_path = parsing.parse_and_compile_urdf(config["robot"]["urdf"])
         self.model, self.collision_model, self.visual_model = pin.buildModelsFromUrdf(
@@ -82,6 +98,11 @@ class PinocchioInterface:
             self.collision_link_names.update(config["scene"]["collision_link_names"])
 
     def visualize(self, q):
+        """Visualize robot configuration.
+
+        Args:
+            q (ndarray): Joint configuration vector.
+        """
         viz = visualizer(self.model, self.collision_model, self.visual_model)
         viz.initViewer(open=True)
         viz.viewer.open()
@@ -89,6 +110,14 @@ class PinocchioInterface:
         viz.display(q)
 
     def getGeometryObject(self, link_names):
+        """Get geometry objects for given link names.
+
+        Args:
+            link_names (list or str): Link name(s) to get geometry objects for.
+
+        Returns:
+            GeometryObject or list: Geometry object(s) for the link(s).
+        """
         objs = []
         for name in link_names:
             o_id = self.collision_model.getGeometryId(name + "_0")
@@ -104,6 +133,17 @@ class PinocchioInterface:
             return objs
 
     def getSignedDistance(self, o1, tf1, o2, tf2):
+        """Compute signed distance between two geometry objects.
+
+        Args:
+            o1 (GeometryObject): First geometry object.
+            tf1 (tuple): Transformation (position, rotation) for object 1.
+            o2 (GeometryObject): Second geometry object.
+            tf2 (tuple): Transformation (position, rotation) for object 2.
+
+        Returns:
+            casadi.MX or float: Signed distance between the objects.
+        """
         o1_geo_type = o1.geometry.getNodeType()
         o2_geo_type = o2.geometry.getNodeType()
 
@@ -137,24 +177,29 @@ class PinocchioInterface:
         return signed_dist
 
     def addCollisionObjects(self, geoms):
-        """Add a list of geometry objects to the collision model
+        """Add a list of geometry objects to the collision model.
 
-        :param geoms: pinocchio GeometryObject
-        :return: None
+        Args:
+            geoms (list): List of pinocchio GeometryObject.
         """
         for geom in geoms:
             self.collision_model.addGeometryObject(geom)
 
     def addVisualObjects(self, geoms):
+        """Add a list of geometry objects to the visual model.
+
+        Args:
+            geoms (list): List of pinocchio GeometryObject.
+        """
         for geom in geoms:
             self.visual_model.addGeometryObject(geom)
 
     def addCollisionPairs(self, pairs, expand_name=True):
-        """add collision pairs to the model
+        """Add collision pairs to the model.
 
-        :param pairs: list of tuples
-        :param expand_name: append _0 to link names if True
-        :return: None
+        Args:
+            pairs (list): List of tuples of collision pairs.
+            expand_name (bool): Append _0 to link names if True.
         """
         for pair in pairs:
             id1 = self.collision_model.getGeometryId(
@@ -166,9 +211,11 @@ class PinocchioInterface:
             self.collision_model.addCollisionPair(pin.CollisionPair(id1, id2))
 
     def removeAllCollisionPairs(self):
+        """Remove all collision pairs from the collision model."""
         self.collision_model.removeAllCollisionPairs()
 
     def addGroundCollisionObject(self):
+        """Add a ground plane collision object."""
         # add a ground plane
         ground_placement = pin.SE3.Identity()
         ground_shape = fcl.Halfspace(np.array([0, 0, 1]), 0)
@@ -180,6 +227,14 @@ class PinocchioInterface:
         self.addCollisionObjects([ground_geom_obj])
 
     def computeDistances(self, q):
+        """Compute distances for all collision pairs.
+
+        Args:
+            q (ndarray): Joint configuration vector.
+
+        Returns:
+            tuple: (distances, names) where distances is array of minimum distances and names is list of collision pair names.
+        """
         data = self.model.createData()
         geom_data = pin.GeometryData(self.collision_model)
         pin.computeDistances(self.model, data, self.collision_model, geom_data, q)
@@ -196,7 +251,14 @@ class PinocchioInterface:
 
 
 class CasadiModelInterface:
+    """Interface combining robot, scene, and Pinocchio models for CasADi-based control."""
+
     def __init__(self, config):
+        """Initialize CasADi model interface.
+
+        Args:
+            config (dict): Configuration dictionary.
+        """
         self.robot = MobileManipulator3D(config)
         self.scene = Scene(config)
         self.pinocchio_interface = PinocchioInterface(config)
@@ -226,11 +288,14 @@ class CasadiModelInterface:
         self._setupPinocchioCollisionMdl()
 
     def _addCollisionPairFromTwoGroups(self, group1, group2):
-        """add all possible collision link pairs, one from each group
+        """Add all possible collision link pairs, one from each group.
 
-        :param group1: a list of collision link
-        :param group2: another list of collision link
-        :return: nested list of possible pairs
+        Args:
+            group1 (list): List of collision link names.
+            group2 (list): Another list of collision link names.
+
+        Returns:
+            list: Nested list of possible pairs.
         """
 
         pairs = []
@@ -241,6 +306,11 @@ class CasadiModelInterface:
         return pairs
 
     def _setupCollisionPair(self, config):
+        """Setup collision pairs from configuration.
+
+        Args:
+            config (dict): Configuration dictionary.
+        """
         if config["robot"].get("collision_pairs", False) and config["robot"][
             "collision_pairs"
         ].get("self", False):
@@ -303,6 +373,7 @@ class CasadiModelInterface:
                     )
 
     def _setupCollisionPairDetailed(self):
+        """Setup detailed collision pairs for self-collision and obstacles."""
         # base
         self.collision_pairs_detailed["self"] = [
             ["ur10_arm_forearm_collision_link", "base_collision_link"]
@@ -352,6 +423,7 @@ class CasadiModelInterface:
                 )
 
     def _setupSelfCollisionSymMdl(self):
+        """Setup symbolic models for self-collision signed distances."""
         sd_syms = []
         for pair in self.collision_pairs["self"]:
             os = self.pinocchio_interface.getGeometryObject(pair)
@@ -376,6 +448,7 @@ class CasadiModelInterface:
         )
 
     def _setupStaticObstaclesCollisionSymMdl(self):
+        """Setup symbolic models for static obstacle signed distances."""
         for obstacle, pairs in self.collision_pairs["static_obstacles"].items():
             sd_syms = []
             for pair in pairs:
@@ -403,6 +476,7 @@ class CasadiModelInterface:
             )
 
     def _setupPinocchioCollisionMdl(self):
+        """Setup Pinocchio collision model with collision pairs."""
         self.pinocchio_interface.removeAllCollisionPairs()
         self.pinocchio_interface.addCollisionPairs(
             self.collision_pairs_detailed["self"]
@@ -413,10 +487,13 @@ class CasadiModelInterface:
             self.pinocchio_interface.addCollisionPairs(pairs)
 
     def getSignedDistanceSymMdls(self, name):
-        """get signed distance function by collision link name
+        """Get signed distance function by collision link name.
 
-        :param name: collision link name
-        :return:
+        Args:
+            name (str): Collision link name.
+
+        Returns:
+            casadi.Function or None: Signed distance function, or None if not found.
         """
         if name == "self":
             return self.signedDistanceSymMdlsPerGroup["self"]
@@ -430,6 +507,16 @@ class CasadiModelInterface:
     def evaluateSignedDistance(
         self, names: List[str], qs: ndarray, params: Dict[str, List[ndarray]] = {}
     ):
+        """Evaluate signed distances for collision link names.
+
+        Args:
+            names (List[str]): List of collision link names to evaluate.
+            qs (ndarray): Joint configuration(s), shape (N, nq) or (nq,).
+            params (Dict[str, List[ndarray]]): Additional parameters per collision link.
+
+        Returns:
+            dict: Dictionary mapping collision link names to signed distance arrays.
+        """
         sd = {}
         N = len(qs)
         names.remove("static_obstacles")
@@ -454,6 +541,16 @@ class CasadiModelInterface:
     def evaluateSignedDistancePerPair(
         self, names: List[str], qs: ndarray, params: Dict[str, List[ndarray]] = {}
     ):
+        """Evaluate signed distances per collision pair (not aggregated).
+
+        Args:
+            names (List[str]): List of collision link names to evaluate.
+            qs (ndarray): Joint configuration(s), shape (N, nq) or (nq,).
+            params (Dict[str, List[ndarray]]): Additional parameters per collision link.
+
+        Returns:
+            dict: Dictionary mapping collision link names to dictionaries of per-pair signed distances.
+        """
         sd = {}
 
         N = len(qs)
@@ -486,9 +583,10 @@ class CasadiModelInterface:
 
 class Scene:
     def __init__(self, config):
-        """Casadi symbolic model of a 3D Scene
+        """Casadi symbolic model of a 3D Scene.
 
-        :param config:
+        Args:
+            config (dict): Configuration dictionary.
         """
         if config["scene"]["enabled"]:
             urdf_path = parsing.parse_and_compile_urdf(config["scene"]["urdf"])
@@ -504,6 +602,7 @@ class Scene:
         self._setupCollisionLinkKinSymMdl()
 
     def _setupCollisionLinkKinSymMdl(self):
+        """Create kinematic symbolic model for collision links in scene."""
         self.collisionLinkKinSymMdls = {}
 
         for group, name_list in self.collision_link_names.items():
@@ -521,7 +620,11 @@ class Scene:
 
 class MobileManipulator3D:
     def __init__(self, config):
-        """Casadi symbolic model of Mobile Manipulator"""
+        """Casadi symbolic model of Mobile Manipulator.
+
+        Args:
+            config (dict): Configuration dictionary with robot parameters.
+        """
         urdf_path = parsing.parse_and_compile_urdf(config["robot"]["urdf"])
         urdf = open(urdf_path, "r").read()
         # we use cas_kin_dyn to build casadi forward kinematics functions
@@ -610,10 +713,7 @@ class MobileManipulator3D:
             self.kinSymMdls[name] = self._getFk(name)
 
     def _setupCollisionLinkKinSymMdl(self):
-        """Create kinematic symbolic model for collision links
-
-        :return:
-        """
+        """Create kinematic symbolic model for collision links."""
         self.collisionLinkKinSymMdls = {}
 
         for collision_group, link_list in self.collision_link_names.items():
@@ -674,6 +774,7 @@ class MobileManipulator3D:
                 )
 
     def _setupManipulabilitySymMdl(self):
+        """Setup symbolic models for end-effector and arm manipulability."""
         Jee_fcn = self.jacSymMdls[self.tool_link_name]
         qsym = cs.SX.sym("qsx", self.DoF)
         Jee_eqn = Jee_fcn(qsym)
@@ -686,10 +787,17 @@ class MobileManipulator3D:
         )
 
     def _getFk(self, link_name, base_frame=False):
-        """Create symbolic function for a link named link_name
+        """Create symbolic function for a link named link_name.
+
         The symbolic function returns the position of its parent joint in and rotation w.r.t the world frame.
         Note this is different from link_state provided by Pybullet which provides CoM position.
 
+        Args:
+            link_name (str): Name of the link.
+            base_frame (bool): If True, express pose in base frame; if False, in world frame.
+
+        Returns:
+            casadi.Function: Forward kinematics function returning (position, rotation).
         """
         # TODO: Should we handle base through pinocchio by adopting the cartesian base urdf file?
         if link_name == self.base_link_name:
@@ -726,6 +834,15 @@ class MobileManipulator3D:
         )
 
     def _discretizefmdl(self, ss_mdl, dt):
+        """Discretize state-space model for given time step.
+
+        Args:
+            ss_mdl (dict): State-space model dictionary.
+            dt (float): Discretization time step.
+
+        Returns:
+            dict: Discretized state-space model dictionary.
+        """
         if "linear" in ss_mdl["mdl_type"]:
             x_sym = ss_mdl["x"]
             u_sym = ss_mdl["u"]
@@ -750,13 +867,16 @@ class MobileManipulator3D:
 
     @staticmethod
     def ssIntegrate(dt, xo, u_bar, ssSymMdl):
-        """
+        """Integrate state-space model.
 
-        :param dt: discretization time step
-        :param x0: initial state
-        :param u_bar: control inputs numpy.ndarray [N, nu]
-        :param ssSymMdl: state-space symbolic model
-        :return: x_bar
+        Args:
+            dt (float): Discretization time step.
+            xo (ndarray): Initial state.
+            u_bar (ndarray): Control inputs, shape [N, nu].
+            ssSymMdl (dict): State-space symbolic model.
+
+        Returns:
+            ndarray: State trajectory x_bar, shape [N+1, nx].
         """
         N = u_bar.shape[0]
         # For linear system, discreet time model is exact
@@ -769,11 +889,15 @@ class MobileManipulator3D:
         return x_bar
 
     def checkBounds(self, xs, us, tol=1e-2):
-        """
+        """Check bounds for states and controls.
 
-        :param xs:
-        :param us:
-        :return:
+        Args:
+            xs (ndarray): State trajectory.
+            us (ndarray): Control trajectory.
+            tol (float): Tolerance for bound checking.
+
+        Returns:
+            bool: True if within bounds, False otherwise.
         """
 
         # check state
@@ -791,6 +915,15 @@ class MobileManipulator3D:
         return xs_num_violation, us_num_violation
 
     def getEE(self, q, base_frame=False):
+        """Get end-effector position and orientation.
+
+        Args:
+            q (ndarray): Joint configuration vector.
+            base_frame (bool): If True, express position in base frame; if False, in world frame.
+
+        Returns:
+            tuple: (position, quaternion) where position is 3D array and quaternion is 4D array.
+        """
         fee = self.kinSymMdls[self.tool_link_name]
         P, rot = fee(q)
         quat = r2q(np.array(rot), order="xyzs")

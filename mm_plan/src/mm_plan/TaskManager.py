@@ -41,10 +41,10 @@ class TaskManager:
         priority (current task).
 
         Args:
-            t: Current time
-            robot_states: (joint angles, joint velocities)
-            num_horizon_points: Number of horizon points (N+1)
-            dt: Time step
+            t (float): Current time.
+            robot_states (tuple): (joint angles, joint velocities).
+            num_horizon_points (int): Number of horizon points (N+1).
+            dt (float): Time step.
 
         Returns:
             Dictionary with reference trajectories:
@@ -123,8 +123,8 @@ class TaskManager:
         """Update task manager and check if current task is finished.
 
         Args:
-            t: Current time
-            states: Dictionary with "EE" and "base" states
+            t (float): Current time.
+            states (dict): Dictionary with "EE" and "base" states:
                 - "base": {"pose": [x, y, yaw], "velocity": [vx, vy, vyaw]}
                 - "EE": {"pose": [x, y, z, roll, pitch, yaw], "velocity": [vx, vy, vz, wx, wy, wz]}
 

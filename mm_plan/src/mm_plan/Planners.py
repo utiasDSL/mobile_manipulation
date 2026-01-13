@@ -30,8 +30,8 @@ class Planner(ABC):
         Returns None, None if this planner doesn't provide base references.
 
         Args:
-            t: Time (s)
-            robot_states: (joint angle, joint velocity), optional
+            t (float): Time (s).
+            robot_states (dict, optional): (joint angle, joint velocity), optional.
 
         Returns:
             (position, velocity) or (None, None) if not applicable
@@ -44,8 +44,8 @@ class Planner(ABC):
         Returns None, None if this planner doesn't provide EE references.
 
         Args:
-            t: Time (s)
-            robot_states: (joint angle, joint velocity), optional
+            t (float): Time (s).
+            robot_states (dict, optional): (joint angle, joint velocity), optional.
 
         Returns:
             (position, velocity) or (None, None) if not applicable
@@ -58,10 +58,10 @@ class Planner(ABC):
         Returns None, None if this planner doesn't provide base references.
 
         Args:
-            robot_states: Current robot states
-            num_pts: Number of points to return
-            dt: Time step between points
-            time_offset: Time offset from current time
+            robot_states (dict): Current robot states.
+            num_pts (int): Number of points to return.
+            dt (float): Time step between points.
+            time_offset (float): Time offset from current time.
 
         Returns:
             (positions, velocities) arrays or (None, None) if not applicable
@@ -74,10 +74,10 @@ class Planner(ABC):
         Returns None, None if this planner doesn't provide EE references.
 
         Args:
-            robot_states: Current robot states
-            num_pts: Number of points to return
-            dt: Time step between points
-            time_offset: Time offset from current time
+            robot_states (dict): Current robot states.
+            num_pts (int): Number of points to return.
+            dt (float): Time step between points.
+            time_offset (float): Time offset from current time.
 
         Returns:
             (positions, velocities) arrays or (None, None) if not applicable
@@ -89,8 +89,8 @@ class Planner(ABC):
         """Check if the planner has finished.
 
         Args:
-            t: Current time
-            states: Dictionary with "base" and "EE" states
+            t (float): Current time.
+            states (dict): Dictionary with "base" and "EE" states:
                 - "base": {"pose": [x, y, yaw], "velocity": [vx, vy, vyaw]}
                 - "EE": {"pose": [x, y, z, roll, pitch, yaw], "velocity": [vx, vy, vz, wx, wy, wz]}
 
@@ -103,7 +103,7 @@ class Planner(ABC):
         """Update robot states.
 
         Args:
-            robot_states: (joint angle, joint velocity)
+            robot_states (tuple): (joint angle, joint velocity).
         """
         self.robot_states = robot_states
 
@@ -181,19 +181,43 @@ class WaypointPlanner(Planner):
         self.t_reached = 0
 
     def getBaseTrackingPoint(self, t, robot_states=None):
-        """Get base tracking point."""
+        """Get base tracking point.
+
+        Args:
+            t (float): Current time.
+            robot_states (dict, optional): Current robot states (unused for waypoint planner).
+
+        Returns:
+            tuple: (position, velocity) where position is (3,) array and velocity is (3,) array, or (None, None) if no base reference.
+        """
         if not self.has_base_ref:
             return None, None
         return self.base_target.copy(), np.zeros(3)
 
     def getEETrackingPoint(self, t, robot_states=None):
-        """Get EE tracking point."""
+        """Get EE tracking point.
+
+        Args:
+            t (float): Current time.
+            robot_states (dict, optional): Current robot states (unused for waypoint planner).
+
+        Returns:
+            tuple: (position, velocity) where position is (6,) array [x,y,z,qx,qy,qz,qw] and velocity is (6,) array, or (None, None) if no EE reference.
+        """
         if not self.has_ee_ref:
             return None, None
         return self.ee_target.copy(), np.zeros(6)
 
     def checkFinished(self, t, states):
-        """Check if waypoint has been reached."""
+        """Check if waypoint has been reached.
+
+        Args:
+            t (float): Current time.
+            states (dict): Dictionary with "base" and "EE" keys containing pose information.
+
+        Returns:
+            bool: True if waypoint has been reached, False otherwise.
+        """
         base_finished = True
         ee_finished = True
 
@@ -336,7 +360,15 @@ class PathPlanner(Planner):
         }
 
     def getBaseTrackingPoint(self, t, robot_states=None):
-        """Get base tracking point from path."""
+        """Get base tracking point from path.
+
+        Args:
+            t (float): Current time.
+            robot_states (dict, optional): Current robot states (unused for path planner).
+
+        Returns:
+            tuple: (position, velocity) where position is (3,) array and velocity is (3,) array, or (None, None) if no base reference.
+        """
         if not self.has_base_ref:
             return None, None
 
@@ -349,7 +381,15 @@ class PathPlanner(Planner):
         return p, v
 
     def getEETrackingPoint(self, t, robot_states=None):
-        """Get EE tracking point from path."""
+        """Get EE tracking point from path.
+
+        Args:
+            t (float): Current time.
+            robot_states (dict, optional): Current robot states (unused for path planner).
+
+        Returns:
+            tuple: (position, velocity) where position is (6,) array [x,y,z,qx,qy,qz,qw] and velocity is (6,) array, or (None, None) if no EE reference.
+        """
         if not self.has_ee_ref:
             return None, None
 
@@ -365,10 +405,10 @@ class PathPlanner(Planner):
         """Get array of base tracking points.
 
         Args:
-            robot_states: Current robot states (unused, kept for interface compatibility)
-            num_pts: Number of points to return
-            dt: Time step between points
-            time_offset: Time offset from path start (elapsed time since path started)
+            robot_states (dict): Current robot states (unused, kept for interface compatibility).
+            num_pts (int): Number of points to return.
+            dt (float): Time step between points.
+            time_offset (float): Time offset from path start (elapsed time since path started).
         """
         if (
             not self.has_base_ref
@@ -387,10 +427,10 @@ class PathPlanner(Planner):
         """Get array of EE tracking points.
 
         Args:
-            robot_states: Current robot states (unused, kept for interface compatibility)
-            num_pts: Number of points to return
-            dt: Time step between points
-            time_offset: Time offset from path start (elapsed time since path started)
+            robot_states (dict): Current robot states (unused, kept for interface compatibility).
+            num_pts (int): Number of points to return.
+            dt (float): Time step between points.
+            time_offset (float): Time offset from path start (elapsed time since path started).
         """
         if not self.has_ee_ref or self.ee_plan is None or len(self.ee_plan["t"]) == 0:
             return None, None
@@ -414,7 +454,15 @@ class PathPlanner(Planner):
             return pos_err, ori_err
 
     def checkFinished(self, t, states):
-        """Check if path has been completed."""
+        """Check if path has been completed.
+
+        Args:
+            t (float): Current time.
+            states (dict): Dictionary with "base" and "EE" keys containing pose information.
+
+        Returns:
+            bool: True if path has been completed, False otherwise.
+        """
         base_finished = True
         ee_finished = True
 
@@ -473,7 +521,7 @@ def create_planner(config: dict):
     """Create a planner instance from configuration.
 
     Args:
-        config: Planner configuration dictionary containing "planner_type"
+        config (dict): Planner configuration dictionary containing "planner_type".
 
     Returns:
         Instance of the requested planner
