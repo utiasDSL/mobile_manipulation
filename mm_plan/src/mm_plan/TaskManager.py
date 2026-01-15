@@ -156,8 +156,13 @@ class TaskManager:
                     "All tasks completed (%d/%d)", self.planner_num, self.planner_num
                 )
             return True, 1
-
-        return False, 1
+        else:
+            self.logger.info(
+                "Working on task %d/%d",
+                self.curr_task_id + 1,
+                self.planner_num,
+            )
+            return False, 1
 
     def print(self):
         """Print task manager status."""

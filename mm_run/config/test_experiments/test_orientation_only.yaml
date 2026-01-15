@@ -5,23 +5,29 @@
 
 planner:
   tasks:
-  - name: EE Orientation Change
+  - name: EE Orientation Facing Down
     planner_type: WaypointPlanner
-    ee_pose: [1.0, 0.0, 0.8, 0, 0, 0]  # World frame: [x, y, z, roll, pitch, yaw]
-    tracking_err_tol: 0.05
-  - name: EE Rotate 180
+    ee_pose: [3, 0, 0, -1pi, 0, 0]  # World frame: [x, y, z, roll, pitch, yaw]
+    ee_mask: [false, false, false, true, true, true]  # Only orientation matters
+    tracking_ori_err_tol: 0.05
+  - name: EE Orientation Facing Backwards
     planner_type: WaypointPlanner
-    ee_pose: [1.0, 0.0, 0.8, 3.14, 0, 0]  # Same position, rotate 180° around x-axis (world frame)
-    tracking_err_tol: 0.05
+    ee_pose: [0, 2, 0, -1pi, 0.5pi, 0]  # World frame: [x, y, z, roll, pitch, yaw]
+    ee_mask: [false, false, false, true, true, true]  # Only orientation matters
+    tracking_ori_err_tol: 0.05
 
 controller:
   self_collision_avoidance_enabled: True
   static_obstacles_collision_avoidance_enabled: False
   acados:
     name: "TestOrientationTracking"
+  cost_params:
+    EEPose:
+      Qk: [0, 0, 0, 3, 3, 3]  # [x, y, z, roll, pitch, yaw]
+      P: [0, 0, 0, 1, 1, 1]   # Terminal weights
 
 simulation:
-  duration: 8
+  duration: 6
 
 include:
   - package: "mm_run"

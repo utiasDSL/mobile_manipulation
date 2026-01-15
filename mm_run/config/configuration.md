@@ -36,7 +36,7 @@ planner:
   tasks:
     - name: str                    # Task identifier
       planner_type: "WaypointPlanner" | "PathPlanner"
-      tracking_err_tol: float      # Position error tolerance [m]
+      tracking_pos_err_tol: float      # Position error tolerance [m]
       tracking_ori_err_tol: float  # Optional: orientation error tolerance [rad] (default: 0.1)
 ```
 
@@ -47,20 +47,20 @@ planner:
   planner_type: "WaypointPlanner"
   base_pose: [x, y, yaw]                    # Optional: SE2 [m, m, rad] in world frame
   ee_pose: [x, y, z, roll, pitch, yaw]      # Optional: SE3 [m, m, m, rad, rad, rad] in world frame
-  tracking_err_tol: 0.1
+  tracking_pos_err_tol: 0.1
   hold_period: 1.0                          # Optional: hold time at target [s]
 
 # Sequential: Only base moves
 - name: "Move Base"
   planner_type: "WaypointPlanner"
   base_pose: [2.0, 1.0, 0.0]
-  tracking_err_tol: 0.2
+  tracking_pos_err_tol: 0.2
 
 # Sequential: Only EE moves
 - name: "Reach Down"
   planner_type: "WaypointPlanner"
   ee_pose: [2.2, 1.2, 0.5, 1.57, 0, 0]
-  tracking_err_tol: 0.05
+  tracking_pos_err_tol: 0.05
   hold_period: 1.0
 ```
 
@@ -72,7 +72,7 @@ planner:
   base_path: [[x1, y1, yaw1], [x2, y2, yaw2], ...]  # Optional: Array of SE2 poses
   ee_path: [[x1, y1, z1, r1, p1, y1], [x2, y2, z2, r2, p2, y2], ...]  # Optional: Array of SE3 poses
   dt: 0.1                         # Time step between path points [s]
-  tracking_err_tol: 0.1
+  tracking_pos_err_tol: 0.1
   end_stop: false                 # Optional: require zero velocity at end (default: false)
 
 # Sequential: Only base path
@@ -80,14 +80,14 @@ planner:
   planner_type: "PathPlanner"
   base_path: [[0, 0, 0], [1, 0, 0], [2, 1, 1.57]]
   dt: 0.1
-  tracking_err_tol: 0.2
+  tracking_pos_err_tol: 0.2
 
 # Sequential: Only EE path
 - name: "EE Path"
   planner_type: "PathPlanner"
   ee_path: [[1, 0, 1, 0, 0, 0], [1.5, 0.2, 0.8, 0, 0, 0]]
   dt: 0.1
-  tracking_err_tol: 0.02
+  tracking_pos_err_tol: 0.02
 ```
 
 **Note**: At least one of `base_pose`/`base_path` or `ee_pose`/`ee_path` must be specified. Tasks execute sequentially, but each task can coordinate base and EE simultaneously.

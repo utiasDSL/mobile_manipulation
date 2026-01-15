@@ -5,7 +5,7 @@ planner:
     planner_type: "WaypointPlanner"
     ee_pose: [0.0, 1.0, 0.0, 0.0, 0.0, 0.0]  # [x, y, z, roll, pitch, yaw]
     hold_period: 3.0
-    tracking_err_tol: 0.02
+    tracking_pos_err_tol: 0.02
 
 simulation:
   robot:
