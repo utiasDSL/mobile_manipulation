@@ -95,7 +95,7 @@ class ControllerROSNode:
 
         if self.planner_config.get("use_joy", False):
             self.use_joy = True
-            self.joystick_interface = JoystickButtonInterface(1)  # circle
+            self.task_switch_button_interface = JoystickButtonInterface(1)  # circle
         else:
             self.use_joy = False
 

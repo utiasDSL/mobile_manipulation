@@ -47,20 +47,62 @@ def signed_distance_half_space_sphere(d, p, n, c, r):
     return (c - p).T @ n - d - r
 
 
-def signed_distance_sphere_cylinder(c_sphere, c_cylinder, r_sphere, r_cylinder):
-    """Signed distance between a sphere and a cylinder (with infinite height).
+def signed_distance_sphere_cylinder(
+    c_sphere, c_cylinder, r_sphere, r_cylinder, half_length=None
+):
+    """Signed distance between a sphere and a cylinder (finite or infinite height).
 
     Args:
         c_sphere (ndarray): Center of the sphere.
         c_cylinder (ndarray): Center of the cylinder.
         r_sphere (float): Radius of the sphere.
         r_cylinder (float): Radius of the cylinder.
+        half_length (float, optional): Half-length of the cylinder along z-axis.
+                                      If None, treats cylinder as infinitely tall.
 
     Returns:
         casadi.MX or float: Signed distance between sphere and cylinder.
     """
+    # Distance in x-y plane
+    dist_xy = cs.norm_2(c_sphere[:2] - c_cylinder[:2])
 
-    return cs.norm_2(c_sphere[:2] - c_cylinder[:2]) - r_sphere - r_cylinder
+    if half_length is None:
+        # Infinite height: only consider x-y distance
+        return dist_xy - r_sphere - r_cylinder
+
+    # Finite height: check if sphere is within cylinder's z-range
+    z_sphere = c_sphere[2]
+    z_cylinder = c_cylinder[2]
+    z_min = z_cylinder - half_length
+    z_max = z_cylinder + half_length
+
+    # If within z-range: use 2D distance in x-y plane
+    dist_in_range = dist_xy - r_sphere - r_cylinder
+
+    # If above cylinder: distance to top cap
+    # Closest point on top cap: if projection is inside circle, use vertical distance;
+    # if outside, use distance to edge of circle
+    z_above = z_sphere - z_max
+    dist_xy_to_edge = cs.fmax(
+        dist_xy - r_cylinder, 0
+    )  # Distance from sphere center to cap edge in x-y
+    dist_above = cs.sqrt(dist_xy_to_edge**2 + z_above**2) - r_sphere
+
+    # If below cylinder: distance to bottom cap
+    z_below = z_min - z_sphere
+    dist_below = cs.sqrt(dist_xy_to_edge**2 + z_below**2) - r_sphere
+
+    # Select appropriate distance based on z position
+    # If z_sphere < z_min: use dist_below
+    # If z_sphere > z_max: use dist_above
+    # If z_min <= z_sphere <= z_max: use dist_in_range
+    signed_dist = cs.if_else(
+        z_sphere < z_min,
+        dist_below,
+        cs.if_else(z_sphere > z_max, dist_above, dist_in_range),
+    )
+
+    return signed_dist
 
 
 class PinocchioInterface:
@@ -167,11 +209,19 @@ class PinocchioInterface:
             )
         elif o1_geo_type == fcl.GEOM_CYLINDER and o2_geo_type == fcl.GEOM_SPHERE:
             signed_dist = signed_distance_sphere_cylinder(
-                tf2[0], tf1[0], o2.geometry.radius, o1.geometry.radius
+                tf2[0],
+                tf1[0],
+                o2.geometry.radius,
+                o1.geometry.radius,
+                o1.geometry.halfLength,
             )
         elif o1_geo_type == fcl.GEOM_SPHERE and o2_geo_type == fcl.GEOM_CYLINDER:
             signed_dist = signed_distance_sphere_cylinder(
-                tf1[0], tf2[0], o1.geometry.radius, o2.geometry.radius
+                tf1[0],
+                tf2[0],
+                o1.geometry.radius,
+                o2.geometry.radius,
+                o2.geometry.halfLength,
             )
 
         return signed_dist
@@ -358,7 +408,10 @@ class CasadiModelInterface:
                 if obstacle == "ground":
                     self.collision_pairs["static_obstacles"][obstacle] = (
                         self._addCollisionPairFromTwoGroups(
-                            [obstacle], self.robot.collision_link_names["tool"]
+                            [obstacle],
+                            self.robot.collision_link_names["wrist"]
+                            + self.robot.collision_link_names["tool"]
+                            + self.robot.collision_link_names["forearm"],
                         )
                     )
                 else:
@@ -766,14 +819,22 @@ class MobileManipulator3D:
                 )
 
     def _setupManipulabilitySymMdl(self):
-        """Setup symbolic models for end-effector and arm manipulability."""
+        """Setup symbolic models for end-effector and arm manipulability.
+
+        Uses Frobenius norm squared (trace of J*J^T) instead of determinant
+        to enable code generation for Acados. This is a good proxy for manipulability
+        that encourages large, well-conditioned Jacobians.
+        """
         Jee_fcn = self.jacSymMdls[self.tool_link_name]
         qsym = cs.SX.sym("qsx", self.DoF)
         Jee_eqn = Jee_fcn(qsym)
-        man_eqn = cs.det(Jee_eqn @ Jee_eqn.T) ** 0.5
+        # Use Frobenius norm squared (code-generable) instead of det (not code-generable)
+        man_eqn = cs.trace(Jee_eqn @ Jee_eqn.T)
 
         self.manipulability_fcn = cs.Function("manipulability_fcn", [qsym], [man_eqn])
-        arm_man_eqn = cs.det(Jee_eqn[:, 3:] @ Jee_eqn[:, 3:].T) ** 0.5
+        # Arm manipulability: only arm joints (skip base: x, y, yaw)
+        Jee_arm = Jee_eqn[:, 3:]
+        arm_man_eqn = cs.trace(Jee_arm @ Jee_arm.T)
         self.arm_manipulability_fcn = cs.Function(
             "arm_manipulability_fcn", [qsym], [arm_man_eqn]
         )

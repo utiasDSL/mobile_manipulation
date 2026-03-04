@@ -164,7 +164,7 @@ class TrajectoryTrackingCostFunction(CostFunctions):
 class VelocityCostFunction(TrajectoryTrackingCostFunction):
     """Velocity tracking cost function for end-effector or base."""
 
-    def __init__(self, robot_mdl, params, target="EE", dimension=3, name=None):
+    def __init__(self, robot_mdl, params, target="EE", dimension=3):
         """Initialize velocity cost function.
 
         Args:
@@ -172,7 +172,6 @@ class VelocityCostFunction(TrajectoryTrackingCostFunction):
             params (dict): Cost function parameters.
             target (str): Target to track, either "EE" or "base".
             dimension (int): Dimension of velocity to track (3 or 6).
-            name (str, optional): Name of the cost function. If None, auto-generated.
         """
         ss_mdl = robot_mdl.ssSymMdl
         nx, nu, nr = ss_mdl["nx"], ss_mdl["nu"], dimension
@@ -208,8 +207,8 @@ class VelocityCostFunction(TrajectoryTrackingCostFunction):
                     "vb", [robot_mdl.x_sym], [jac(robot_mdl.q_sym) @ robot_mdl.v_sym]
                 )
 
-        if name is None:
-            name = f"{target}Vel{dimension}"
+        # Generate name matching MPC expectations: "BaseVel" or "EEVel" (no dimension suffix)
+        name = f"{target.capitalize()}Vel" if target == "base" else f"{target}Vel"
 
         super().__init__(nx, nu, nr, f_fcn, name)
 
@@ -217,25 +216,21 @@ class VelocityCostFunction(TrajectoryTrackingCostFunction):
 class PoseSE3CostFunction(CostFunctions):
     """End-effector pose tracking cost function in SE(3)."""
 
-    def __init__(self, robot_mdl, params, base_frame=False, name=None):
-        """Initialize SE(3) pose cost function.
+    def __init__(self, robot_mdl, params):
+        """Initialize SE(3) pose cost function in world frame.
 
         Args:
             robot_mdl (MobileManipulator3D): Robot model.
             params (dict): Cost function parameters.
-            base_frame (bool): If True, express pose in base frame; if False, in world frame.
-            name (str, optional): Name of the cost function. If None, auto-generated.
         """
         ss_mdl = robot_mdl.ssSymMdl
         nx, nu = ss_mdl["nx"], ss_mdl["nu"]
 
-        fk = robot_mdl._getFk(robot_mdl.tool_link_name, base_frame=base_frame)
+        fk = robot_mdl._getFk(robot_mdl.tool_link_name, base_frame=False)
         p_ee, rot_ee = fk(robot_mdl.q_sym)
         f_fcn = cs.Function("fee", [robot_mdl.x_sym], [p_ee, rot_ee])
 
-        if name is None:
-            frame_str = "BaseFrame" if base_frame else ""
-            name = f"EEPoseSE3{frame_str}"
+        name = "EEPose"
 
         super().__init__(nx, nu, name)
         self.nr = 6
@@ -313,7 +308,7 @@ class BasePoseSE2CostFunction(CostFunctions):
         ss_mdl = robot_mdl.ssSymMdl
         nx = ss_mdl["nx"]
         nu = ss_mdl["nu"]
-        super().__init__(nx, nu, "BasePoseSE2")
+        super().__init__(nx, nu, "BasePose")
 
         self.nr = 3
         self.p_dict = {
@@ -576,12 +571,37 @@ class ManipulabilityCostFunction(CostFunctions):
         self.p_struct = casadi_sym_struct(self.p_dict)
         self.p_sym = self.p_struct.cat
 
-        self.J_eqn = (
-            robot_mdl.arm_manipulability_fcn(robot_mdl.q_sym) ** 2
-            * self.p_dict["w"]
-            * 0.5
+        # Extract joint positions q from state x (first DoF elements)
+        nq = robot_mdl.DoF
+        q_from_x = self.x_sym[:nq]
+
+        # Use the robot model's manipulability function (now uses Frobenius norm for code generation)
+        manipulability = robot_mdl.arm_manipulability_fcn(q_from_x)
+        # Square for better sensitivity to low manipulability, then negate to maximize
+        # Higher manipulability = lower cost (we're minimizing, so negate to maximize manipulability)
+        self.J_eqn = -(manipulability**2) * self.p_dict["w"] * 0.5
+        self.J_fcn = cs.Function(
+            "J_" + self.name,
+            [self.x_sym, self.u_sym, self.p_sym],
+            [self.J_eqn],
         )
-        self.J_fcn = cs.Function("fee", [robot_mdl.x_sym], [self.J_eqn])
+
+        # Compute Hessian approximation: d^2J/dx^2
+        # Since manipulability only depends on q (first nq elements of x),
+        # we compute the Hessian w.r.t. x (which will be zero for velocity components)
+        # Use jacobian of gradient for Hessian
+        dJ_dx = cs.jacobian(self.J_eqn, self.x_sym)
+        H_approx = cs.jacobian(dJ_dx, self.x_sym)
+        # Add zero block for control inputs: [0, 0; 0, H_approx]
+        # Use blockcat with 4 separate blocks
+        H_approx_full = cs.blockcat(
+            cs.MX.zeros(nu, nu), cs.MX.zeros(nu, nx), cs.MX.zeros(nx, nu), H_approx
+        )
+        self.H_approx_fcn = cs.Function(
+            "H_approx_" + self.name,
+            [self.x_sym, self.u_sym, self.p_sym],
+            [H_approx_full],
+        )
 
 
 # Cost Function Registry
@@ -630,114 +650,34 @@ class CostFunctionRegistry:
         return list(cls._registry.keys())
 
 
-# Helper functions to create parameterized cost functions
-def create_base_pose_cost(robot_mdl, params, dimension="SE2"):
-    """Create base pose cost: dimension must be SE2 (x,y,yaw).
-
-    Args:
-        robot_mdl (MobileManipulator3D): Robot model.
-        params (dict): Cost function parameters.
-        dimension (str): Dimension type, must be "SE2".
-
-    Returns:
-        BasePoseSE2CostFunction: Base pose cost function instance.
-
-    Raises:
-        ValueError: If dimension is not "SE2".
-    """
-    if dimension != "SE2":
-        raise ValueError(
-            f"Base pose cost only supports SE2. Got dimension='{dimension}'. "
-            "Use SE2 for base pose tracking with proper yaw handling."
-        )
-    return BasePoseSE2CostFunction(robot_mdl, params)
-
-
-def create_base_vel_cost(robot_mdl, params, dimension=3):
-    """Create base velocity cost: dimension can be 2 (vx,vy) or 3 (vx,vy,vyaw).
-
-    Args:
-        robot_mdl (MobileManipulator3D): Robot model.
-        params (dict): Cost function parameters.
-        dimension (int): Velocity dimension (2 or 3).
-
-    Returns:
-        VelocityCostFunction: Base velocity cost function instance.
-    """
-    dim_int = int(dimension)
-    return VelocityCostFunction(robot_mdl, params, "base", dim_int, f"BaseVel{dim_int}")
-
-
-def create_ee_pose_cost(robot_mdl, params, pose_type="SE3", frame="world"):
-    """Create EE pose cost: pose_type must be SE3 (position+orientation), frame can be world or base.
-
-    Args:
-        robot_mdl (MobileManipulator3D): Robot model.
-        params (dict): Cost function parameters.
-        pose_type (str): Pose type, must be "SE3".
-        frame (str): Reference frame, either "world" or "base".
-
-    Returns:
-        PoseSE3CostFunction: End-effector pose cost function instance.
-
-    Raises:
-        ValueError: If pose_type is not "SE3".
-    """
-    base_frame = frame == "base"
-    if pose_type != "SE3":
-        raise ValueError(
-            f"EE pose cost only supports SE3. Got pose_type='{pose_type}'. "
-            "Use SE3 for EE pose tracking (set orientation weights to 0 for position-only tracking)."
-        )
-    name = f"EEPoseSE3{'BaseFrame' if base_frame else ''}"
-    return PoseSE3CostFunction(robot_mdl, params, base_frame, name)
-
-
-def create_ee_vel_cost(robot_mdl, params):
-    """Create EE velocity cost: 6D (3D linear + 3D angular) for SE3 compatibility.
-
-    Args:
-        robot_mdl (MobileManipulator3D): Robot model.
-        params (dict): Cost function parameters.
-
-    Returns:
-        VelocityCostFunction: End-effector velocity cost function instance.
-    """
-    return VelocityCostFunction(robot_mdl, params, "EE", 6, "EEVel6")
-
-
-def create_regularization_cost(robot_mdl, params):
-    """Create regularization cost.
-
-    Args:
-        robot_mdl (MobileManipulator3D): Robot model.
-        params (dict): Cost function parameters (not used, but kept for consistency).
-
-    Returns:
-        RegularizationCostFunction: Regularization cost function instance.
-    """
-    ss_mdl = robot_mdl.ssSymMdl
-    return RegularizationCostFunction(ss_mdl["nx"], ss_mdl["nu"])
-
-
-def create_manipulability_cost(robot_mdl, params):
-    """Create manipulability cost.
-
-    Args:
-        robot_mdl (MobileManipulator3D): Robot model.
-        params (dict): Cost function parameters (not used, but kept for consistency).
-
-    Returns:
-        ManipulabilityCostFunction: Manipulability cost function instance.
-    """
-    return ManipulabilityCostFunction(robot_mdl)
-
-
-# Register core cost functions (simplified to 6 parameterized functions)
-CostFunctionRegistry.register("BasePose", create_base_pose_cost)
-CostFunctionRegistry.register("BaseVel", create_base_vel_cost)
-CostFunctionRegistry.register("EEPose", create_ee_pose_cost)
-CostFunctionRegistry.register("EEVel", create_ee_vel_cost)
+# Register core cost functions
+CostFunctionRegistry.register(
+    "BasePose",
+    lambda robot_mdl, params, **kwargs: BasePoseSE2CostFunction(robot_mdl, params),
+)
+CostFunctionRegistry.register(
+    "BaseVel",
+    lambda robot_mdl, params, **kwargs: VelocityCostFunction(
+        robot_mdl, params, "base", 3
+    ),
+)
+CostFunctionRegistry.register(
+    "EEPose", lambda robot_mdl, params, **kwargs: PoseSE3CostFunction(robot_mdl, params)
+)
+CostFunctionRegistry.register(
+    "EEVel",
+    lambda robot_mdl, params, **kwargs: VelocityCostFunction(
+        robot_mdl, params, "EE", 6
+    ),
+)
 CostFunctionRegistry.register("ControlEffort", ControlEffortCostFunction)
-CostFunctionRegistry.register("Regularization", create_regularization_cost)
-CostFunctionRegistry.register("Manipulability", create_manipulability_cost)
+CostFunctionRegistry.register(
+    "Regularization",
+    lambda robot_mdl, params, **kwargs: RegularizationCostFunction(
+        robot_mdl.ssSymMdl["nx"], robot_mdl.ssSymMdl["nu"]
+    ),
+)
+CostFunctionRegistry.register(
+    "Manipulability",
+    lambda robot_mdl, params, **kwargs: ManipulabilityCostFunction(robot_mdl),
+)

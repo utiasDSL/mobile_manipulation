@@ -5,7 +5,6 @@ import os
 import time
 
 import numpy as np
-from scipy.interpolate import interp1d
 from scipy.spatial.transform import Rotation as Rot
 
 import mm_control.MPC as MPC
@@ -13,6 +12,8 @@ from mm_plan.TaskManager import TaskManager
 from mm_simulator import simulation
 from mm_utils import parsing
 from mm_utils.logging import DataLogger
+from mm_utils.math import compute_velocity_command
+from mm_utils.metrics import extract_robot_states
 
 
 def main():
@@ -73,7 +74,7 @@ def main():
 
     sim_config = config["simulation"]
     ctrl_config = config["controller"]
-    planner_config = config["planner"]
+    planner_config = config.get("planner", None)
 
     # Simulator
     timestamp = datetime.datetime.now()
@@ -108,9 +109,6 @@ def main():
     sim_log.setLevel(config["logging"]["log_level"])
     sim_log.addHandler(ch)
 
-    # initial time, state, input
-    t = 0.0
-
     # init logger (combined sim+control in one process)
     logger = DataLogger(config, name="combined")
 
@@ -125,59 +123,54 @@ def main():
     sot.activatePlanners()
     u = np.zeros(sim_config["robot"]["dims"]["v"])
 
+    # Controller frequency management
+    ctrl_period = 1.0 / ctrl_config.get("ctrl_rate")
+    last_controller_time = -ctrl_period  # Initialize to allow first call
+
+    t = 0.0
     while t <= sim.duration:
+        print(f"-------------- {t:.3f}s/{sim.duration}s ------------------")
         # open-loop command
         robot_states = robot.joint_states(add_noise=False)
 
-        # Get references from TaskManager
-        references = sot.getReferences(t, robot_states, controller.N + 1, controller.dt)
-
-        t0 = time.perf_counter()
-        v_bar, u_bar = controller.control(t, robot_states, references)
-        t1 = time.perf_counter()
-        controller_log.log(20, f"Controller Run Time: {t1 - t0}")
-
-        if ctrl_config["cmd_vel_type"] == "integration":
-            u += u_bar[0] * sim.timestep
-        elif ctrl_config["cmd_vel_type"] == "interpolation":
-            # Interpolate velocity trajectory at sim.timestep
-            # v_bar has shape (N+1, nu), times are at 0, dt, 2*dt, ..., N*dt
-            N = v_bar.shape[0]
-            t_v_bar = np.arange(N) * controller.dt
-            v_interp = interp1d(
-                t_v_bar,
-                v_bar,
-                axis=0,
-                bounds_error=False,
-                fill_value="extrapolate",
+        # Only call controller if enough time has passed
+        if t - last_controller_time >= ctrl_period:
+            # Get references from TaskManager
+            references = sot.getReferences(
+                t, robot_states, controller.N + 1, controller.dt
             )
-            u = v_interp(sim.timestep)
-        else:
-            raise ValueError(f"Unknown cmd_vel_type: {ctrl_config['cmd_vel_type']}")
+
+            t0 = time.perf_counter()
+            v_bar, u_bar = controller.control(t, robot_states, references)
+            t1 = time.perf_counter()
+            controller_log.log(20, f"Controller Run Time: {t1 - t0}")
+            last_controller_time = t
+
+        u = compute_velocity_command(
+            u,
+            u_bar,
+            v_bar,
+            ctrl_config["cmd_vel_type"],
+            t - last_controller_time,
+            controller.dt,
+            simulation_dt=sim.timestep,
+        )
 
         robot.command_velocity(u)
         t, _ = sim.step(t)
 
-        # Convert to pose arrays in world frame
-        ee_curr_pos, ee_cur_orn = robot.link_pose()
-        ee_euler = Rot.from_quat(ee_cur_orn).as_euler("xyz")
-        ee_pose = np.hstack([ee_curr_pos, ee_euler])
+        # Extract robot states using shared utility function
+        states = extract_robot_states(robot, robot_states)
 
-        ee_lin_vel, ee_ang_vel = robot.link_velocity()
-        ee_vel = np.hstack([ee_lin_vel, ee_ang_vel])  # [vx, vy, vz, wx, wy, wz]
-
-        base_pose = robot_states[0][:3]  # [x, y, yaw] already in world frame
-        base_vel = robot_states[1][:3]  # [vx, vy, vyaw]
-
-        states = {
-            "base": {"pose": base_pose, "velocity": base_vel},
-            "EE": {"pose": ee_pose, "velocity": ee_vel},
-        }
-
-        sot.update(t, states)
+        # Pass MPC masks to TaskManager for task completion checks
+        sot.update(
+            t, states, base_mask=controller.base_mask, ee_mask=controller.ee_mask
+        )
 
         # log
-        v_ew_w, ω_ew_w = robot.link_velocity()
+        # Use extracted states instead of calling link_velocity() again
+        v_ew_w = states["EE"]["velocity"][:3]
+        ω_ew_w = states["EE"]["velocity"][3:]
 
         # Get tracking points from references
         r_ew_wd = None
@@ -201,11 +194,13 @@ def main():
         logger.append("xs", np.hstack(robot_states))
         logger.append("controller_run_time", t1 - t0)
         logger.append("cmd_vels", u)
-        logger.append("r_ew_ws", ee_curr_pos)
-        logger.append("Q_wes", ee_cur_orn)
+        logger.append("r_ew_ws", states["EE"]["pose"][:3])
+        # Convert Euler angles back to quaternion for logging
+        ee_quat = Rot.from_euler("xyz", states["EE"]["pose"][3:]).as_quat()
+        logger.append("Q_wes", ee_quat)
         logger.append("v_ew_ws", v_ew_w)
         logger.append("ω_ew_ws", ω_ew_w)
-        logger.append("r_bw_ws", robot_states[0][:2])
+        logger.append("r_bw_ws", states["base"]["pose"][:2])
 
         if r_bw_wd is not None:
             if r_bw_wd.shape[0] == 2:
@@ -213,7 +208,7 @@ def main():
             elif r_bw_wd.shape[0] == 3:
                 logger.append("r_bw_w_ds", r_bw_wd[:2])
                 logger.append("yaw_bw_w_ds", r_bw_wd[2])
-                logger.append("yaw_bw_ws", robot_states[0][2])
+                logger.append("yaw_bw_ws", states["base"]["pose"][2])
         if v_bw_wd is not None:
             if v_bw_wd.shape[0] == 2:
                 logger.append("v_bw_w_ds", v_bw_wd)
@@ -227,8 +222,6 @@ def main():
         if "MPC" in ctrl_config["type"]:
             for key, val in controller.log.items():
                 logger.append("_".join(["mpc", key]) + "s", val)
-
-        time.sleep(sim.timestep)
 
     session_timestamp = timestamp.strftime("%Y-%m-%d_%H-%M-%S")
     logger.save(session_timestamp=session_timestamp)

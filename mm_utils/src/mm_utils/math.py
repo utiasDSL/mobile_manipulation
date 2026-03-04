@@ -1,5 +1,6 @@
 import casadi as cs
 import numpy as np
+from scipy.interpolate import interp1d
 from scipy.spatial.transform import Rotation as Rot
 from spatialmath.base import q2r, qunit, r2q
 
@@ -320,3 +321,156 @@ def casadi_SO3_log(R):
     omega = cs.conditional(theta > 1e-2, omega_list, 0, False)
 
     return omega
+
+
+def normalize_mask(mask=None, dim=None):
+    """Normalize a mask array to a boolean numpy array.
+
+    Args:
+        mask (array, optional): Mask array. If None, creates array of all True.
+        dim (int, optional): Dimension of the mask. Required if mask is None.
+
+    Returns:
+        np.ndarray: Boolean mask array of shape (dim,).
+    """
+    if mask is None:
+        if dim is None:
+            raise ValueError("dim must be provided when mask is None")
+        return np.ones(dim, dtype=bool)
+    else:
+        return np.array(mask, dtype=bool)
+
+
+def compute_base_pose_errors(base_pose, base_target, base_mask, pos_tol, ori_tol):
+    """Compute base position and orientation errors.
+
+    Args:
+        base_pose (np.ndarray): Current base pose [x, y, yaw].
+        base_target (np.ndarray): Target base pose [x, y, yaw].
+        base_mask (np.ndarray): Boolean mask [x, y, yaw].
+        pos_tol (float): Position error tolerance.
+        ori_tol (float): Orientation error tolerance.
+
+    Returns:
+        tuple: (pos_err, ori_err, pos_within_tol, ori_within_tol)
+    """
+    pos_mask = base_mask[:2]
+    pos_err = np.linalg.norm((base_pose[:2] - base_target[:2])[pos_mask])
+    pos_within_tol = pos_err < pos_tol
+
+    if base_mask[2]:
+        yaw_err = abs(wrap_pi_scalar(base_pose[2] - base_target[2]))
+        ori_within_tol = yaw_err < ori_tol
+    else:
+        yaw_err = 0.0
+        ori_within_tol = True
+
+    return pos_err, yaw_err, pos_within_tol, ori_within_tol
+
+
+def compute_ee_pose_errors(ee_pose, ee_target, ee_mask, pos_tol, ori_tol):
+    """Compute EE position and orientation errors.
+
+    Args:
+        ee_pose (np.ndarray): Current EE pose [x, y, z, roll, pitch, yaw].
+        ee_target (np.ndarray): Target EE pose [x, y, z, roll, pitch, yaw].
+        ee_mask (np.ndarray): Boolean mask [x, y, z, roll, pitch, yaw].
+        pos_tol (float): Position error tolerance.
+        ori_tol (float): Orientation error tolerance.
+
+    Returns:
+        tuple: (pos_err, ori_err, pos_within_tol, ori_within_tol)
+    """
+    pos_mask = ee_mask[:3]
+    pos_err = np.linalg.norm((ee_pose[:3] - ee_target[:3])[pos_mask])
+    pos_within_tol = pos_err < pos_tol
+
+    ori_mask = ee_mask[3:]
+    if not np.any(ori_mask):
+        ori_err = 0.0
+        ori_within_tol = True
+    else:
+        # Compute orientation error using rotation matrices (proper geometric distance)
+        R_goal = Rot.from_euler("xyz", ee_target[3:]).as_matrix()
+        R_curr = Rot.from_euler("xyz", ee_pose[3:]).as_matrix()
+        # R_error transforms from current to goal frame (relative rotation)
+        R_error = R_goal @ R_curr.T
+        rotvec = Rot.from_matrix(R_error).as_rotvec()
+        # Convert rotation vector to Euler angles to get error decomposed into roll/pitch/yaw
+        # This allows us to apply the mask to specific axes
+        rotvec_euler = Rot.from_rotvec(rotvec).as_euler("xyz")
+        # Apply mask and compute magnitude of masked error
+        ori_err = np.linalg.norm(rotvec_euler[ori_mask])
+        ori_within_tol = ori_err < ori_tol
+
+    return pos_err, ori_err, pos_within_tol, ori_within_tol
+
+
+def compute_velocity_command_integration(u, u_bar, t, controller_dt, simulation_dt):
+    """Compute velocity command using integration method.
+
+    Args:
+        u (np.ndarray): Current velocity command, shape (nu,).
+        u_bar (np.ndarray): Control input, shape (N+1, nu) or (nu,). Uses first element.
+        t (float): Time to interpolate at (relative to controller plan start).
+        controller_dt (float): Controller timestep in seconds.
+        simulation_dt (float): Simulation timestep in seconds (for integration).
+
+    Returns:
+        np.ndarray: New velocity command, shape (nu,).
+    """
+    N = u_bar.shape[0]
+    t_u_bar = np.arange(N) * controller_dt
+    u_interp = interp1d(
+        t_u_bar, u_bar, axis=0, bounds_error=False, fill_value="extrapolate"
+    )
+
+    return u + u_interp(t) * simulation_dt
+
+
+def compute_velocity_command_interpolation(v_bar, t, controller_dt):
+    """Compute velocity command using interpolation method.
+
+    Args:
+        v_bar (np.ndarray): Velocity trajectory, shape (N+1, nu).
+        t (float): Time to interpolate at (relative to controller plan start).
+        controller_dt (float): Controller timestep in seconds.
+
+    Returns:
+        np.ndarray: Interpolated velocity command, shape (nu,).
+    """
+    N = v_bar.shape[0]
+    t_v_bar = np.arange(N) * controller_dt
+    v_interp = interp1d(
+        t_v_bar, v_bar, axis=0, bounds_error=False, fill_value="extrapolate"
+    )
+    return v_interp(t + controller_dt)
+
+
+def compute_velocity_command(
+    u, u_bar, v_bar, cmd_vel_type, t, controller_dt, simulation_dt=None
+):
+    """Compute velocity command from controller output.
+
+    This is a convenience function that handles both integration and interpolation methods.
+
+    Args:
+        u (np.ndarray): Current velocity command, shape (nu,).
+        u_bar (np.ndarray): Control input, shape (N+1, nu) or (nu,).
+        v_bar (np.ndarray): Velocity trajectory, shape (N+1, nu).
+        cmd_vel_type (str): "integration" or "interpolation".
+        t (float): Time to interpolate at (relative to controller plan start).
+        controller_dt (float): Controller timestep in seconds.
+        simulation_dt (float, optional): Simulation timestep in seconds. Required for integration method.
+
+    Returns:
+        np.ndarray: Computed velocity command, shape (nu,).
+    """
+    if cmd_vel_type == "integration":
+        return compute_velocity_command_integration(
+            u, u_bar, t, controller_dt, simulation_dt
+        )
+    elif cmd_vel_type == "interpolation":
+        return compute_velocity_command_interpolation(v_bar, t, controller_dt)
+    else:
+        raise ValueError(f"Unknown cmd_vel_type: {cmd_vel_type}")

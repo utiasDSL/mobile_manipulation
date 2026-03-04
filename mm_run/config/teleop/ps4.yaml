@@ -1,4 +1,11 @@
 # Teleop configuration for PS4 joystick using the x-pad configuration.
+#
+# Button mappings used by the controller:
+#   Button 0: X
+#   Button 1: Circle (task switching)
+#   Button 2: Square (start/end tasks)
+#   Button 3: Triangle
+
 joy_node:
   deadzone: 0.1
   autorepeat_rate: 20

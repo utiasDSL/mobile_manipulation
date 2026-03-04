@@ -6,7 +6,11 @@ planner:
   tasks:
   - name: Path Planning
     planner_type: PathPlanner
-    base_path: [[0, 0, 0], [1.0, 0.2, 0.5], [2.0, 0.5, 1.0], [2.5, 0.4, 1.57]]  # World frame: [x, y, yaw]
+    base_path:
+    - [0, 0, 0]
+    - [1.0, 0.2, 0.5]
+    - [2.0, 0.5, 1.0]
+    - [2.5, 0.4, 1.57]
     ee_path:
     - [1.5, 0.4, 1.0, -1pi, 0, 0]
     - [1.5, 0.8, 1.0, -1pi, 0, 0]
@@ -22,7 +26,7 @@ controller:
     name: "TestPathPlanning"
 
 simulation:
-  duration: 8
+  duration: 5
 
 include:
   - package: "mm_run"

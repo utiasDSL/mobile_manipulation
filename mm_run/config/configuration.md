@@ -53,7 +53,7 @@ planner:
 # Sequential: Only base moves
 - name: "Move Base"
   planner_type: "WaypointPlanner"
-  base_pose: [2.0, 1.0, 0.0]
+  base_pose: [2, 1, 0]
   tracking_pos_err_tol: 0.2
 
 # Sequential: Only EE moves

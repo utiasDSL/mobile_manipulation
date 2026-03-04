@@ -90,7 +90,11 @@ def main():
     vicon_tool_interface = SimulatedViconObjectInterface(
         sim_config["robot"]["tool_vicon_name"]
     )
-    while not ros_interface.ready():
+    while (
+        not ros_interface.ready()
+        or not rospy.has_param("/controller_started")
+        or not rospy.get_param("/controller_started")
+    ):
         q, v = robot.joint_states()
         ros_interface.publish_feedback(t, q, v)
         ros_interface.publish_time(t)
@@ -102,14 +106,14 @@ def main():
 
     print("Control commands received. Proceed ... ")
     t0 = t
-    while not rospy.is_shutdown() and t - t0 <= sim.duration:
+    while not rospy.is_shutdown():
+        print(f"-------------- {(t-t0):.3f}s/{sim.duration}s ------------------")
         q, v = robot.joint_states()
         ros_interface.publish_feedback(t, q, v)
         ros_interface.publish_time(t)
 
         cmd_vel_world = robot.command_velocity(ros_interface.cmd_vel, bodyframe=True)
         ee_curr_pos, ee_curr_orn = robot.link_pose()
-        base_curr_pos, _ = robot.link_pose(-1)
         vicon_tool_interface.publish_pose(t, ee_curr_pos, ee_curr_orn)
 
         # log
@@ -130,6 +134,17 @@ def main():
 
         t, _ = sim.step(t)
         time.sleep(sim.timestep)
+
+        # Check if controller has finished all tasks or if duration exceeded
+        controller_finished = rospy.get_param("/controller_finished", False)
+        if controller_finished:
+            print("Controller finished all tasks. Stopping simulation.")
+            break
+        if t - t0 >= sim.duration:
+            print(
+                f"Simulation duration ({sim.duration}s) exceeded. Stopping simulation."
+            )
+            break
 
     logger.save(session_timestamp=session_timestamp)
 

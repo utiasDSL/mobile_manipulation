@@ -28,8 +28,8 @@ controller:
     static_obstacles: False
 
   collision_safety_margin:
-    self: 0.25
-    static_obstacles: 0.15
+    self: 0.10
+    static_obstacles: 0.10
 
   # Soft constraints parameters
   xu_soft:
@@ -68,13 +68,18 @@ controller:
     Effort:
       Qqa: [0, 0, 0, 0, 0, 0]
       Qqb: [0, 0, 0]
-      Qva: [0.01, 0.01, 0.01, 0.01, 0.01, 0.01]
+      Qva: [0.1, 0.1, 0.1, 0.1, 0.1, 0.1]
       Qvb: [0.01, 0.01, 0.01]
       Qua: [0.01, 0.01, 0.01, 0.01, 0.01, 0.01]
       Qub: [0.01, 0.01, 0.01]
     # Regularization cost (optional)
     Regularization:
       eps: 1.0e-06
+    # Manipulability cost - encourages high arm manipulability while maintaining safety
+    # This helps the arm maintain good dexterity while avoiding obstacles
+    # Manipulability:
+    #   w: 0.005  # Weight for manipulability cost
+
     slack:
       z: 10  # linear term
       Z: 1    # quadratic term

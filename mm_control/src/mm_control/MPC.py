@@ -30,12 +30,12 @@ class MPC(MPCBase):
         # Base costs - always use SE2 (yaw tracking controlled via weights, set yaw weight to 0 to disable)
         costs.append(
             CostFunctionRegistry.create(
-                "BasePose", self.robot, cost_params.get("BasePose", {}), dimension="SE2"
+                "BasePose", self.robot, cost_params.get("BasePose", {})
             )
         )
         costs.append(
             CostFunctionRegistry.create(
-                "BaseVel", self.robot, cost_params.get("BaseVel", {}), dimension=3
+                "BaseVel", self.robot, cost_params.get("BaseVel", {})
             )
         )
 
@@ -45,8 +45,6 @@ class MPC(MPCBase):
                 "EEPose",
                 self.robot,
                 cost_params.get("EEPose", {}),
-                pose_type="SE3",
-                frame="world",
             )
         )
         costs.append(
@@ -61,6 +59,17 @@ class MPC(MPCBase):
                 "ControlEffort", self.robot, cost_params.get("Effort", {})
             )
         )
+
+        # Optional manipulability cost (encourages high arm manipulability)
+        if "Manipulability" in cost_params:
+            costs.append(
+                CostFunctionRegistry.create(
+                    "Manipulability", self.robot, cost_params.get("Manipulability", {})
+                )
+            )
+            self.manipulability_enabled = True
+        else:
+            self.manipulability_enabled = False
 
         # Add collision costs/constraints
         constraints = []
@@ -82,26 +91,65 @@ class MPC(MPCBase):
         self.cost = costs
         self.constraints = constraints + [self.controlCst, self.stateCst]
 
-        # Initialize masks to None (will be set from references in control())
-        self.base_mask = None
-        self.ee_mask = None
+        # Get objective_horizon and decay_rate (defaults: full horizon, no decay)
+        # These are used for time-varying weights in BaseVel and EEVel
+        self.objective_horizon = config.get("objective_horizon", self.N + 1)
+        self.decay_rate = config.get("decay_rate", 1.0)
 
-    def _get_config_key_for_cost_name(self, cost_name):
-        """Map cost function name to simplified config parameter key.
+        # Get MPC-level masks (default: all True - track all dimensions)
+        # These apply to both pose and velocity tracking from planners
+        if "base_mask" in config:
+            self.base_mask = np.array(config["base_mask"], dtype=float)
+        else:
+            self.base_mask = np.ones(3, dtype=float)
 
-        Args:
-            cost_name (str): Cost function name (e.g., "EEPoseSE3").
+        if "ee_mask" in config:
+            self.ee_mask = np.array(config["ee_mask"], dtype=float)
+        else:
+            self.ee_mask = np.ones(6, dtype=float)
 
-        Returns:
-            str: Simplified config key (e.g., "EEPose").
-        """
-        name_mapping = {
-            "EEPoseSE3": "EEPose",
-            "EEVel6": "EEVel",
-            "BasePoseSE2": "BasePose",
-            "BaseVel3": "BaseVel",
-        }
-        return name_mapping.get(cost_name, cost_name)
+        # Cache parameter structure keys (constant, no need to recompute)
+        self._p_keys = list(self.p_struct.keys())
+
+        # Pre-compute cost config mappings and dimensions
+        self._cost_config_cache = {}
+        self._cost_dim_cache = {}
+        all_tracking_costs = ["BasePose", "BaseVel", "EEPose", "EEVel"]
+        for name in all_tracking_costs:
+            cost_params = self.params["cost_params"].get(name, {})
+            self._cost_config_cache[name] = cost_params
+
+            # Cache dimensions
+            if name == "EEPose":
+                self._cost_dim_cache[name] = 6
+            elif name == "BasePose":
+                self._cost_dim_cache[name] = 3
+            elif name == "EEVel":
+                self._cost_dim_cache[name] = 6
+            elif name == "BaseVel":
+                self._cost_dim_cache[name] = 3
+
+        # Pre-compute velocity masks (same as pose masks on main)
+        self._velocity_base_mask = self.base_mask.copy()
+        self._velocity_ee_mask = self.ee_mask.copy()
+
+        # Pre-compute control effort params (constant)
+        effort_params = self.params["cost_params"]["Effort"]
+        self._control_effort_param_names = [
+            f"{param_name}_ControlEffort"
+            for param_name in ["Qqa", "Qqb", "Qva", "Qvb", "Qua", "Qub"]
+        ]
+        self._control_effort_param_values = [
+            effort_params[param_name]
+            for param_name in ["Qqa", "Qqb", "Qva", "Qvb", "Qua", "Qub"]
+        ]
+
+        # Pre-compute manipulability params (constant)
+        if self.manipulability_enabled:
+            manipulability_params = self.params["cost_params"].get("Manipulability", {})
+            self._manipulability_weight = manipulability_params.get("w", 1.0)
+        else:
+            self._manipulability_weight = None
 
     def _set_control_effort_params(self, curr_p_map):
         """Set ControlEffort cost function parameters in the parameter map.
@@ -109,9 +157,20 @@ class MPC(MPCBase):
         Args:
             curr_p_map (casadi.struct_MX): Current parameter map to update.
         """
-        effort_params = self.params["cost_params"]["Effort"]
-        for param_name in ["Qqa", "Qqb", "Qva", "Qvb", "Qua", "Qub"]:
-            curr_p_map[f"{param_name}_ControlEffort"] = effort_params[param_name]
+        # Use pre-computed parameter names and values
+        for param_name, param_value in zip(
+            self._control_effort_param_names, self._control_effort_param_values
+        ):
+            curr_p_map[param_name] = param_value
+
+    def _set_manipulability_params(self, curr_p_map):
+        """Set Manipulability cost function parameters in the parameter map.
+
+        Args:
+            curr_p_map (casadi.struct_MX): Current parameter map to update.
+        """
+        if self.manipulability_enabled and self._manipulability_weight is not None:
+            curr_p_map["w_Manipulability"] = self._manipulability_weight
 
     def control(
         self,
@@ -129,8 +188,6 @@ class MPC(MPCBase):
                     "base_velocity": array of shape (N+1, 3) or None,
                     "ee_pose": array of shape (N+1, 6) or None,
                     "ee_velocity": array of shape (N+1, 6) or None,
-                    "base_mask": array of shape (3,) or None,  # [x, y, yaw] - True means dimension matters
-                    "ee_mask": array of shape (6,) or None,  # [x, y, z, roll, pitch, yaw] - True means dimension matters
                 }
 
         Returns:
@@ -138,7 +195,6 @@ class MPC(MPCBase):
                 - v_bar: velocity trajectory, shape (N+1, nu)
                 - u_bar: control input trajectory, shape (N, nu)
         """
-        self.py_logger.debug(f"control time {t}")
         self.curr_control_time = t
         q, v = robot_states
         q[2:9] = wrap_pi_array(q[2:9])
@@ -191,27 +247,21 @@ class MPC(MPCBase):
                 - "base_velocity": array of shape (N+1, 3) or None
                 - "ee_pose": array of shape (N+1, 6) or None
                 - "ee_velocity": array of shape (N+1, 6) or None
-                - "base_mask": array of shape (3,) or None, [x, y, yaw] - True means dimension matters
-                - "ee_mask": array of shape (6,) or None, [x, y, z, roll, pitch, yaw] - True means dimension matters
             xo (ndarray): Current state vector [q, v] to compute current EE pose if needed
 
         Returns:
             Dictionary with cost function names as keys:
-                - "BasePoseSE2": list of arrays (N+1, 3)
-                - "BaseVel3": list of arrays (N+1, 3)
-                - "EEPoseSE3": list of arrays (N+1, 6)
-                - "EEVel6": list of arrays (N+1, 6)
+                - "BasePose": list of arrays (N+1, 3)
+                - "BaseVel": list of arrays (N+1, 3)
+                - "EEPose": list of arrays (N+1, 6)
+                - "EEVel": list of arrays (N+1, 6)
         """
         r_bar_map = {}
-
-        # Store masks as instance variables for use in _set_tracking_params
-        self.base_mask = references.get("base_mask")
-        self.ee_mask = references.get("ee_mask")
 
         # Convert base pose reference - only if provided
         if references.get("base_pose") is not None:
             base_pose = references["base_pose"]
-            r_bar_map["BasePoseSE2"] = [base_pose[i] for i in range(self.N + 1)]
+            r_bar_map["BasePose"] = [base_pose[i] for i in range(self.N + 1)]
             self.rbase_bar = (
                 base_pose.tolist() if hasattr(base_pose, "tolist") else base_pose
             )
@@ -222,13 +272,13 @@ class MPC(MPCBase):
         # Convert base velocity reference - only if provided
         if references.get("base_velocity") is not None:
             base_vel = references["base_velocity"]
-            r_bar_map["BaseVel3"] = [base_vel[i] for i in range(self.N + 1)]
+            r_bar_map["BaseVel"] = [base_vel[i] for i in range(self.N + 1)]
 
         # Convert EE pose reference - only if provided
         if references.get("ee_pose") is not None:
             ee_pose = references["ee_pose"]
             # EE reference is in world frame
-            r_bar_map["EEPoseSE3"] = [ee_pose[i] for i in range(self.N + 1)]
+            r_bar_map["EEPose"] = [ee_pose[i] for i in range(self.N + 1)]
             self.ree_bar = ee_pose.tolist() if hasattr(ee_pose, "tolist") else ee_pose
         else:
             # No EE reference: set empty list for visualization
@@ -237,7 +287,7 @@ class MPC(MPCBase):
         # Convert EE velocity reference - only if provided
         if references.get("ee_velocity") is not None:
             ee_vel = references["ee_velocity"]
-            r_bar_map["EEVel6"] = [ee_vel[i] for i in range(self.N + 1)]
+            r_bar_map["EEVel"] = [ee_vel[i] for i in range(self.N + 1)]
 
         return r_bar_map
 
@@ -265,6 +315,7 @@ class MPC(MPCBase):
             self._set_initial_guess(curr_p_map, i, x_bar_initial, u_bar_initial)
             self._set_tracking_params(curr_p_map, r_bar_map, i)
             self._set_control_effort_params(curr_p_map)
+            self._set_manipulability_params(curr_p_map)
             self._set_ocp_params(curr_p_map, i)
             curr_p_map_bar.append(curr_p_map)
 
@@ -299,71 +350,66 @@ class MPC(MPCBase):
             i (int): Horizon step index.
         """
         t1 = time.perf_counter()
-        p_keys = self.p_struct.keys()
 
         # List of all possible tracking cost functions (world frame only)
-        all_tracking_costs = ["BasePoseSE2", "BaseVel3", "EEPoseSE3", "EEVel6"]
+        all_tracking_costs = ["BasePose", "BaseVel", "EEPose", "EEVel"]
 
         for name in all_tracking_costs:
-            p_name_r = f"r_{name}"  # Reference parameter for the tracking cost (e.g., r_EEPoseSE3)
-            p_name_W = f"W_{name}"  # Weight matrix parameter for the tracking cost (e.g., W_EEPoseSE3)
+            p_name_r = f"r_{name}"  # Reference parameter for the tracking cost (e.g., r_EEPose)
+            p_name_W = f"W_{name}"  # Weight matrix parameter for the tracking cost (e.g., W_EEPose)
 
-            if p_name_r in p_keys:
+            if p_name_r in self._p_keys:
                 if name in r_bar_map:
                     # Reference provided: set reference and use configured weights
-                    curr_p_map[p_name_r] = r_bar_map[name][i]
-                    config_key = self._get_config_key_for_cost_name(name)
-                    cost_params = self.params["cost_params"].get(config_key, {})
+                    ref_val = r_bar_map[name][i]
+                    curr_p_map[p_name_r] = ref_val
+                    dim = len(ref_val)
+
+                    # Use cached cost params
+                    cost_params = self._cost_config_cache[name]
                     weight_key = "P" if i == self.N else "Qk"
-                    weights = cost_params.get(
-                        weight_key, [1.0] * len(r_bar_map[name][i])
+                    weights = np.array(
+                        cost_params.get(weight_key, [1.0] * dim), dtype=float
                     )
 
-                    if isinstance(weights, (int, float)):
-                        weights = [weights] * len(r_bar_map[name][i])
-                    weights = np.array(weights)
+                    if len(weights) != dim:
+                        raise ValueError(
+                            f"Weight length mismatch for {name}: {len(weights)} != {dim}"
+                        )
 
-                    # Apply masks to zero out weights for masked dimensions
-                    if (
-                        name in ["BasePoseSE2", "BaseVel3"]
-                        and self.base_mask is not None
-                    ):
-                        if len(weights) == len(self.base_mask):
-                            weights = weights * self.base_mask.astype(float)
-                        else:
-                            raise ValueError(
-                                f"Weights length {len(weights)} does not match base mask length {len(self.base_mask)}"
-                            )
-                    elif name in ["EEPoseSE3", "EEVel6"] and self.ee_mask is not None:
-                        if len(weights) == len(self.ee_mask):
-                            weights = weights * self.ee_mask.astype(float)
-                        else:
-                            raise ValueError(
-                                f"Weights length {len(weights)} does not match ee mask length {len(self.ee_mask)}"
-                            )
+                    # Apply MPC masks to pose costs (zero out weights for masked dimensions)
+                    if name == "BasePose":
+                        weights = weights * self.base_mask
+                    elif name == "EEPose":
+                        weights = weights * self.ee_mask
+                    elif name in ["BaseVel", "EEVel"]:
+                        weight_scale = (
+                            self.decay_rate**i if i <= self.objective_horizon else 0
+                        )
+                        velocity_mask = (
+                            self._velocity_base_mask
+                            if name == "BaseVel"
+                            else self._velocity_ee_mask
+                        )
+                        weights = weights * velocity_mask * weight_scale
+                    else:
+                        raise ValueError(f"Unknown cost function name: {name}")
 
                     curr_p_map[p_name_W] = np.diag(weights)
                 else:
                     # No reference provided: set weights to zero (minimize control effort only)
-                    config_key = self._get_config_key_for_cost_name(name)
-                    cost_params = self.params["cost_params"].get(config_key, {})
+                    # Use cached dimension
+                    dim = self._cost_dim_cache[name]
+                    cost_params = self._cost_config_cache[name]
                     weight_key = "P" if i == self.N else "Qk"
-                    # Get dimension from default weights
+                    # Get dimension from default weights (fallback if cache fails)
                     default_weights = cost_params.get(weight_key, [1.0])
-                    if isinstance(default_weights, (list, np.ndarray)):
+                    if (
+                        isinstance(default_weights, (list, np.ndarray))
+                        and len(default_weights) > 0
+                    ):
                         dim = len(default_weights)
-                    else:
-                        # Scalar weight - determine dimension from cost function name
-                        if name == "EEPoseSE3":
-                            dim = 6
-                        elif name == "BasePoseSE2":
-                            dim = 3
-                        elif name == "EEVel6":
-                            dim = 6
-                        elif name == "BaseVel3":
-                            dim = 3
-                        else:
-                            raise ValueError(f"Unknown cost function name: {name}")
+
                     # Set zero reference and zero weights
                     curr_p_map[p_name_r] = np.zeros(dim)
                     curr_p_map[p_name_W] = np.diag(np.zeros(dim))
@@ -396,12 +442,15 @@ class MPC(MPCBase):
             u_bar_initial (ndarray): Initial control trajectory guess, shape (N, nu).
         """
         t1 = time.perf_counter()
-        self.ocp_solver.solve_for_x0(xo, fail_on_nonzero_status=False)
+        # solve_for_x0 sets x0 and calls solve(), but cython wrapper may not expose .status
+        # So we manually set x0 and call solve() to get the status return value
+        self.ocp_solver.set(0, "lbx", xo)
+        self.ocp_solver.set(0, "ubx", xo)
+        status = self.ocp_solver.solve()
         t2 = time.perf_counter()
         self.log["time_ocp_solve"] = t2 - t1
 
-        self.ocp_solver.print_statistics()
-        self.log["solver_status"] = self.ocp_solver.status
+        self.log["solver_status"] = status
         if self.ocp.solver_options.nlp_solver_type != "SQP_RTI":
             self.log["step_size"] = np.mean(self.ocp_solver.get_stats("alpha"))
         else:
@@ -410,7 +459,7 @@ class MPC(MPCBase):
         self.log["qp_iter"] = sum(self.ocp_solver.get_stats("qp_iter"))
         self.log["cost_final"] = self.ocp_solver.get_cost()
 
-        if self.ocp_solver.status != 0:
+        if status != 0:
             x_bar = [self.ocp_solver.get(i, "x") for i in range(self.N)]
             u_bar = [self.ocp_solver.get(i, "u") for i in range(self.N)]
             x_bar.append(self.ocp_solver.get(self.N, "x"))
@@ -426,9 +475,7 @@ class MPC(MPCBase):
             }
 
             if self.params["acados"]["raise_exception_on_failure"]:
-                raise Exception(
-                    f"acados acados_ocp_solver returned status {self.ocp_solver.status}"
-                )
+                raise Exception(f"acados acados_ocp_solver returned status {status}")
         else:
             self.log["iter_snapshot"] = None
 

@@ -8,14 +8,15 @@ planner:
   - name: Move 1
     planner_type: WaypointPlanner
     base_pose: [0.5, 0.0, 0]  # World frame: [x, y, yaw]
-    ee_pose: [1.2, 0.2, 0.9, 0, 0, 0]  # World frame: [x, y, z, roll, pitch, yaw]
-    tracking_pos_err_tol: 0.5
-    tracking_ori_err_tol: 0.5
+    ee_pose: [1.5, 0.5, 0.9, -0.5pi, -0.5pi, -0.5pi]  # World frame: [x, y, z, roll, pitch, yaw]
+    tracking_pos_err_tol: 0.2
+    tracking_ori_err_tol: 0.2
   - name: Move 2
     planner_type: WaypointPlanner
-    base_pose: [2.0, 0.5, 1.57]  # World frame: [x, y, yaw]
-    ee_pose: [2.2, 0.7, 1.0, 1.57, 0, 0]  # World frame: [x, y, z, roll, pitch, yaw]
+    base_pose: [1, 0.5, 0.5]  # World frame: [x, y, yaw]
+    ee_pose: [2, 0, 1.5, -0.5pi, 0.5pi, -0.5pi]  # World frame: [x, y, z, roll, pitch, yaw]
     tracking_pos_err_tol: 0.2
+    tracking_ori_err_tol: 0.2
 
 controller:
   self_collision_avoidance_enabled: True
@@ -24,7 +25,7 @@ controller:
     name: "TestComplexSequence"
 
 simulation:
-  duration: 8
+  duration: 5
 
 include:
   - package: "mm_run"

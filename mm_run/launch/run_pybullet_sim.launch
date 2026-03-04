@@ -6,6 +6,7 @@
   <arg name="ctrl_config" default="default" doc="alternative controller config overwriting the one in config"/>
   <arg name="planner_config" default="default" doc="alternative planner config overwriting the one in config"/>
   <arg name="logging_sub_folder" default="default" doc="save data to a sub folder if set"/>
+  <arg name="gui" default="false" doc="Enable PyBullet GUI"/>
 
   <!-- Simulation -->
   <include file="$(find mm_run)/launch/pybullet_sim.launch" pass_all_args="true"/>

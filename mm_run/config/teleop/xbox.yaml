@@ -1,0 +1,25 @@
+# Teleop configuration for XBOX controller (USB or Bluetooth).
+#
+# Button mappings used by the controller:
+#   Button 0: A (toggle between base and EE control mode)
+#   Button 1: B (used for task switching when use_joy is enabled)
+#   Button 2: X (used for start/end tasks - press to start, press again to end)
+#   Button 3: Y
+#   Button 4: Left Bumper (EE yaw negative/wz-)
+#   Button 5: Right Bumper (EE yaw positive/wz+)
+#   Button 6: Back/View
+#   Button 7: Start/Menu
+#   Button 8: Left Stick Press
+#   Button 9: Right Stick Press
+#
+# Axis mappings:
+#   Axis 0: Left stick X (vx)
+#   Axis 1: Left stick Y (vy)
+#   Axis 2: Left trigger (LT) - EE pitch negative (wy-)
+#   Axis 3: Right stick X (wx) - Base yaw (vyaw) or EE roll (wx)
+#   Axis 4: Right stick Y (vz) - EE vertical (vz)
+#   Axis 5: Right trigger (RT) - EE pitch positive (wy+)
+
+joy_node:
+  deadzone: 0.1
+  autorepeat_rate: 20

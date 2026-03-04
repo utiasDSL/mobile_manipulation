@@ -1,9 +1,17 @@
 <launch>
   <arg name="joy_dev" default="$(optenv RIDGEBACK_JOY_DEVICE /dev/input/js0)"/>
   <arg name="joystick" default="true"/>
+  <arg name="controller_type" default="ps4" doc="Controller type: ps4 or xbox"/>
 
-  <group ns="bluetooth_teleop" if="$(arg joystick)">
-    <rosparam command="load" file="$(find mm_run)/config/teleop/ps4.yaml"/>
+  <group ns="teleop" if="$(arg joystick)">
+    <!-- Load appropriate config based on controller type -->
+    <group if="$(eval controller_type == 'ps4')">
+      <rosparam command="load" file="$(find mm_run)/config/teleop/ps4.yaml"/>
+    </group>
+    <group if="$(eval controller_type == 'xbox')">
+      <rosparam command="load" file="$(find mm_run)/config/teleop/xbox.yaml"/>
+    </group>
+
     <param name="joy_node/dev" value="$(arg joy_dev)"/>
 
     <node pkg="joy" type="joy_node" name="joy_node"/>

@@ -63,7 +63,7 @@ python3 mm_run/scripts/experiment.py --config $(rospack find mm_run)/config/simp
 
 ### Run Controller and Simulation Asynchronously (ROS Nodes)
 ```bash
-roslaunch mm_run run_pybullet_sim.launch config:=$(rospack find mm_run)/config/simple_experiment.yaml
+roslaunch mm_run run_pybullet_sim.launch config:=$(rospack find mm_run)/config/simple_experiment.yaml gui:=True
 ```
 
 ### Visualize Results

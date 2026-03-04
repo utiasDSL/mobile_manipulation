@@ -4,10 +4,18 @@
 <launch>
   <arg name="config"/>
   <arg name="logging_sub_folder" default="default"/>
+  <arg name="gui" default="false" doc="Enable PyBullet GUI"/>
 
   <!-- use simulation time -->
   <param name="/use_sim_time" value="true" type="bool"/>
 
   <!-- Simulation -->
-  <node pkg="mm_run" type="sim_ros.py" name="sim_ros" output="screen" required="true" args="--config $(arg config) --GUI --logging_sub_folder $(arg logging_sub_folder)"/>
+  <group if="$(arg gui)">
+    <node pkg="mm_run" type="sim_ros.py" name="sim_ros" output="screen" required="true"
+          args="--config $(arg config) --GUI --logging_sub_folder $(arg logging_sub_folder)"/>
+  </group>
+  <group unless="$(arg gui)">
+    <node pkg="mm_run" type="sim_ros.py" name="sim_ros" output="screen" required="true"
+          args="--config $(arg config) --logging_sub_folder $(arg logging_sub_folder)"/>
+  </group>
 </launch>

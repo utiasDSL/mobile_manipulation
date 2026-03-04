@@ -10,15 +10,17 @@ planner:
   # Task 1: Move mobile base to target pose (SE2: x, y, yaw)
   - name: Base Waypoint
     planner_type: WaypointPlanner
-    base_pose: [3.5, 0.4, 3.14]   # x, y, yaw in world frame
+    base_pose: [3.0, 0.4, 1pi]   # x, y, yaw in world frame
     tracking_pos_err_tol: 0.2
+    tracking_ori_err_tol: 0.2
 
   # Task 2: Move end-effector to target pose (SE3: x, y, z, roll, pitch, yaw)
   - name: EE Waypoint
     planner_type: WaypointPlanner
-    ee_pose: [1.5, 0.4, 1.0, 3.14, 0, 0]  # x, y, z, roll, pitch, yaw - EE pointing down
+    ee_pose: [1.5, 0.4, 1.0, 1pi, 0, 0]  # x, y, z, roll, pitch, yaw - EE pointing down
     hold_period: 1.0
     tracking_pos_err_tol: 0.05
+    tracking_ori_err_tol: 0.05
 
 controller:
   # Enable self-collision avoidance (prevents robot from colliding with itself)
@@ -29,36 +31,8 @@ controller:
   acados:
     name: "SimpleExperiment"
 
-  cost_params:
-    # End-effector pose cost (used for both Vec3 position and SE3 pose, world and base frames)
-    EEPose:
-      Qk: [3, 3, 3, 3, 3, 3]  # For SE3: [x, y, z, roll, pitch, yaw]. For Vec3: first 3 used
-      P: [1, 1, 1, 1, 1, 1]    # Terminal weights (same structure)
-    # End-effector velocity cost (6D: 3D linear + 3D angular for SE3 compatibility)
-    EEVel:
-      Qk: [0, 0, 0, 0, 0, 0]  # [vx, vy, vz, ωx, ωy, ωz]
-      P: [0, 0, 0, 0, 0, 0]    # Terminal weights [vx, vy, vz, ωx, ωy, ωz]
-    # Base pose cost (always SE2: [x, y, yaw])
-    # Set yaw weight (3rd element) to 0 to disable yaw tracking
-    BasePose:
-      Qk: [3, 3, 3]  # [x, y, yaw] - set yaw weight to 0 to disable yaw tracking
-      P: [1, 1, 1]    # Terminal weights [x, y, yaw]
-    # Base velocity cost (always 3D: [vx, vy, vyaw])
-    # Set vyaw weight (3rd element) to 0 to disable yaw velocity tracking
-    BaseVel:
-      Qk: [0, 0, 0]  # [vx, vy, vyaw] - set vyaw weight to 0 to disable yaw velocity tracking
-      P: [0, 0, 0]    # Terminal weights [vx, vy, vyaw]
-    # Control effort cost (always included)
-    Effort:
-      Qqa: [0, 0, 0, 0, 0, 0]
-      Qqb: [0, 0, 0]
-      Qva: [0.01, 0.01, 0.01, 0.01, 0.01, 0.01]
-      Qvb: [0.01, 0.01, 0.01]
-      Qua: [0.01, 0.01, 0.01, 0.01, 0.01, 0.01]
-      Qub: [0.01, 0.01, 0.01]
-
 simulation:
-  duration: 10
+  duration: 15
 
 include:
   - package: "mm_run"
